@@ -48,6 +48,26 @@ PAGES:
   switch-page [profileId] <index>
   list-pages [profileId]
 
+COOKIES:
+  cookies get [profileId]                          Get all cookies for profile
+  cookies save [profileId] --path <file>           Save cookies to file
+  cookies load [profileId] --path <file>           Load cookies from file
+  cookies auto start [profileId] [--interval <ms>] Start auto-saving cookies
+  cookies auto stop [profileId]                    Stop auto-saving
+  cookies auto status [profileId]                  Check auto-save status
+
+WINDOW:
+  window move [profileId] --x <x> --y <y>          Move browser window
+  window resize [profileId] --width <w> --height <h> Resize browser window
+
+MOUSE:
+  mouse move [profileId] --x <x> --y <y> [--steps <n>]  Move mouse to coordinates
+  mouse click [profileId] --x <x> --y <y> [--button left|right|middle] [--clicks <n>] [--delay <ms>]  Click at coordinates
+  mouse wheel [profileId] [--deltax <px>] [--deltay <px>]  Scroll wheel
+
+SYSTEM:
+  system display                                   Show display metrics
+
 SYSTEM:
   shutdown                                  Shutdown browser-service
   help
@@ -67,6 +87,16 @@ EXAMPLES:
   camo type "#search-input" "hello world"
   camo highlight ".post-card"
   camo viewport --width 1920 --height 1080
+  camo cookies get
+  camo cookies save --path /tmp/cookies.json
+  camo cookies load --path /tmp/cookies.json
+  camo cookies auto start --interval 5000
+  camo window move --x 100 --y 100
+  camo window resize --width 1920 --height 1080
+  camo mouse move --x 500 --y 300
+  camo mouse click --x 500 --y 300 --button left
+  camo mouse wheel --deltay -300
+  camo system display
   camo stop
 
 ENV:

@@ -66,6 +66,38 @@ Available regions:
 - `br` - Brazil (Sao Paulo)
 - `in` - India (Mumbai)
 
+### Cookie Management
+
+```bash
+camo cookies get [profileId]
+camo cookies save [profileId] --path /tmp/cookies.json
+camo cookies load [profileId] --path /tmp/cookies.json
+camo cookies auto start [profileId] --interval 5000
+camo cookies auto stop [profileId]
+camo cookies auto status [profileId]
+```
+
+### Window Control
+
+```bash
+camo window move [profileId] --x 100 --y 100
+camo window resize [profileId] --width 1920 --height 1080
+```
+
+### Mouse Control
+
+```bash
+camo mouse move [profileId] --x 500 --y 300 --steps 10
+camo mouse click [profileId] --x 500 --y 300 --button left --clicks 2
+camo mouse wheel [profileId] --deltay -300
+```
+
+### System
+
+```bash
+camo system display
+```
+
 ### Profile Management
 
 ```bash
