@@ -9,7 +9,7 @@ const notifier = getChangeNotifier();
 const elementFilter = createElementFilter();
 
 export async function handleContainerFilterCommand(args) {
-  const profileId = resolveProfileId(args);
+  const profileId = resolveProfileId(args, 1, getDefaultProfile);
   const session = await getSessionByProfile(profileId);
   if (!session) {
     throw new Error(`No active session for profile: ${profileId || 'default'}`);
@@ -48,7 +48,7 @@ export async function handleContainerFilterCommand(args) {
 }
 
 export async function handleContainerWatchCommand(args) {
-  const profileId = resolveProfileId(args);
+  const profileId = resolveProfileId(args, 1, getDefaultProfile);
   const session = await getSessionByProfile(profileId);
   if (!session) {
     throw new Error(`No active session for profile: ${profileId || 'default'}`);
@@ -104,7 +104,7 @@ export async function handleContainerWatchCommand(args) {
 }
 
 export async function handleContainerListCommand(args) {
-  const profileId = resolveProfileId(args);
+  const profileId = resolveProfileId(args, 1, getDefaultProfile);
   const session = await getSessionByProfile(profileId);
   if (!session) {
     throw new Error(`No active session for profile: ${profileId || 'default'}`);
