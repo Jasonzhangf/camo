@@ -1,7 +1,7 @@
 # Camo CLI
 
 [![CI](https://github.com/Jasonzhangf/camo/actions/workflows/ci.yml/badge.svg)](https://github.com/Jasonzhangf/camo/actions/workflows/ci.yml)
-[![npm version](https://badge.fury.io/js/@webauto%2Fcamo.svg)](https://www.npmjs.com/package/@webauto/camo)
+[![npm version](https://badge.fury.io/js/@web-auto%2Fcamo.svg)](https://www.npmjs.com/package/@web-auto/camo)
 
 A cross-platform command-line interface for Camoufox browser automation.
 
@@ -10,7 +10,7 @@ A cross-platform command-line interface for Camoufox browser automation.
 ### npm (Recommended)
 
 ```bash
-npm install -g @webauto/camo
+npm install -g @web-auto/camo
 ```
 
 ### From Source
