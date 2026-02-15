@@ -114,6 +114,11 @@ EXAMPLES:
   camo unlock myprofile
   camo stop
 
+CONTAINER FILTER & SUBSCRIPTION:
+  container filter <selector> [--profile <id>]      Filter DOM elements by CSS selector
+  container watch --selector <css>                  Watch for element changes
+  container list                                    List visible elements in viewport
+
 ENV:
   WEBAUTO_BROWSER_URL                       Default: http://127.0.0.1:7704
   WEBAUTO_REPO_ROOT                         Optional explicit webauto repo root

@@ -11,6 +11,7 @@ import { handleCookiesCommand } from './commands/cookies.mjs';
 import { handleWindowCommand } from './commands/window.mjs';
 import { handleMouseCommand } from './commands/mouse.mjs';
 import { handleSystemCommand } from './commands/system.mjs';
+import { handleContainerCommand } from './commands/container.mjs';
 import {
   handleStartCommand, handleStopCommand, handleStatusCommand,
   handleGotoCommand, handleBackCommand, handleScreenshotCommand,
@@ -112,11 +113,16 @@ async function main() {
     return;
   }
 
+  if (cmd === 'container') {
+    await handleContainerCommand(args);
+    return;
+  }
+
   const serviceCommands = new Set([
     'start', 'stop', 'close', 'status', 'list', 'goto', 'navigate', 'back', 'screenshot',
     'new-page', 'close-page', 'switch-page', 'list-pages', 'shutdown',
     'scroll', 'click', 'type', 'highlight', 'clear-highlight', 'viewport',
-    'cookies', 'window', 'mouse', 'system',
+    'cookies', 'window', 'mouse', 'system', 'container',
   ]);
 
   if (!serviceCommands.has(cmd)) {
