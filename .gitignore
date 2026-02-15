@@ -1,7 +1,28 @@
+# Dependencies
 node_modules/
-.DS_Store
-*.log
+
+# Build outputs
 dist/
 *.tgz
-.npmrc
-.beads/beads.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+
+# Temporary files
+tmp/
+temp/

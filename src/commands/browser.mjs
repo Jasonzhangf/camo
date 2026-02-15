@@ -1,12 +1,15 @@
 import fs from 'node:fs';
-import path from 'node:path';
-import { listProfiles, getDefaultProfile, hasStartScript } from '../utils/config.mjs';
-import { callAPI, ensureCamoufox, ensureBrowserService, getSessionByProfile } from '../utils/browser-service.mjs';
+import { listProfiles, getDefaultProfile } from '../utils/config.mjs';
+import { callAPI, ensureCamoufox, ensureBrowserService, getSessionByProfile, checkBrowserService } from '../utils/browser-service.mjs';
 import { resolveProfileId, ensureUrlScheme, looksLikeUrlToken, getPositionals } from '../utils/args.mjs';
+import { acquireLock, releaseLock, isLocked, getLockInfo, cleanupStaleLocks } from '../lifecycle/lock.mjs';
+import { registerSession, updateSession, getSessionInfo, unregisterSession, listRegisteredSessions, markSessionClosed, cleanupStaleSessions, recoverSession } from '../lifecycle/session-registry.mjs';
 
 export async function handleStartCommand(args) {
   ensureCamoufox();
   await ensureBrowserService();
+  cleanupStaleLocks();
+  cleanupStaleSessions();
 
   const urlIdx = args.indexOf('--url');
   const explicitUrl = urlIdx >= 0 ? args[urlIdx + 1] : undefined;
@@ -36,8 +39,16 @@ export async function handleStartCommand(args) {
     }
   }
 
+  // Check for existing session in browser service
   const existing = await getSessionByProfile(profileId);
   if (existing) {
+    // Session exists in browser service - update registry and lock
+    acquireLock(profileId, { sessionId: existing.session_id || existing.profileId });
+    registerSession(profileId, {
+      sessionId: existing.session_id || existing.profileId,
+      url: existing.current_url,
+      mode: existing.mode,
+    });
     console.log(JSON.stringify({
       ok: true,
       sessionId: existing.session_id || existing.profileId,
@@ -48,6 +59,15 @@ export async function handleStartCommand(args) {
     return;
   }
 
+  // No session in browser service - check registry for recovery
+  const registryInfo = getSessionInfo(profileId);
+  if (registryInfo && registryInfo.status === 'active') {
+    // Session was active but browser service doesn't have it
+    // This means service was restarted - clean up and start fresh
+    unregisterSession(profileId);
+    releaseLock(profileId);
+  }
+
   const headless = args.includes('--headless');
   const targetUrl = explicitUrl || implicitUrl;
   const result = await callAPI('start', {
@@ -55,6 +75,16 @@ export async function handleStartCommand(args) {
     url: targetUrl ? ensureUrlScheme(targetUrl) : undefined,
     headless,
   });
+  
+  if (result?.ok) {
+    const sessionId = result.sessionId || result.profileId || profileId;
+    acquireLock(profileId, { sessionId });
+    registerSession(profileId, {
+      sessionId,
+      url: targetUrl,
+      headless,
+    });
+  }
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -62,7 +92,10 @@ export async function handleStopCommand(args) {
   await ensureBrowserService();
   const profileId = resolveProfileId(args, 1, getDefaultProfile);
   if (!profileId) throw new Error('Usage: camo stop [profileId]');
+  
   const result = await callAPI('stop', { profileId });
+  releaseLock(profileId);
+  markSessionClosed(profileId);
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -95,7 +128,9 @@ export async function handleGotoCommand(args) {
 
   if (!profileId) throw new Error('Usage: camo goto [profileId] <url> (or set default profile first)');
   if (!url) throw new Error('Usage: camo goto [profileId] <url>');
+  
   const result = await callAPI('goto', { profileId, url: ensureUrlScheme(url) });
+  updateSession(profileId, { url: ensureUrlScheme(url), lastSeen: Date.now() });
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -358,6 +393,70 @@ export async function handleListPagesCommand(args) {
 
 export async function handleShutdownCommand() {
   await ensureBrowserService();
+  
+  // Get all active sessions
+  const status = await callAPI('getStatus', {});
+  const sessions = Array.isArray(status?.sessions) ? status.sessions : [];
+  
+  // Stop each session and cleanup registry
+  for (const session of sessions) {
+    try {
+      await callAPI('stop', { profileId: session.profileId });
+    } catch {
+      // Best effort cleanup
+    }
+    releaseLock(session.profileId);
+    markSessionClosed(session.profileId);
+  }
+  
+  // Cleanup any remaining registry entries
+  const registered = listRegisteredSessions();
+  for (const reg of registered) {
+    if (reg.status !== 'closed') {
+      markSessionClosed(reg.profileId);
+      releaseLock(reg.profileId);
+    }
+  }
+  
   const result = await callAPI('service:shutdown', {});
   console.log(JSON.stringify(result, null, 2));
+}
+
+export async function handleSessionsCommand(args) {
+  const serviceUp = await checkBrowserService();
+  const registeredSessions = listRegisteredSessions();
+  
+  let liveSessions = [];
+  if (serviceUp) {
+    try {
+      const status = await callAPI('getStatus', {});
+      liveSessions = Array.isArray(status?.sessions) ? status.sessions : [];
+    } catch {
+      // Service may have just become unavailable
+    }
+  }
+  
+  // Merge live and registered sessions
+  const liveProfileIds = new Set(liveSessions.map(s => s.profileId));
+  const merged = [...liveSessions];
+  
+  // Add registered sessions that are not in live sessions (need recovery)
+  for (const reg of registeredSessions) {
+    if (!liveProfileIds.has(reg.profileId) && reg.status === 'active') {
+      merged.push({
+        ...reg,
+        live: false,
+        needsRecovery: true,
+      });
+    }
+  }
+  
+  console.log(JSON.stringify({
+    ok: true,
+    serviceUp,
+    sessions: merged,
+    count: merged.length,
+    registered: registeredSessions.length,
+    live: liveSessions.length,
+  }, null, 2));
 }

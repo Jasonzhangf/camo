@@ -19,6 +19,10 @@ import {
   handleNewPageCommand, handleClosePageCommand, handleSwitchPageCommand,
   handleListPagesCommand, handleShutdownCommand
 } from './commands/browser.mjs';
+import {
+  handleCleanupCommand, handleForceStopCommand, handleLockCommand,
+ handleUnlockCommand, handleSessionsCommand
+} from './commands/lifecycle.mjs';
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const START_SCRIPT_REL = path.join('runtime', 'infra', 'utils', 'scripts', 'service', 'start-browser-service.mjs');
@@ -79,6 +83,32 @@ async function main() {
 
   if (cmd === 'create') {
     await handleCreateCommand(args);
+    return;
+  }
+
+  // Lifecycle commands
+  if (cmd === 'cleanup') {
+    await handleCleanupCommand(args);
+    return;
+  }
+
+  if (cmd === 'force-stop') {
+    await handleForceStopCommand(args);
+    return;
+  }
+
+  if (cmd === 'lock') {
+    await handleLockCommand(args);
+    return;
+  }
+
+  if (cmd === 'unlock') {
+    await handleUnlockCommand(args);
+    return;
+  }
+
+  if (cmd === 'sessions') {
+    await handleSessionsCommand(args);
     return;
   }
 

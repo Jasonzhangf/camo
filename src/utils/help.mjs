@@ -29,6 +29,16 @@ BROWSER CONTROL:
   status [profileId]
   list                                      Alias of status
 
+LIFECYCLE & CLEANUP:
+  sessions                                  List active browser sessions
+  cleanup [profileId]                       Cleanup session (release lock + stop)
+  cleanup all                               Cleanup all active sessions
+  cleanup locks                             Cleanup stale lock files
+  force-stop [profileId]                    Force stop session (for stuck sessions)
+  lock list                                 List active session locks
+  lock [profileId]                          Show lock info for profile
+  unlock [profileId]                        Release lock for profile
+
 NAVIGATION:
   goto [profileId] <url>                    Navigate to URL (uses default if profileId omitted)
   back [profileId]                          Navigate back (uses default)
@@ -69,7 +79,7 @@ SYSTEM:
   system display                                   Show display metrics
 
 SYSTEM:
-  shutdown                                  Shutdown browser-service
+  shutdown                                  Shutdown browser-service (stops all sessions)
   help
 
 EXAMPLES:
@@ -97,6 +107,11 @@ EXAMPLES:
   camo mouse click --x 500 --y 300 --button left
   camo mouse wheel --deltay -300
   camo system display
+  camo sessions
+  camo cleanup myprofile
+  camo force-stop myprofile
+  camo lock list
+  camo unlock myprofile
   camo stop
 
 ENV:
@@ -109,5 +124,5 @@ export function printProfilesAndHint(listProfiles, getDefaultProfile) {
   const profiles = listProfiles();
   const defaultProfile = getDefaultProfile();
   console.log(JSON.stringify({ ok: true, profiles, defaultProfile, count: profiles.length }, null, 2));
-  console.log('\\nRun `camo help` for usage.');
+  console.log('\\nRun \`camo help\` for usage.');
 }

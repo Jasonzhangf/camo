@@ -35,9 +35,14 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Test global install
+      - name: Test global install (Unix)
         run: npm install -g .
         if: matrix.os != 'windows-latest'
+
+      - name: Test global install (Windows)
+        run: npm install -g .
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
 
   publish-npm:
     needs: test
@@ -66,45 +71,3 @@ jobs:
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-  # Release automation: bump version and create tag
-  bump-version:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Configure git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Bump version
-        run: npm run version:bump
-
-      - name: Get new version
-        id: version
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Commit and tag
-        run: |
-          git add package.json
-          git commit -m "chore: bump version to ${{ steps.version.outputs.version }}" || echo "No changes to commit"
-          git tag "v${{ steps.version.outputs.version }}"
-          git push --follow-tags
-
-    outputs:
-      version: ${{ steps.version.outputs.version }}
