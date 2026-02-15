@@ -1,6 +1,6 @@
 {
-  "name": "camo",
-  "version": "1.0.0",
+  "name": "@webauto/camo",
+  "version": "0.1.0001",
   "description": "Camoufox Browser CLI - Cross-platform browser automation",
   "type": "module",
   "bin": {
@@ -9,11 +9,18 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
+    "version:bump": "node scripts/bump-version.mjs",
     "install:global": "npm run build && npm install -g .",
-    "uninstall:global": "npm uninstall -g camo",
+    "uninstall:global": "npm uninstall -g @webauto/camo",
     "build:global": "npm run build && npm test && npm install -g ."
   },
-  "keywords": ["browser", "automation", "camoufox", "cli", "playwright"],
+  "keywords": [
+    "browser",
+    "automation",
+    "camoufox",
+    "cli",
+    "playwright"
+  ],
   "license": "MIT",
   "engines": {
     "node": ">=20.0.0"
