@@ -5,6 +5,8 @@ import { listProfiles, getDefaultProfile, loadConfig, hasStartScript, setRepoRoo
 import { ensureCamoufox, ensureBrowserService } from './utils/browser-service.mjs';
 import { printHelp, printProfilesAndHint } from './utils/help.mjs';
 import { handleProfileCommand } from './commands/profile.mjs';
+import { handleInitCommand } from './commands/init.mjs';
+import { handleCreateCommand } from './commands/create.mjs';
 import {
   handleStartCommand, handleStopCommand, handleStatusCommand,
   handleGotoCommand, handleBackCommand, handleScreenshotCommand,
@@ -33,14 +35,6 @@ async function handleConfigCommand(args) {
   }
   setRepoRoot(resolved);
   console.log(JSON.stringify({ ok: true, repoRoot: resolved }, null, 2));
-}
-
-async function handleInitCommand() {
-  ensureCamoufox();
-  await ensureBrowserService();
-  const profiles = listProfiles();
-  const defaultProfile = getDefaultProfile();
-  console.log(JSON.stringify({ ok: true, profiles, defaultProfile, count: profiles.length }, null, 2));
 }
 
 async function main() {
@@ -75,7 +69,12 @@ async function main() {
   }
 
   if (cmd === 'init') {
-    await handleInitCommand();
+    await handleInitCommand(args);
+    return;
+  }
+
+  if (cmd === 'create') {
+    await handleCreateCommand(args);
     return;
   }
 

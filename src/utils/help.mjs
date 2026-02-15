@@ -12,6 +12,13 @@ PROFILE MANAGEMENT:
   profile delete <profileId>                Delete a profile
   profile default [profileId]               Get or set default profile
 
+INITIALIZATION:
+  init                                      Ensure camoufox + browser-service
+  init geoip                                Download GeoIP database
+  init list                                 List available OS and region options
+  create fingerprint --os <os> --region <r> Create browser fingerprint
+  create profile <profileId>                Create a new profile
+
 CONFIG:
   config repo-root [path]                   Get or set persisted webauto repo root
 
@@ -47,6 +54,10 @@ SYSTEM:
 
 EXAMPLES:
   camo init
+  camo init geoip
+  camo init list
+  camo create fingerprint --os mac --region us
+  camo create fingerprint --os windows --region uk
   camo profile create myprofile
   camo profile default myprofile
   camo start --url https://example.com

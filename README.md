@@ -19,8 +19,52 @@ npm install -g camo
 ## Usage
 
 ```bash
+camo init geoip                            # Download GeoIP database
+camo init list                             # List available OS/regions
+camo create fingerprint --os mac --region us
 camo <command> [options]
 ```
+
+### Initialization
+
+```bash
+camo init                              # Ensure camoufox + browser-service
+camo init geoip                        # Download GeoIP database
+camo init list                         # List available OS and regions
+```
+
+### Fingerprint Creation
+
+Create browser fingerprints with specific OS and region settings:
+
+```bash
+camo create fingerprint --os mac --region us
+camo create fingerprint --os windows --region uk
+camo create fingerprint --os linux --region sg
+camo create fingerprint --os mac-m1 --region jp
+```
+
+Available OS options:
+- `mac` (default) - macOS (auto architecture)
+- `mac-m1` - macOS with Apple Silicon
+- `mac-intel` - macOS with Intel
+- `windows` - Windows 11
+- `windows-10` - Windows 10
+- `linux` - Ubuntu 22.04
+
+Available regions:
+- `us` (default) - United States (New York)
+- `us-west` - United States (Los Angeles)
+- `uk` - United Kingdom (London)
+- `de` - Germany (Berlin)
+- `fr` - France (Paris)
+- `jp` - Japan (Tokyo)
+- `sg` - Singapore
+- `au` - Australia (Sydney)
+- `hk` - Hong Kong
+- `tw` - Taiwan (Taipei)
+- `br` - Brazil (Sao Paulo)
+- `in` - India (Mumbai)
 
 ### Profile Management
 
@@ -71,6 +115,8 @@ camo close-page 0
 
 - Config file: `~/.webauto/camo-cli.json`
 - Profiles directory: `~/.webauto/profiles/`
+- Fingerprints directory: `~/.webauto/fingerprints/`
+- GeoIP database: `~/.webauto/geoip/GeoLite2-City.mmdb`
 
 ### Environment Variables
 
