@@ -7,6 +7,10 @@ import { printHelp, printProfilesAndHint } from './utils/help.mjs';
 import { handleProfileCommand } from './commands/profile.mjs';
 import { handleInitCommand } from './commands/init.mjs';
 import { handleCreateCommand } from './commands/create.mjs';
+import { handleCookiesCommand } from './commands/cookies.mjs';
+import { handleWindowCommand } from './commands/window.mjs';
+import { handleMouseCommand } from './commands/mouse.mjs';
+import { handleSystemCommand } from './commands/system.mjs';
 import {
   handleStartCommand, handleStopCommand, handleStatusCommand,
   handleGotoCommand, handleBackCommand, handleScreenshotCommand,
@@ -82,6 +86,7 @@ async function main() {
     'start', 'stop', 'close', 'status', 'list', 'goto', 'navigate', 'back', 'screenshot',
     'new-page', 'close-page', 'switch-page', 'list-pages', 'shutdown',
     'scroll', 'click', 'type', 'highlight', 'clear-highlight', 'viewport',
+    'cookies', 'window', 'mouse', 'system',
   ]);
 
   if (!serviceCommands.has(cmd)) {
@@ -142,6 +147,18 @@ async function main() {
       break;
     case 'shutdown':
       await handleShutdownCommand();
+      break;
+    case 'cookies':
+      await handleCookiesCommand(args);
+      break;
+    case 'window':
+      await handleWindowCommand(args);
+      break;
+    case 'mouse':
+      await handleMouseCommand(args);
+      break;
+    case 'system':
+      await handleSystemCommand(args);
       break;
   }
 }
