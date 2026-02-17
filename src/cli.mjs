@@ -2,7 +2,6 @@
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { listProfiles, getDefaultProfile, loadConfig, hasStartScript, setRepoRoot } from './utils/config.mjs';
-import { ensureCamoufox, ensureBrowserService } from './utils/browser-service.mjs';
 import { printHelp, printProfilesAndHint } from './utils/help.mjs';
 import { handleProfileCommand } from './commands/profile.mjs';
 import { handleInitCommand } from './commands/init.mjs';
@@ -24,7 +23,7 @@ import {
 } from './commands/browser.mjs';
 import {
   handleCleanupCommand, handleForceStopCommand, handleLockCommand,
- handleUnlockCommand, handleSessionsCommand
+ handleUnlockCommand, handleSessionsCommand, handleInstancesCommand
 } from './commands/lifecycle.mjs';
 import { handleSessionWatchdogCommand } from './lifecycle/session-watchdog.mjs';
 import { safeAppendProgressEvent } from './events/progress-log.mjs';
@@ -55,6 +54,13 @@ function inferProfileId(cmd, args) {
     'new-page', 'close-page', 'switch-page', 'list-pages',
     'cleanup', 'force-stop', 'lock', 'unlock', 'sessions',
   ].includes(cmd)) {
+    if ((cmd === 'stop' || cmd === 'close') && (args.includes('--id') || args.includes('--alias'))) {
+      return null;
+    }
+    const first = positionals[0] || null;
+    if ((cmd === 'stop' || cmd === 'close') && (first === 'all' || first === 'idle')) {
+      return null;
+    }
     return positionals[0] || null;
   }
 
@@ -209,6 +215,11 @@ async function main() {
 
   if (cmd === 'sessions') {
     await runTrackedCommand(cmd, args, () => handleSessionsCommand(args));
+    return;
+  }
+
+  if (cmd === 'instances') {
+    await runTrackedCommand(cmd, args, () => handleInstancesCommand(args));
     return;
   }
 

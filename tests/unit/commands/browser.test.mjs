@@ -67,6 +67,129 @@ describe('browser command', () => {
     assert.strictEqual(getSessionInfo(TEST_PROFILE), null);
     assert.strictEqual(fs.existsSync(getWatchdogFile(TEST_PROFILE)), false);
   });
+
+  it('supports stop by alias', async () => {
+    const profileId = `${TEST_PROFILE}-alias`;
+    registerSession(profileId, { sessionId: 'sid-alias', alias: 'alias-stop-test' });
+    acquireLock(profileId, { sessionId: 'sid-alias' });
+
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) return { ok: true, status: 200 };
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        if (body.action === 'stop') {
+          return { ok: true, status: 200, json: async () => ({ ok: true, profileId: body.args.profileId }) };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    await handleStopCommand(['stop', '--alias', 'alias-stop-test']);
+    assert.strictEqual(getSessionInfo(profileId), null);
+    assert.strictEqual(isLocked(profileId), false);
+    unregisterSession(profileId);
+    releaseLock(profileId);
+  });
+
+  it('supports close all', async () => {
+    const p1 = `${TEST_PROFILE}-all-1`;
+    const p2 = `${TEST_PROFILE}-all-2`;
+    registerSession(p1, { sessionId: 'sid-1' });
+    registerSession(p2, { sessionId: 'sid-2' });
+    acquireLock(p1, { sessionId: 'sid-1' });
+    acquireLock(p2, { sessionId: 'sid-2' });
+
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) return { ok: true, status: 200 };
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        if (body.action === 'getStatus') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ sessions: [{ profileId: p1 }, { profileId: p2 }] }),
+          };
+        }
+        if (body.action === 'stop') {
+          return { ok: true, status: 200, json: async () => ({ ok: true }) };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    const logs = [];
+    const originalConsoleLog = console.log;
+    console.log = (value) => logs.push(value);
+    try {
+      await handleStopCommand(['close', 'all']);
+    } finally {
+      console.log = originalConsoleLog;
+    }
+
+    const payload = JSON.parse(String(logs.at(-1) || '{}'));
+    assert.strictEqual(payload.ok, true);
+    assert.strictEqual(payload.mode, 'all');
+    assert.strictEqual(getSessionInfo(p1), null);
+    assert.strictEqual(getSessionInfo(p2), null);
+    assert.strictEqual(isLocked(p1), false);
+    assert.strictEqual(isLocked(p2), false);
+    unregisterSession(p1);
+    unregisterSession(p2);
+    releaseLock(p1);
+    releaseLock(p2);
+  });
+
+  it('supports stop idle', async () => {
+    const idleProfile = `${TEST_PROFILE}-idle`;
+    const activeProfile = `${TEST_PROFILE}-active`;
+    registerSession(idleProfile, {
+      sessionId: 'sid-idle',
+      headless: true,
+      idleTimeoutMs: 500,
+      lastActivityAt: Date.now() - 10_000,
+      status: 'active',
+    });
+    registerSession(activeProfile, {
+      sessionId: 'sid-active',
+      headless: true,
+      idleTimeoutMs: 3600_000,
+      lastActivityAt: Date.now(),
+      status: 'active',
+    });
+    acquireLock(idleProfile, { sessionId: 'sid-idle' });
+    acquireLock(activeProfile, { sessionId: 'sid-active' });
+
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) return { ok: true, status: 200 };
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        if (body.action === 'stop') {
+          return { ok: true, status: 200, json: async () => ({ ok: true, profileId: body.args.profileId }) };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    const logs = [];
+    const originalConsoleLog = console.log;
+    console.log = (value) => logs.push(value);
+    try {
+      await handleStopCommand(['stop', 'idle']);
+    } finally {
+      console.log = originalConsoleLog;
+    }
+
+    const payload = JSON.parse(String(logs.at(-1) || '{}'));
+    assert.strictEqual(payload.ok, true);
+    assert.strictEqual(payload.mode, 'idle');
+    assert.strictEqual(payload.targetCount, 1);
+    assert.strictEqual(getSessionInfo(idleProfile), null);
+    assert.notStrictEqual(getSessionInfo(activeProfile), null);
+    unregisterSession(idleProfile);
+    unregisterSession(activeProfile);
+    releaseLock(idleProfile);
+    releaseLock(activeProfile);
+  });
 });
 
 describe('browser start window sizing helpers', () => {

@@ -5,12 +5,80 @@
 import { getDefaultProfile } from '../utils/config.mjs';
 import { callAPI, ensureBrowserService, checkBrowserService } from '../utils/browser-service.mjs';
 import { resolveProfileId } from '../utils/args.mjs';
-import { acquireLock, getLockInfo, releaseLock, isLocked, cleanupStaleLocks, listActiveLocks } from '../lifecycle/lock.mjs';
+import { acquireLock, getLockInfo, releaseLock, cleanupStaleLocks, listActiveLocks } from '../lifecycle/lock.mjs';
 import { 
   getSessionInfo, unregisterSession, markSessionClosed, cleanupStaleSessions,
-  listRegisteredSessions, registerSession, updateSession
+  listRegisteredSessions, updateSession
 } from '../lifecycle/session-registry.mjs';
 import { stopAllSessionWatchdogs, stopSessionWatchdog } from '../lifecycle/session-watchdog.mjs';
+
+const DEFAULT_HEADLESS_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+
+function computeIdleState(session, now = Date.now()) {
+  const headless = session?.headless === true;
+  const timeoutMs = headless
+    ? (Number.isFinite(Number(session?.idleTimeoutMs)) ? Math.max(0, Number(session.idleTimeoutMs)) : DEFAULT_HEADLESS_IDLE_TIMEOUT_MS)
+    : 0;
+  const lastAt = Number(session?.lastActivityAt || session?.lastSeen || session?.startTime || now);
+  const idleMs = Math.max(0, now - (Number.isFinite(lastAt) ? lastAt : now));
+  const idle = headless && timeoutMs > 0 && idleMs >= timeoutMs;
+  return { headless, timeoutMs, idleMs, idle };
+}
+
+function buildMergedSessionRows(liveSessions, registeredSessions) {
+  const now = Date.now();
+  const regMap = new Map(registeredSessions.map((item) => [item.profileId, item]));
+  const rows = [];
+  const liveMap = new Map(liveSessions.map((item) => [item.profileId, item]));
+
+  for (const live of liveSessions) {
+    const reg = regMap.get(live.profileId);
+    const idle = computeIdleState(reg || {}, now);
+    rows.push({
+      profileId: live.profileId,
+      sessionId: live.session_id || live.profileId,
+      instanceId: reg?.instanceId || live.session_id || live.profileId,
+      alias: reg?.alias || null,
+      url: live.current_url,
+      mode: live.mode,
+      headless: idle.headless,
+      idleTimeoutMs: idle.timeoutMs,
+      idleMs: idle.idleMs,
+      idle: idle.idle,
+      live: true,
+      registered: !!reg,
+      registryStatus: reg?.status,
+      lastSeen: reg?.lastSeen || null,
+      lastActivityAt: reg?.lastActivityAt || null,
+    });
+  }
+
+  for (const reg of registeredSessions) {
+    if (liveMap.has(reg.profileId)) continue;
+    if (reg.status === 'closed') continue;
+    const idle = computeIdleState(reg, now);
+    rows.push({
+      profileId: reg.profileId,
+      sessionId: reg.sessionId || reg.profileId,
+      instanceId: reg.instanceId || reg.sessionId || reg.profileId,
+      alias: reg.alias || null,
+      url: reg.url || null,
+      mode: reg.mode || null,
+      headless: idle.headless,
+      idleTimeoutMs: idle.timeoutMs,
+      idleMs: idle.idleMs,
+      idle: idle.idle,
+      live: false,
+      orphaned: true,
+      needsRecovery: reg.status === 'active',
+      registered: true,
+      registryStatus: reg.status,
+      lastSeen: reg.lastSeen || null,
+      lastActivityAt: reg.lastActivityAt || null,
+    });
+  }
+  return rows;
+}
 
 export async function handleCleanupCommand(args) {
   const sub = args[1];
@@ -158,38 +226,7 @@ export async function handleSessionsCommand(args) {
     } catch {}
   }
   
-  // Build a map of live sessions
-  const liveMap = new Map(liveSessions.map(s => [s.profileId, s]));
-  
-  // Merge live and registered sessions
-  const merged = [];
-  
-  // Add all live sessions
-  for (const live of liveSessions) {
-    const reg = getSessionInfo(live.profileId);
-    merged.push({
-      profileId: live.profileId,
-      sessionId: live.session_id || live.profileId,
-      url: live.current_url,
-      mode: live.mode,
-      live: true,
-      registered: !!reg,
-      registryStatus: reg?.status,
-      lastSeen: reg?.lastSeen,
-    });
-  }
-  
-  // Add registered sessions that are not live (orphaned)
-  for (const reg of registeredSessions) {
-    if (!liveMap.has(reg.profileId) && reg.status !== 'closed') {
-      merged.push({
-        ...reg,
-        live: false,
-        orphaned: true,
-        needsRecovery: reg.status === 'active',
-      });
-    }
-  }
+  const merged = buildMergedSessionRows(liveSessions, registeredSessions);
   
   console.log(JSON.stringify({
     ok: true,
@@ -200,6 +237,10 @@ export async function handleSessionsCommand(args) {
     live: liveSessions.length,
     orphaned: merged.filter(s => s.orphaned).length,
   }, null, 2));
+}
+
+export async function handleInstancesCommand(args) {
+  await handleSessionsCommand(args);
 }
 
 export async function handleRecoverCommand(args) {

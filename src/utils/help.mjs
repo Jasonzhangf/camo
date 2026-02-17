@@ -24,12 +24,17 @@ CONFIG:
 
 BROWSER CONTROL:
   init                                      Ensure camoufox + ensure browser-service daemon
-  start [profileId] [--url <url>] [--headless] [--width <w> --height <h>]
+  start [profileId] [--url <url>] [--headless] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]
   stop [profileId]
+  stop --id <instanceId>                    Stop by instance id
+  stop --alias <alias>                      Stop by alias
+  stop idle                                 Stop all idle sessions
+  stop all                                  Stop all sessions
   status [profileId]
   list                                      Alias of status
 
 LIFECYCLE & CLEANUP:
+  instances                                 List global camoufox instances (live + registered + idle state)
   sessions                                  List active browser sessions
   cleanup [profileId]                       Cleanup session (release lock + stop)
   cleanup all                               Cleanup all active sessions
@@ -90,8 +95,13 @@ EXAMPLES:
   camo create fingerprint --os windows --region uk
   camo profile create myprofile
   camo profile default myprofile
-  camo start --url https://example.com
+  camo start --url https://example.com --alias main
+  camo start worker-1 --headless --alias shard1 --idle-timeout 45m
   camo start myprofile --width 1920 --height 1020
+  camo stop --id inst_xxxxxxxx
+  camo stop --alias shard1
+  camo stop idle
+  camo close all
   camo goto https://www.xiaohongshu.com
   camo scroll --down --amount 500
   camo click "#search-input"
@@ -109,6 +119,7 @@ EXAMPLES:
   camo mouse wheel --deltay -300
   camo system display
   camo sessions
+  camo instances
   camo cleanup myprofile
   camo force-stop myprofile
   camo lock list

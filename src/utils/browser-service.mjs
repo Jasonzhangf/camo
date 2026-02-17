@@ -4,6 +4,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { BROWSER_SERVICE_URL, loadConfig, setRepoRoot } from './config.mjs';
+import { touchSessionActivity } from '../lifecycle/session-registry.mjs';
+
+function shouldTrackSessionActivity(action, payload) {
+  const profileId = String(payload?.profileId || '').trim();
+  if (!profileId) return false;
+  if (action === 'getStatus' || action === 'service:shutdown' || action === 'stop') return false;
+  return true;
+}
 
 export async function callAPI(action, payload = {}) {
   const r = await fetch(`${BROWSER_SERVICE_URL}/command`, {
@@ -21,6 +29,12 @@ export async function callAPI(action, payload = {}) {
   }
 
   if (!r.ok) throw new Error(body?.error || `HTTP ${r.status}`);
+  if (shouldTrackSessionActivity(action, payload)) {
+    touchSessionActivity(payload.profileId, {
+      lastAction: String(action || '').trim() || null,
+      lastActionAt: Date.now(),
+    });
+  }
   return body;
 }
 

@@ -15,6 +15,9 @@ import {
   cleanupStaleSessions,
   recoverSession,
   getSessionFile,
+  resolveSessionTarget,
+  isSessionAliasTaken,
+  touchSessionActivity,
 } from '../../../src/lifecycle/session-registry.mjs';
 
 const TEST_PREFIX = 'test-sreg-' + Date.now();
@@ -76,6 +79,29 @@ describe('session registry', () => {
     unregisterSession(id);
   });
 
+  it('should resolve session target by profile/instanceId/alias', () => {
+    const id = TEST_PREFIX + '-6b';
+    const created = registerSession(id, { alias: 'alias-6b' });
+    const byProfile = resolveSessionTarget(id);
+    assert.strictEqual(byProfile.profileId, id);
+    assert.strictEqual(byProfile.reason, 'profile');
+    const byInstance = resolveSessionTarget(created.instanceId);
+    assert.strictEqual(byInstance.profileId, id);
+    assert.strictEqual(byInstance.reason, 'instanceId');
+    const byAlias = resolveSessionTarget('alias-6b');
+    assert.strictEqual(byAlias.profileId, id);
+    assert.strictEqual(byAlias.reason, 'alias');
+    unregisterSession(id);
+  });
+
+  it('should report alias usage for active sessions', () => {
+    const id = TEST_PREFIX + '-6c';
+    registerSession(id, { alias: 'alias-6c' });
+    assert.strictEqual(isSessionAliasTaken('alias-6c'), true);
+    assert.strictEqual(isSessionAliasTaken('alias-6c', id), false);
+    unregisterSession(id);
+  });
+
   it('should mark reconnecting and active', () => {
     const id = TEST_PREFIX + '-7';
     registerSession(id);
@@ -84,6 +110,18 @@ describe('session registry', () => {
     const act = markSessionActive(id, { sessionId: 'sid' });
     assert.strictEqual(act.status, 'active');
     assert.strictEqual(act.sessionId, 'sid');
+    unregisterSession(id);
+  });
+
+  it('should touch existing session activity without creating new session', () => {
+    const id = TEST_PREFIX + '-7b';
+    const missing = touchSessionActivity(id, { lastAction: 'noop' });
+    assert.strictEqual(missing, null);
+    registerSession(id, { alias: 'alias-touch' });
+    const before = getSessionInfo(id).lastActivityAt;
+    const touched = touchSessionActivity(id, { lastAction: 'click' });
+    assert.strictEqual(touched.lastAction, 'click');
+    assert.ok(Number(touched.lastActivityAt) >= Number(before));
     unregisterSession(id);
   });
 

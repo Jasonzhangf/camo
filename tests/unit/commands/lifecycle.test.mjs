@@ -31,6 +31,7 @@ describe('lifecycle command', () => {
       assert.strictEqual(typeof lifecycle.handleLockCommand, 'function');
       assert.strictEqual(typeof lifecycle.handleUnlockCommand, 'function');
       assert.strictEqual(typeof lifecycle.handleSessionsCommand, 'function');
+      assert.strictEqual(typeof lifecycle.handleInstancesCommand, 'function');
     });
   });
 

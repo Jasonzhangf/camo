@@ -7,14 +7,25 @@ import {
 } from '../utils/config.mjs';
 import { callAPI, ensureCamoufox, ensureBrowserService, getSessionByProfile, checkBrowserService } from '../utils/browser-service.mjs';
 import { resolveProfileId, ensureUrlScheme, looksLikeUrlToken, getPositionals } from '../utils/args.mjs';
-import { acquireLock, releaseLock, isLocked, getLockInfo, cleanupStaleLocks } from '../lifecycle/lock.mjs';
-import { registerSession, updateSession, getSessionInfo, unregisterSession, listRegisteredSessions, markSessionClosed, cleanupStaleSessions, recoverSession } from '../lifecycle/session-registry.mjs';
+import { acquireLock, releaseLock, cleanupStaleLocks } from '../lifecycle/lock.mjs';
+import {
+  registerSession,
+  updateSession,
+  getSessionInfo,
+  unregisterSession,
+  listRegisteredSessions,
+  markSessionClosed,
+  cleanupStaleSessions,
+  resolveSessionTarget,
+  isSessionAliasTaken,
+} from '../lifecycle/session-registry.mjs';
 import { startSessionWatchdog, stopAllSessionWatchdogs, stopSessionWatchdog } from '../lifecycle/session-watchdog.mjs';
 
 const START_WINDOW_MIN_WIDTH = 960;
 const START_WINDOW_MIN_HEIGHT = 700;
 const START_WINDOW_MAX_RESERVE = 240;
 const START_WINDOW_DEFAULT_RESERVE = 72;
+const DEFAULT_HEADLESS_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -27,6 +38,88 @@ function parseNumber(value, fallback = 0) {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+function readFlagValue(args, names) {
+  for (let i = 0; i < args.length; i += 1) {
+    if (!names.includes(args[i])) continue;
+    const value = args[i + 1];
+    if (!value || String(value).startsWith('-')) return null;
+    return value;
+  }
+  return null;
+}
+
+function parseDurationMs(raw, fallbackMs) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return fallbackMs;
+  const text = String(raw).trim().toLowerCase();
+  if (text === '0' || text === 'off' || text === 'none' || text === 'disable' || text === 'disabled') return 0;
+  const matched = text.match(/^(\d+(?:\.\d+)?)(ms|s|m|h)?$/);
+  if (!matched) {
+    throw new Error('Invalid --idle-timeout. Use forms like 30m, 1800s, 5000ms, 1h, 0');
+  }
+  const value = Number(matched[1]);
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error('Invalid --idle-timeout value');
+  }
+  const unit = matched[2] || 'm';
+  const factor = unit === 'h' ? 3600000 : unit === 'm' ? 60000 : unit === 's' ? 1000 : 1;
+  return Math.floor(value * factor);
+}
+
+function validateAlias(alias) {
+  const text = String(alias || '').trim();
+  if (!text) return null;
+  if (!/^[a-zA-Z0-9._-]+$/.test(text)) {
+    throw new Error('Invalid --alias. Use only letters, numbers, dot, underscore, dash.');
+  }
+  return text.slice(0, 64);
+}
+
+function formatDurationMs(ms) {
+  const value = Number(ms);
+  if (!Number.isFinite(value) || value <= 0) return 'disabled';
+  if (value % 3600000 === 0) return `${value / 3600000}h`;
+  if (value % 60000 === 0) return `${value / 60000}m`;
+  if (value % 1000 === 0) return `${value / 1000}s`;
+  return `${value}ms`;
+}
+
+function computeIdleState(session, now = Date.now()) {
+  const headless = session?.headless === true;
+  const timeoutMs = headless
+    ? (Number.isFinite(Number(session?.idleTimeoutMs)) ? Math.max(0, Number(session.idleTimeoutMs)) : DEFAULT_HEADLESS_IDLE_TIMEOUT_MS)
+    : 0;
+  const lastAt = Number(session?.lastActivityAt || session?.lastSeen || session?.startTime || now);
+  const idleMs = Math.max(0, now - (Number.isFinite(lastAt) ? lastAt : now));
+  const idle = headless && timeoutMs > 0 && idleMs >= timeoutMs;
+  return { headless, timeoutMs, idleMs, idle };
+}
+
+async function stopAndCleanupProfile(profileId, options = {}) {
+  const id = String(profileId || '').trim();
+  if (!id) return { profileId: id, ok: false, error: 'profile_required' };
+  const force = options.force === true;
+  const serviceUp = options.serviceUp === true;
+  let result = null;
+  let error = null;
+  if (serviceUp) {
+    try {
+      result = await callAPI('stop', force ? { profileId: id, force: true } : { profileId: id });
+    } catch (err) {
+      error = err;
+    }
+  }
+  stopSessionWatchdog(id);
+  releaseLock(id);
+  markSessionClosed(id);
+  return {
+    profileId: id,
+    ok: !error,
+    serviceUp,
+    result,
+    error: error ? (error.message || String(error)) : null,
+  };
 }
 
 export function computeTargetViewportFromWindowMetrics(measured) {
@@ -154,8 +247,11 @@ export async function handleStartCommand(args) {
   const explicitHeight = heightIdx >= 0 ? parseNumber(args[heightIdx + 1], NaN) : NaN;
   const hasExplicitWidth = Number.isFinite(explicitWidth);
   const hasExplicitHeight = Number.isFinite(explicitHeight);
+  const alias = validateAlias(readFlagValue(args, ['--alias']));
+  const idleTimeoutRaw = readFlagValue(args, ['--idle-timeout']);
+  const parsedIdleTimeoutMs = parseDurationMs(idleTimeoutRaw, DEFAULT_HEADLESS_IDLE_TIMEOUT_MS);
   if (hasExplicitWidth !== hasExplicitHeight) {
-    throw new Error('Usage: camo start [profileId] [--url <url>] [--headless] [--width <w> --height <h>]');
+    throw new Error('Usage: camo start [profileId] [--url <url>] [--headless] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]');
   }
   if ((hasExplicitWidth && explicitWidth < START_WINDOW_MIN_WIDTH) || (hasExplicitHeight && explicitHeight < START_WINDOW_MIN_HEIGHT)) {
     throw new Error(`Window size too small. Minimum is ${START_WINDOW_MIN_WIDTH}x${START_WINDOW_MIN_HEIGHT}`);
@@ -169,6 +265,7 @@ export async function handleStartCommand(args) {
     const arg = args[i];
     if (arg === '--url') { i++; continue; }
     if (arg === '--width' || arg === '--height') { i++; continue; }
+    if (arg === '--alias' || arg === '--idle-timeout') { i++; continue; }
     if (arg === '--headless') continue;
     if (arg.startsWith('--')) continue;
 
@@ -187,23 +284,45 @@ export async function handleStartCommand(args) {
       throw new Error('No default profile set. Run: camo profile default <profileId>');
     }
   }
+  if (alias && isSessionAliasTaken(alias, profileId)) {
+    throw new Error(`Alias is already in use: ${alias}`);
+  }
 
   // Check for existing session in browser service
   const existing = await getSessionByProfile(profileId);
   if (existing) {
     // Session exists in browser service - update registry and lock
     acquireLock(profileId, { sessionId: existing.session_id || existing.profileId });
-    registerSession(profileId, {
-      sessionId: existing.session_id || existing.profileId,
-      url: existing.current_url,
-      mode: existing.mode,
-    });
+    const saved = getSessionInfo(profileId);
+    const record = saved
+      ? updateSession(profileId, {
+        sessionId: existing.session_id || existing.profileId,
+        url: existing.current_url,
+        mode: existing.mode,
+        alias: alias || saved.alias || null,
+      })
+      : registerSession(profileId, {
+        sessionId: existing.session_id || existing.profileId,
+        url: existing.current_url,
+        mode: existing.mode,
+        alias: alias || null,
+      });
+    const idleState = computeIdleState(record);
     console.log(JSON.stringify({
       ok: true,
       sessionId: existing.session_id || existing.profileId,
+      instanceId: record.instanceId,
       profileId,
       message: 'Session already running',
       url: existing.current_url,
+      alias: record.alias || null,
+      idleTimeoutMs: idleState.timeoutMs,
+      idleTimeout: formatDurationMs(idleState.timeoutMs),
+      closeHint: {
+        byProfile: `camo stop ${profileId}`,
+        byId: `camo stop --id ${record.instanceId}`,
+        byAlias: record.alias ? `camo stop --alias ${record.alias}` : null,
+      },
     }, null, 2));
     startSessionWatchdog(profileId);
     return;
@@ -219,6 +338,7 @@ export async function handleStartCommand(args) {
   }
 
   const headless = args.includes('--headless');
+  const idleTimeoutMs = headless ? parsedIdleTimeoutMs : 0;
   const targetUrl = explicitUrl || implicitUrl;
   const result = await callAPI('start', {
     profileId,
@@ -229,12 +349,28 @@ export async function handleStartCommand(args) {
   if (result?.ok) {
     const sessionId = result.sessionId || result.profileId || profileId;
     acquireLock(profileId, { sessionId });
-    registerSession(profileId, {
+    const record = registerSession(profileId, {
       sessionId,
       url: targetUrl,
       headless,
+      alias,
+      idleTimeoutMs,
+      lastAction: 'start',
     });
     startSessionWatchdog(profileId);
+    result.instanceId = record.instanceId;
+    result.alias = record.alias || null;
+    result.idleTimeoutMs = idleTimeoutMs;
+    result.idleTimeout = formatDurationMs(idleTimeoutMs);
+    result.closeHint = {
+      byProfile: `camo stop ${profileId}`,
+      byId: `camo stop --id ${record.instanceId}`,
+      byAlias: record.alias ? `camo stop --alias ${record.alias}` : null,
+      all: 'camo close all',
+    };
+    result.message = headless
+      ? `Started headless session. Idle timeout: ${formatDurationMs(idleTimeoutMs)}`
+      : 'Started session. Remember to stop it when finished.';
 
     if (!headless) {
       let windowTarget = null;
@@ -286,24 +422,115 @@ export async function handleStartCommand(args) {
 }
 
 export async function handleStopCommand(args) {
-  await ensureBrowserService();
-  const profileId = resolveProfileId(args, 1, getDefaultProfile);
-  if (!profileId) throw new Error('Usage: camo stop [profileId]');
+  const rawTarget = String(args[1] || '').trim();
+  const target = rawTarget.toLowerCase();
+  const idTarget = readFlagValue(args, ['--id']);
+  const aliasTarget = readFlagValue(args, ['--alias']);
+  const stopIdle = target === 'idle' || args.includes('--idle');
+  const stopAll = target === 'all';
+  const serviceUp = await checkBrowserService();
 
-  let result = null;
-  let stopError = null;
-  try {
-    result = await callAPI('stop', { profileId });
-  } catch (err) {
-    stopError = err;
-  } finally {
-    stopSessionWatchdog(profileId);
-    releaseLock(profileId);
-    markSessionClosed(profileId);
+  if (stopAll) {
+    let liveSessions = [];
+    if (serviceUp) {
+      try {
+        const status = await callAPI('getStatus', {});
+        liveSessions = Array.isArray(status?.sessions) ? status.sessions : [];
+      } catch {
+        // Ignore and fallback to local registry.
+      }
+    }
+    const profileSet = new Set(liveSessions.map((item) => String(item?.profileId || '').trim()).filter(Boolean));
+    for (const session of listRegisteredSessions()) {
+      if (String(session?.status || '').trim() === 'closed') continue;
+      const profileId = String(session?.profileId || '').trim();
+      if (profileId) profileSet.add(profileId);
+    }
+
+    const results = [];
+    for (const profileId of profileSet) {
+      // eslint-disable-next-line no-await-in-loop
+      results.push(await stopAndCleanupProfile(profileId, { serviceUp }));
+    }
+    console.log(JSON.stringify({
+      ok: true,
+      mode: 'all',
+      serviceUp,
+      closed: results.filter((item) => item.ok).length,
+      failed: results.filter((item) => !item.ok).length,
+      results,
+    }, null, 2));
+    return;
   }
 
-  if (stopError) throw stopError;
-  console.log(JSON.stringify(result, null, 2));
+  if (stopIdle) {
+    const now = Date.now();
+    const idleTargets = listRegisteredSessions()
+      .filter((item) => String(item?.status || '').trim() === 'active')
+      .map((item) => ({ session: item, idle: computeIdleState(item, now) }))
+      .filter((item) => item.idle.idle)
+      .map((item) => item.session.profileId);
+    const results = [];
+    for (const profileId of idleTargets) {
+      // eslint-disable-next-line no-await-in-loop
+      results.push(await stopAndCleanupProfile(profileId, { serviceUp }));
+    }
+    console.log(JSON.stringify({
+      ok: true,
+      mode: 'idle',
+      serviceUp,
+      targetCount: idleTargets.length,
+      closed: results.filter((item) => item.ok).length,
+      failed: results.filter((item) => !item.ok).length,
+      results,
+    }, null, 2));
+    return;
+  }
+
+  let profileId = null;
+  let resolvedBy = 'profile';
+  if (idTarget) {
+    const resolved = resolveSessionTarget(idTarget);
+    if (!resolved) throw new Error(`No session found for instance id: ${idTarget}`);
+    profileId = resolved.profileId;
+    resolvedBy = resolved.reason;
+  } else if (aliasTarget) {
+    const resolved = resolveSessionTarget(aliasTarget);
+    if (!resolved) throw new Error(`No session found for alias: ${aliasTarget}`);
+    profileId = resolved.profileId;
+    resolvedBy = resolved.reason;
+  } else {
+    const positional = args.slice(1).find((arg) => arg && !String(arg).startsWith('--')) || null;
+    if (positional) {
+      const resolved = resolveSessionTarget(positional);
+      if (resolved) {
+        profileId = resolved.profileId;
+        resolvedBy = resolved.reason;
+      } else {
+        profileId = positional;
+      }
+    }
+  }
+
+  if (!profileId) {
+    profileId = getDefaultProfile();
+  }
+  if (!profileId) {
+    throw new Error('Usage: camo stop [profileId] | camo stop --id <instanceId> | camo stop --alias <alias> | camo stop all | camo stop idle');
+  }
+
+  const result = await stopAndCleanupProfile(profileId, { serviceUp });
+  if (!result.ok && serviceUp) {
+    throw new Error(result.error || `stop failed for profile: ${profileId}`);
+  }
+  console.log(JSON.stringify({
+    ok: true,
+    profileId,
+    resolvedBy,
+    serviceUp,
+    warning: (!serviceUp && !result.ok) ? result.error : null,
+    result: result.result || null,
+  }, null, 2));
 }
 
 export async function handleStatusCommand(args) {

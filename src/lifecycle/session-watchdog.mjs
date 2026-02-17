@@ -9,6 +9,7 @@ import { releaseLock } from './lock.mjs';
 import { getSessionInfo, markSessionClosed } from './session-registry.mjs';
 
 const WATCHDOG_DIR = path.join(os.homedir(), '.webauto', 'run', 'camo-watchdogs');
+const DEFAULT_HEADLESS_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
 function ensureWatchdogDir() {
   if (!fs.existsSync(WATCHDOG_DIR)) {
@@ -102,9 +103,11 @@ async function syncViewportWithWindow(profileId, tolerancePx = 3) {
   return true;
 }
 
-function shouldExitMonitor(profileId) {
-  const info = getSessionInfo(profileId);
-  return !info || info.status !== 'active';
+function resolveIdleTimeoutMs(sessionInfo) {
+  if (!sessionInfo || sessionInfo.headless !== true) return 0;
+  const raw = Number(sessionInfo.idleTimeoutMs);
+  if (Number.isFinite(raw) && raw >= 0) return Math.floor(raw);
+  return DEFAULT_HEADLESS_IDLE_TIMEOUT_MS;
 }
 
 async function cleanupSession(profileId) {
@@ -126,7 +129,18 @@ async function runMonitor(profileId, options = {}) {
   let blankOnlyStreak = 0;
 
   while (true) {
-    if (shouldExitMonitor(profileId)) return;
+    const localInfo = getSessionInfo(profileId);
+    if (!localInfo || localInfo.status !== 'active') return;
+
+    const idleTimeoutMs = resolveIdleTimeoutMs(localInfo);
+    if (idleTimeoutMs > 0) {
+      const lastActivityAt = Number(localInfo.lastActivityAt || localInfo.lastSeen || localInfo.startTime || Date.now());
+      const idleMs = Date.now() - lastActivityAt;
+      if (idleMs >= idleTimeoutMs) {
+        await cleanupSession(profileId);
+        return;
+      }
+    }
 
     let sessions = [];
     try {

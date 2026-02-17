@@ -33,8 +33,11 @@ camo profile create myprofile
 # Set as default
 camo profile default myprofile
 
-# Start browser
-camo start --url https://example.com
+# Start browser (with alias)
+camo start --url https://example.com --alias main
+
+# Start headless worker (auto-kill after idle timeout)
+camo start worker-1 --headless --alias shard1 --idle-timeout 30m
 
 # Navigate
 camo goto https://www.xiaohongshu.com
@@ -68,8 +71,12 @@ camo create fingerprint --os <os> --region <region>
 ### Browser Control
 
 ```bash
-camo start [profileId] [--url <url>] [--headless] [--width <w> --height <h>]
+camo start [profileId] [--url <url>] [--headless] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]
 camo stop [profileId]
+camo stop --id <instanceId>
+camo stop --alias <alias>
+camo stop idle
+camo stop all
 camo status [profileId]
 camo shutdown                          # Shutdown browser-service (all sessions)
 ```
@@ -77,10 +84,12 @@ camo shutdown                          # Shutdown browser-service (all sessions)
 `camo start` in headful mode now persists window size per profile and reuses that size on next start.  
 If no saved size exists, it defaults to near-fullscreen (full width, slight vertical reserve).  
 Use `--width/--height` to override and update the saved profile size.
+For headless sessions, default idle timeout is `30m` (auto-stop on inactivity). Use `--idle-timeout` (e.g. `45m`, `1800s`, `0`) to customize.
 
 ### Lifecycle & Cleanup
 
 ```bash
+camo instances                         # List global camoufox instances (live + orphaned + idle state)
 camo sessions                          # List active browser sessions
 camo cleanup [profileId]               # Cleanup session (release lock + stop)
 camo cleanup all                       # Cleanup all active sessions
@@ -332,7 +341,7 @@ Condition types:
 Camo CLI persists session information locally:
 
 - Sessions are registered in `~/.webauto/sessions/`
-- On restart, `camo sessions` shows both live and orphaned sessions
+- On restart, `camo sessions` / `camo instances` shows live + orphaned sessions
 - Use `camo recover <profileId>` to reconnect or cleanup orphaned sessions
 - Stale sessions (>7 days) are automatically cleaned up
 

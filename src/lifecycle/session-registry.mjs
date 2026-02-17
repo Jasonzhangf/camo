@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import crypto from 'node:crypto';
 
 const SESSION_DIR = path.join(os.homedir(), '.webauto', 'sessions');
 
@@ -15,6 +16,25 @@ function ensureSessionDir() {
   }
 }
 
+function normalizeAlias(value) {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  if (!/^[a-zA-Z0-9._-]+$/.test(text)) {
+    throw new Error('Invalid alias. Use only letters, numbers, dot, underscore, dash.');
+  }
+  return text.slice(0, 64);
+}
+
+function normalizeTimeoutMs(value) {
+  const ms = Number(value);
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  return Math.floor(ms);
+}
+
+function generateInstanceId() {
+  return `inst_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
+}
+
 export function getSessionFile(profileId) {
   return path.join(SESSION_DIR, `${profileId}.json`);
 }
@@ -22,14 +42,24 @@ export function getSessionFile(profileId) {
 export function registerSession(profileId, sessionInfo = {}) {
   ensureSessionDir();
   const sessionFile = getSessionFile(profileId);
+  const now = Date.now();
+  const alias = normalizeAlias(sessionInfo.alias);
+  const idleTimeoutMs = normalizeTimeoutMs(sessionInfo.idleTimeoutMs);
+  const instanceId = String(sessionInfo.instanceId || sessionInfo.sessionId || generateInstanceId()).trim();
   
   const sessionData = {
     profileId,
     pid: process.pid,
-    startTime: Date.now(),
-    lastSeen: Date.now(),
+    instanceId,
+    alias,
+    startTime: now,
+    lastSeen: now,
+    lastActivityAt: now,
     status: 'active',
     ...sessionInfo,
+    instanceId,
+    alias,
+    idleTimeoutMs,
   };
   
   fs.writeFileSync(sessionFile, JSON.stringify(sessionData, null, 2));
@@ -44,12 +74,30 @@ export function updateSession(profileId, updates = {}) {
   
   try {
     const existing = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+    const now = Date.now();
+    const mergedAlias = Object.prototype.hasOwnProperty.call(updates, 'alias')
+      ? normalizeAlias(updates.alias)
+      : normalizeAlias(existing.alias);
+    const mergedIdleTimeoutMs = Object.prototype.hasOwnProperty.call(updates, 'idleTimeoutMs')
+      ? normalizeTimeoutMs(updates.idleTimeoutMs)
+      : normalizeTimeoutMs(existing.idleTimeoutMs);
+    const touchActivity = updates.touchActivity === true;
+    const nextActivityAt = touchActivity
+      ? now
+      : (Object.prototype.hasOwnProperty.call(updates, 'lastActivityAt')
+        ? Number(updates.lastActivityAt) || now
+        : Number(existing.lastActivityAt) || now);
     const updated = {
       ...existing,
       ...updates,
-      lastSeen: Date.now(),
+      instanceId: String(updates.instanceId || existing.instanceId || updates.sessionId || existing.sessionId || generateInstanceId()).trim(),
+      alias: mergedAlias,
+      idleTimeoutMs: mergedIdleTimeoutMs,
+      lastSeen: now,
+      lastActivityAt: nextActivityAt,
       profileId,
     };
+    delete updated.touchActivity;
     fs.writeFileSync(sessionFile, JSON.stringify(updated, null, 2));
     return updated;
   } catch {
@@ -91,6 +139,54 @@ export function listRegisteredSessions() {
   }
   
   return sessions;
+}
+
+export function findSessionByAlias(alias) {
+  const target = normalizeAlias(alias);
+  if (!target) return null;
+  return listRegisteredSessions().find((item) => normalizeAlias(item?.alias) === target) || null;
+}
+
+export function findSessionByInstanceId(instanceId) {
+  const target = String(instanceId || '').trim();
+  if (!target) return null;
+  return listRegisteredSessions().find((item) => String(item?.instanceId || '').trim() === target) || null;
+}
+
+export function resolveSessionTarget(target) {
+  const value = String(target || '').trim();
+  if (!value) return null;
+  const sessions = listRegisteredSessions();
+  const byProfile = sessions.find((item) => String(item?.profileId || '').trim() === value);
+  if (byProfile) return { profileId: byProfile.profileId, reason: 'profile', session: byProfile };
+  const byInstanceId = sessions.find((item) => String(item?.instanceId || '').trim() === value);
+  if (byInstanceId) return { profileId: byInstanceId.profileId, reason: 'instanceId', session: byInstanceId };
+  const byAlias = sessions.find((item) => normalizeAlias(item?.alias) === normalizeAlias(value));
+  if (byAlias) return { profileId: byAlias.profileId, reason: 'alias', session: byAlias };
+  return null;
+}
+
+export function isSessionAliasTaken(alias, exceptProfileId = '') {
+  const target = normalizeAlias(alias);
+  if (!target) return false;
+  const except = String(exceptProfileId || '').trim();
+  return listRegisteredSessions().some((item) => {
+    if (!item) return false;
+    if (except && String(item.profileId || '').trim() === except) return false;
+    if (String(item.status || '').trim() !== 'active') return false;
+    return normalizeAlias(item.alias) === target;
+  });
+}
+
+export function touchSessionActivity(profileId, updates = {}) {
+  const id = String(profileId || '').trim();
+  if (!id) return null;
+  const existing = getSessionInfo(id);
+  if (!existing) return null;
+  return updateSession(id, {
+    ...updates,
+    touchActivity: true,
+  });
 }
 
 export function markSessionReconnecting(profileId) {
