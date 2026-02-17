@@ -1,0 +1,8 @@
+{
+  "defaultMaxLines": 500,
+  "overrides": {
+    "src/autoscript/runtime.mjs": 700,
+    "src/autoscript/xhs-unified-template.mjs": 950,
+    "src/core/actions.mjs": 620
+  }
+}

@@ -24,7 +24,7 @@ CONFIG:
 
 BROWSER CONTROL:
   init                                      Ensure camoufox + ensure browser-service daemon
-  start [profileId] [--url <url>] [--headless]
+  start [profileId] [--url <url>] [--headless] [--width <w> --height <h>]
   stop [profileId]
   status [profileId]
   list                                      Alias of status
@@ -91,6 +91,7 @@ EXAMPLES:
   camo profile create myprofile
   camo profile default myprofile
   camo start --url https://example.com
+  camo start myprofile --width 1920 --height 1020
   camo goto https://www.xiaohongshu.com
   camo scroll --down --amount 500
   camo click "#search-input"
@@ -115,13 +116,36 @@ EXAMPLES:
   camo stop
 
 CONTAINER FILTER & SUBSCRIPTION:
-  container filter <selector> [--profile <id>]      Filter DOM elements by CSS selector
-  container watch --selector <css>                  Watch for element changes
-  container list                                    List visible elements in viewport
+  container init [--source <dir>] [--force]         Initialize subscription dir + migrate container sets
+  container sets [--site <siteKey>]                 List migrated subscription sets
+  container register [profileId] <setId...>         Register targets (path / url+dom markers) for profile
+  container targets [profileId]                     Show registered subscription targets
+  container filter [profileId] <selector...>        Filter DOM elements by CSS selector
+  container watch [profileId] [--selector <css>]    Watch for element changes (or use registered selectors)
+  container list [profileId]                        List visible elements in viewport
+
+AUTOSCRIPT (STRATEGY LAYER):
+  autoscript scaffold xhs-unified [--output <file>]        Generate xiaohongshu unified-harvest autoscript template
+  autoscript validate <file>                        Validate autoscript schema and references
+  autoscript explain <file>                         Print normalized graph and defaults
+  autoscript snapshot <jsonl-file> [--out <snapshot-file>] Build resumable snapshot from run JSONL
+  autoscript replay <jsonl-file> [--summary-file <path>]   Rebuild summary from run JSONL
+  autoscript run <file> [--profile <id>] [--jsonl-file <path>] [--summary-file <path>]  Run autoscript runtime
+  autoscript resume <file> --snapshot <snapshot-file> [--from-node <nodeId>] [--profile <id>] [--jsonl-file <path>] [--summary-file <path>]
+  autoscript mock-run <file> --fixture <fixture.json> [--profile <id>] [--jsonl-file <path>] [--summary-file <path>]
+
+PROGRESS EVENTS:
+  events serve [--host 127.0.0.1] [--port 7788]    Start progress websocket server (/events)
+  events tail [filters...]                          Tail progress events via websocket
+  events recent [--limit 50]                        Show recent persisted events
+  events emit --event <name>                        Emit a manual test event
+  (non-events commands auto-start daemon by default)
 
 ENV:
   WEBAUTO_BROWSER_URL                       Default: http://127.0.0.1:7704
   WEBAUTO_REPO_ROOT                         Optional explicit webauto repo root
+  CAMO_PROGRESS_EVENTS_FILE                 Optional path override for progress jsonl
+  CAMO_PROGRESS_WS_HOST / CAMO_PROGRESS_WS_PORT   Progress daemon host/port (defaults: 127.0.0.1:7788)
 `);
 }
 

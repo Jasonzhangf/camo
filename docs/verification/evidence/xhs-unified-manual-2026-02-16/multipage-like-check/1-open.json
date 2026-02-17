@@ -1,0 +1,7 @@
+{
+  "ok": true,
+  "result": {
+    "clicked": true,
+    "selector": ".note-item:nth-of-type(1) a.cover"
+  }
+}

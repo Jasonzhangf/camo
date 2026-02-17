@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "session": {
+    "profileId": "xiaohongshu-batch-1",
+    "session_id": "xiaohongshu-batch-1",
+    "current_url": "https://www.xiaohongshu.com/explore?channel_id=homefeed_recommend",
+    "mode": "dev",
+    "owner_pid": null
+  }
+}

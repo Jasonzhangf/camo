@@ -68,11 +68,15 @@ camo create fingerprint --os <os> --region <region>
 ### Browser Control
 
 ```bash
-camo start [profileId] [--url <url>] [--headless]
+camo start [profileId] [--url <url>] [--headless] [--width <w> --height <h>]
 camo stop [profileId]
 camo status [profileId]
 camo shutdown                          # Shutdown browser-service (all sessions)
 ```
+
+`camo start` in headful mode now persists window size per profile and reuses that size on next start.  
+If no saved size exists, it defaults to near-fullscreen (full width, slight vertical reserve).  
+Use `--width/--height` to override and update the saved profile size.
 
 ### Lifecycle & Cleanup
 
@@ -146,6 +150,41 @@ camo mouse wheel [profileId] [--deltax <px>] [--deltay <px>]
 camo system display                    # Show display metrics
 ```
 
+### Container Subscription
+
+```bash
+camo container init [--source <container-library-dir>] [--force]
+camo container sets [--site <siteKey>]
+camo container register [profileId] <setId...> [--append]
+camo container targets [profileId]
+camo container filter [profileId] <selector...>
+camo container watch [profileId] [--selector <css>] [--throttle <ms>]
+camo container list [profileId]
+```
+
+### Autoscript
+
+```bash
+camo autoscript scaffold xhs-unified [--output <file>] [options]
+camo autoscript validate <file>
+camo autoscript explain <file>
+camo autoscript snapshot <jsonl-file> [--out <snapshot-file>]
+camo autoscript replay <jsonl-file> [--summary-file <path>]
+camo autoscript run <file> [--profile <id>] [--jsonl-file <path>] [--summary-file <path>]
+camo autoscript resume <file> --snapshot <snapshot-file> [--from-node <nodeId>] [--profile <id>] [--jsonl-file <path>] [--summary-file <path>]
+camo autoscript mock-run <file> --fixture <fixture.json> [--profile <id>] [--jsonl-file <path>] [--summary-file <path>]
+```
+
+### Progress Events (WS)
+
+```bash
+camo events serve [--host 127.0.0.1] [--port 7788]
+camo events tail [--profile <id>] [--run-id <id>] [--events e1,e2] [--replay 50]
+camo events recent [--limit 50]
+```
+
+By default, non-`events` commands auto-start the progress daemon (`/events`) in background.
+
 ## Fingerprint Options
 
 ### OS Options
@@ -180,11 +219,113 @@ camo system display                    # Show display metrics
 - Session registry: `~/.webauto/sessions/`
 - Lock files: `~/.webauto/locks/`
 - GeoIP database: `~/.webauto/geoip/GeoLite2-City.mmdb`
+- User container root: `~/.webauto/container-lib/`
+- Subscription root: `~/.webauto/container-subscriptions/`
+
+### Subscription-driven Watch
+
+```bash
+# 1) Migrate container-library into subscription sets
+camo container init --source /Users/fanzhang/Documents/github/webauto/container-library
+
+# 2) Register sets to a profile
+camo container register xiaohongshu-batch-1 xiaohongshu_home xiaohongshu_home.search_input
+
+# 3) Start watch using registered selectors (no --selector needed)
+camo container watch xiaohongshu-batch-1 --throttle 500
+```
+
+### Autoscript Mode (Subscription + Operations)
+
+```bash
+# Generate xiaohongshu unified-harvest migration script from webauto phase-unified-harvest
+camo autoscript scaffold xhs-unified \
+  --output ./autoscripts/xiaohongshu/unified-harvest.autoscript.json \
+  --profile xiaohongshu-batch-1 \
+  --keyword "手机膜" \
+  --tab-count 4 \
+  --note-interval 900 \
+  --do-comments \
+  --do-likes \
+  --max-notes 30
+
+# Validate + explain + run
+camo autoscript validate ./autoscripts/xiaohongshu/unified-harvest.autoscript.json
+camo autoscript explain ./autoscripts/xiaohongshu/unified-harvest.autoscript.json
+camo autoscript run ./autoscripts/xiaohongshu/unified-harvest.autoscript.json \
+  --profile xiaohongshu-batch-1 \
+  --jsonl-file ./runs/xhs-unified/run.jsonl \
+  --summary-file ./runs/xhs-unified/run.summary.json
+
+# Build snapshot + replay summary from existing JSONL
+camo autoscript snapshot ./runs/xhs-unified/run.jsonl \
+  --out ./runs/xhs-unified/run.snapshot.json
+camo autoscript replay ./runs/xhs-unified/run.jsonl \
+  --summary-file ./runs/xhs-unified/replay.summary.json
+
+# Resume from a snapshot (optionally force rerun from a node)
+camo autoscript resume ./autoscripts/xiaohongshu/unified-harvest.autoscript.json \
+  --snapshot ./runs/xhs-unified/run.snapshot.json \
+  --from-node comments_harvest \
+  --profile xiaohongshu-batch-1
+
+# Mock replay mode for deterministic local debugging
+camo autoscript mock-run ./autoscripts/xiaohongshu/unified-harvest.autoscript.json \
+  --fixture ./autoscripts/xiaohongshu/fixtures/mock-run.json \
+  --summary-file ./runs/xhs-unified/mock.summary.json
+```
+
+The xhs-unified scaffold includes anti-risk defaults:
+- operation pacing (`operationMinIntervalMs`, `eventCooldownMs`, `jitterMs`)
+- navigation/tab switch cooldown (`navigationMinIntervalMs`)
+- per-operation timeout budget (`timeoutMs`)
+- multi-tab rotation (`ensure_tab_pool`, `tab_pool_switch_next`)
+
+Example script:
+
+```json
+{
+  "name": "xhs-login-flow",
+  "profileId": "xiaohongshu-batch-1",
+  "throttle": 500,
+  "subscriptions": [
+    { "id": "login_input", "selector": "#login-input" },
+    { "id": "submit_btn", "selector": "button.submit" }
+  ],
+  "operations": [
+    {
+      "id": "fill_login",
+      "action": "type",
+      "selector": "#login-input",
+      "text": "demo@example.com",
+      "trigger": "login_input.appear"
+    },
+    {
+      "id": "click_submit",
+      "action": "click",
+      "selector": "button.submit",
+      "trigger": { "subscription": "submit_btn", "event": "exist" },
+      "conditions": [
+        { "type": "operation_done", "operationId": "fill_login" },
+        { "type": "subscription_exist", "subscriptionId": "submit_btn" }
+      ]
+    }
+  ]
+}
+```
+
+Condition types:
+- `operation_done`: previous operation completed
+- `subscription_exist`: subscribed element currently exists
+- `subscription_appear`: subscribed element has appeared at least once
 
 ### Environment Variables
 
 - `WEBAUTO_BROWSER_URL` - Browser service URL (default: `http://127.0.0.1:7704`)
 - `WEBAUTO_REPO_ROOT` - WebAuto repository root (optional)
+- `WEBAUTO_CONTAINER_ROOT` - User container root override (default: `~/.webauto/container-lib`)
+- `CAMO_PROGRESS_EVENTS_FILE` - Optional progress event JSONL path override
+- `CAMO_PROGRESS_WS_HOST` / `CAMO_PROGRESS_WS_PORT` - Progress websocket daemon bind address (default: `127.0.0.1:7788`)
 
 ## Session Persistence
 

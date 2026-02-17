@@ -40,6 +40,7 @@ describe('browser-service utilities', () => {
       assert.strictEqual(typeof bs.ensureCamoufox, 'function');
       assert.strictEqual(typeof bs.ensureBrowserService, 'function');
       assert.strictEqual(typeof bs.findRepoRootCandidate, 'function');
+      assert.strictEqual(typeof bs.getDomSnapshotByProfile, 'function');
     });
   });
 
@@ -125,6 +126,63 @@ describe('browser-service utilities', () => {
       const { getSessionByProfile } = await import('../../../src/utils/browser-service.mjs');
       const session = await getSessionByProfile('nonexistent');
       assert.strictEqual(session, null);
+    });
+
+    it('should recover session from page:list when getStatus is empty', async () => {
+      global.fetch = async (_url, options) => {
+        const body = JSON.parse(options.body);
+        if (body.action === 'getStatus') {
+          return {
+            ok: true,
+            json: async () => ({ sessions: [] }),
+          };
+        }
+        if (body.action === 'page:list') {
+          return {
+            ok: true,
+            json: async () => ({
+              pages: [{ index: 0, url: 'https://www.xiaohongshu.com/explore', active: true }],
+              activeIndex: 0,
+            }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({ ok: true }),
+        };
+      };
+      const { getSessionByProfile } = await import('../../../src/utils/browser-service.mjs');
+      const session = await getSessionByProfile('profile-a');
+      assert.strictEqual(session.profileId, 'profile-a');
+      assert.strictEqual(session.current_url, 'https://www.xiaohongshu.com/explore');
+      assert.strictEqual(session.recoveredFromPages, true);
+    });
+  });
+
+  describe('getDomSnapshotByProfile', () => {
+    it('should attach viewport metadata on snapshot root', async () => {
+      global.fetch = async (_url, options) => {
+        const body = JSON.parse(options.body);
+        if (body.action === 'evaluate') {
+          return {
+            ok: true,
+            json: async () => ({
+              result: {
+                dom_tree: { tag: 'body', children: [] },
+                viewport: { width: 1440, height: 900 },
+              },
+            }),
+          };
+        }
+        return {
+          ok: true,
+          json: async () => ({ ok: true }),
+        };
+      };
+      const { getDomSnapshotByProfile } = await import('../../../src/utils/browser-service.mjs');
+      const snapshot = await getDomSnapshotByProfile('profile-a');
+      assert.strictEqual(snapshot.tag, 'body');
+      assert.deepStrictEqual(snapshot.__viewport, { width: 1440, height: 900 });
     });
   });
 

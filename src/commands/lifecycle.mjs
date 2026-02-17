@@ -10,6 +10,7 @@ import {
   getSessionInfo, unregisterSession, markSessionClosed, cleanupStaleSessions,
   listRegisteredSessions, registerSession, updateSession
 } from '../lifecycle/session-registry.mjs';
+import { stopAllSessionWatchdogs, stopSessionWatchdog } from '../lifecycle/session-watchdog.mjs';
 
 export async function handleCleanupCommand(args) {
   const sub = args[1];
@@ -36,14 +37,21 @@ export async function handleCleanupCommand(args) {
         const sessions = Array.isArray(status?.sessions) ? status.sessions : [];
         
         for (const session of sessions) {
+          let stopError = null;
           try {
             await callAPI('stop', { profileId: session.profileId });
+          } catch (err) {
+            stopError = err;
+          } finally {
+            stopSessionWatchdog(session.profileId);
             releaseLock(session.profileId);
             markSessionClosed(session.profileId);
-            results.push({ profileId: session.profileId, ok: true });
-          } catch (err) {
-            results.push({ profileId: session.profileId, ok: false, error: err.message });
           }
+          results.push(
+            stopError
+              ? { profileId: session.profileId, ok: false, error: stopError.message }
+              : { profileId: session.profileId, ok: true },
+          );
         }
       } catch {}
     }
@@ -51,6 +59,7 @@ export async function handleCleanupCommand(args) {
     // Cleanup stale locks and sessions
     const cleanedLocks = cleanupStaleLocks();
     const cleanedSessions = cleanupStaleSessions();
+    stopAllSessionWatchdogs();
     
     console.log(JSON.stringify({
       ok: true,
@@ -74,6 +83,7 @@ export async function handleCleanupCommand(args) {
     } catch {}
   }
   
+  stopSessionWatchdog(profileId);
   releaseLock(profileId);
   markSessionClosed(profileId);
   console.log(JSON.stringify({ ok: true, profileId }, null, 2));
@@ -86,11 +96,13 @@ export async function handleForceStopCommand(args) {
   
   try {
     const result = await callAPI('stop', { profileId, force: true });
+    stopSessionWatchdog(profileId);
     releaseLock(profileId);
     markSessionClosed(profileId);
     console.log(JSON.stringify({ ok: true, profileId, ...result }, null, 2));
   } catch (err) {
     // Even if stop fails, cleanup local state
+    stopSessionWatchdog(profileId);
     releaseLock(profileId);
     markSessionClosed(profileId);
     console.log(JSON.stringify({ ok: true, profileId, warning: 'Session stopped locally but remote stop failed: ' + err.message }, null, 2));
@@ -204,6 +216,7 @@ export async function handleRecoverCommand(args) {
   
   if (!serviceUp) {
     // Service is down - session cannot be recovered, clean up
+    stopSessionWatchdog(profileId);
     unregisterSession(profileId);
     releaseLock(profileId);
     console.log(JSON.stringify({
@@ -240,6 +253,7 @@ export async function handleRecoverCommand(args) {
       }, null, 2));
     } else {
       // Session not in browser service - clean up
+      stopSessionWatchdog(profileId);
       unregisterSession(profileId);
       releaseLock(profileId);
       console.log(JSON.stringify({

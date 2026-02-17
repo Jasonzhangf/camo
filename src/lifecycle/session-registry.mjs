@@ -105,10 +105,14 @@ export function markSessionActive(profileId, updates = {}) {
 export function markSessionClosed(profileId) {
   const sessionFile = getSessionFile(profileId);
   if (fs.existsSync(sessionFile)) {
-    const existing = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
-    existing.status = 'closed';
-    existing.closedAt = Date.now();
-    fs.writeFileSync(sessionFile, JSON.stringify(existing, null, 2));
+    try {
+      const existing = JSON.parse(fs.readFileSync(sessionFile, 'utf-8'));
+      existing.status = 'closed';
+      existing.closedAt = Date.now();
+      fs.writeFileSync(sessionFile, JSON.stringify(existing, null, 2));
+    } catch {
+      // Best-effort close: continue with removal even for corrupted metadata.
+    }
   }
   return unregisterSession(profileId);
 }

@@ -1,0 +1,107 @@
+{
+  "ok": true,
+  "profileId": "xiaohongshu-batch-1",
+  "count": 10,
+  "elements": [
+    {
+      "selector": ".comment-item",
+      "path": "root/12/0/3/1/2/0/1/0/0",
+      "tag": "div",
+      "id": "comment-68eca3e40000000038007a71",
+      "classes": [
+        "comment-item"
+      ],
+      "text": "Fortune Ni多少钱呀2025-10-13广东赞2"
+    },
+    {
+      "selector": ".comment-item",
+      "path": "root/12/0/3/1/2/0/1/1/0",
+      "tag": "div",
+      "id": "comment-695f00bf000000000503a6f2",
+      "classes": [
+        "comment-item"
+      ],
+      "text": "🌻向日葵班的小朋友你好 咨询定制01-08浙江赞1"
+    },
+    {
+      "selector": ".comment-item",
+      "path": "root/12/0/3/1/2/0/1/2/0",
+      "tag": "div",
+      "id": "comment-68efca8e000000003802a22f",
+      "classes": [
+        "comment-item"
+      ],
+      "text": "海面怎么联系？2025-10-16重庆赞4"
+    },
+    {
+      "selector": ".comment-item",
+      "path": "root/12/0/3/1/2/0/1/3/0",
+      "tag": "div",
+      "id": "comment-68fb0a930000000039028e0e",
+      "classes": [
+        "comment-item"
+      ],
+      "text": "ChennnIvy_多少钱呢？怎么订？2025-10-24陕西赞1"
+    },
+    {
+      "selector": ".comment-item",
+      "path": "root/12/0/3/1/2/0/1/4/0",
+      "tag": "div",
+      "id": "comment-68ecfd4b0000000037011578",
+      "classes": [
+        "comment-item"
+      ],
+      "text": "..卜卜星🌟滴滴 可以留个联系方式吗2025-10-13四川赞1"
+    },
+    {
+      "selector": ".comment-item",
+      "path": "root/12/0/3/1/2/0/1/5/0",
+      "tag": "div",
+      "id": "comment-68ee32220000000037010708",
+      "classes": [
+        "comment-item"
+      ],
+      "text": "炭炭的宅烤库车店怎么定制的2025-10-14新疆赞1"
+    },
+    {
+      "selector": ".comment-item",
+      "path": "root/12/0/3/1/2/0/1/6/0",
+      "tag": "div",
+      "id": "comment-68ef74e70000000033007f2b",
+      "classes": [
+        "comment-item"
+      ],
+      "text": "Rigzinnnn怎么定制呢！2025-10-15西藏赞1"
+    },
+    {
+      "selector": ".comment-item",
+      "path": "root/12/0/3/1/2/0/1/7/0",
+      "tag": "div",
+      "id": "comment-698b2a67000000000b034a74",
+      "classes": [
+        "comment-item"
+      ],
+      "text": "湘湖甚好咖啡SOMEHOT你好，私5天前浙江赞1"
+    },
+    {
+      "selector": ".comment-item",
+      "path": "root/12/0/3/1/2/0/1/8/0",
+      "tag": "div",
+      "id": "comment-69157377000000003903127e",
+      "classes": [
+        "comment-item"
+      ],
+      "text": "赵锦彤怎么定制？2025-11-13浙江赞1"
+    },
+    {
+      "selector": ".comment-item",
+      "path": "root/12/0/3/1/2/0/1/9/0",
+      "tag": "div",
+      "id": "comment-68fd795300000000390244b5",
+      "classes": [
+        "comment-item"
+      ],
+      "text": "九记八方甜品（临清店）怎么定制2025-10-26山东赞1"
+    }
+  ]
+}

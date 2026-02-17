@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "name": "xhs-esc-close-check",
+  "profileId": "xiaohongshu-batch-1",
+  "throttle": 900,
+  "defaults": {
+    "retry": { "attempts": 1, "backoffMs": 300 },
+    "impact": "subscription",
+    "onFailure": "chain_stop",
+    "validationMode": "none",
+    "pacing": {
+      "operationMinIntervalMs": 500,
+      "eventCooldownMs": 200,
+      "jitterMs": 0,
+      "navigationMinIntervalMs": 1200,
+      "timeoutMs": 120000
+    },
+    "timeoutMs": 120000
+  },
+  "subscriptions": [
+    { "id": "home_search_input", "selector": "#search-input, input.search-input", "events": ["exist", "appear", "disappear"] },
+    { "id": "search_result_item", "selector": ".note-item", "events": ["exist", "appear", "change"] },
+    { "id": "detail_modal", "selector": ".note-detail-mask, .note-detail, .detail-container, .media-container, .note-scroller, .note-content, .interaction-container, .comments-container", "events": ["exist", "appear", "disappear"] }
+  ],
+  "operations": [
+    {
+      "id": "goto_home",
+      "action": "goto",
+      "params": { "url": "https://www.xiaohongshu.com/explore" },
+      "trigger": "startup",
+      "once": true
+    },
+    {
+      "id": "fill_keyword",
+      "action": "type",
+      "params": { "selector": "#search-input", "text": "工作服定制" },
+      "trigger": "home_search_input.exist",
+      "dependsOn": ["goto_home"],
+      "once": true
+    },
+    {
+      "id": "submit_search",
+      "action": "xhs_submit_search",
+      "params": { "keyword": "工作服定制" },
+      "trigger": "home_search_input.exist",
+      "dependsOn": ["fill_keyword"],
+      "once": true
+    },
+    {
+      "id": "open_first_detail",
+      "action": "xhs_open_detail",
+      "params": { "mode": "first", "maxNotes": 1, "keyword": "工作服定制" },
+      "trigger": "search_result_item.exist",
+      "dependsOn": ["submit_search"],
+      "once": true
+    },
+    {
+      "id": "close_detail",
+      "action": "xhs_close_detail",
+      "params": {},
+      "trigger": "detail_modal.exist",
+      "dependsOn": ["open_first_detail"],
+      "once": true,
+      "validation": {
+        "mode": "post",
+        "post": {
+          "page": {
+            "hostIncludes": ["xiaohongshu.com"],
+            "checkpointIn": ["home_ready", "search_ready"]
+          }
+        }
+      }
+    },
+    {
+      "id": "stop_after_close",
+      "action": "raise_error",
+      "params": { "code": "AUTOSCRIPT_DONE_ESC_CLOSE_CHECK" },
+      "trigger": "detail_modal.disappear",
+      "dependsOn": ["close_detail"],
+      "once": true,
+      "impact": "script",
+      "onFailure": "stop_all"
+    }
+  ]
+}

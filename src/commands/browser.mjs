@@ -1,9 +1,144 @@
 import fs from 'node:fs';
-import { listProfiles, getDefaultProfile } from '../utils/config.mjs';
+import {
+  listProfiles,
+  getDefaultProfile,
+  getProfileWindowSize,
+  setProfileWindowSize,
+} from '../utils/config.mjs';
 import { callAPI, ensureCamoufox, ensureBrowserService, getSessionByProfile, checkBrowserService } from '../utils/browser-service.mjs';
 import { resolveProfileId, ensureUrlScheme, looksLikeUrlToken, getPositionals } from '../utils/args.mjs';
 import { acquireLock, releaseLock, isLocked, getLockInfo, cleanupStaleLocks } from '../lifecycle/lock.mjs';
 import { registerSession, updateSession, getSessionInfo, unregisterSession, listRegisteredSessions, markSessionClosed, cleanupStaleSessions, recoverSession } from '../lifecycle/session-registry.mjs';
+import { startSessionWatchdog, stopAllSessionWatchdogs, stopSessionWatchdog } from '../lifecycle/session-watchdog.mjs';
+
+const START_WINDOW_MIN_WIDTH = 960;
+const START_WINDOW_MIN_HEIGHT = 700;
+const START_WINDOW_MAX_RESERVE = 240;
+const START_WINDOW_DEFAULT_RESERVE = 72;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+export function computeTargetViewportFromWindowMetrics(measured) {
+  const innerWidth = Math.max(320, parseNumber(measured?.innerWidth, 0));
+  const innerHeight = Math.max(240, parseNumber(measured?.innerHeight, 0));
+  const outerWidth = Math.max(320, parseNumber(measured?.outerWidth, innerWidth));
+  const outerHeight = Math.max(240, parseNumber(measured?.outerHeight, innerHeight));
+
+  const rawDeltaW = Math.max(0, outerWidth - innerWidth);
+  const rawDeltaH = Math.max(0, outerHeight - innerHeight);
+  const frameW = rawDeltaW > 400 ? 16 : Math.min(rawDeltaW, 120);
+  const frameH = rawDeltaH > 400 ? 88 : Math.min(rawDeltaH, 180);
+
+  return {
+    width: Math.max(320, outerWidth - frameW),
+    height: Math.max(240, outerHeight - frameH),
+    frameW,
+    frameH,
+    innerWidth,
+    innerHeight,
+    outerWidth,
+    outerHeight,
+  };
+}
+
+export function computeStartWindowSize(metrics, options = {}) {
+  const display = metrics?.metrics || metrics || {};
+  const reserveFromEnv = parseNumber(process.env.CAMO_DEFAULT_WINDOW_VERTICAL_RESERVE, START_WINDOW_DEFAULT_RESERVE);
+  const reserve = clamp(
+    parseNumber(options.reservePx, reserveFromEnv),
+    0,
+    START_WINDOW_MAX_RESERVE,
+  );
+
+  const workWidth = parseNumber(display.workWidth, 0);
+  const workHeight = parseNumber(display.workHeight, 0);
+  const width = parseNumber(display.width, 0);
+  const height = parseNumber(display.height, 0);
+  const baseW = Math.floor(workWidth > 0 ? workWidth : width);
+  const baseH = Math.floor(workHeight > 0 ? workHeight : height);
+
+  if (baseW <= 0 || baseH <= 0) {
+    return {
+      width: 1920,
+      height: 1000,
+      reservePx: reserve,
+      source: 'fallback',
+    };
+  }
+
+  return {
+    width: Math.max(START_WINDOW_MIN_WIDTH, baseW),
+    height: Math.max(START_WINDOW_MIN_HEIGHT, baseH - reserve),
+    reservePx: reserve,
+    source: workWidth > 0 || workHeight > 0 ? 'workArea' : 'screen',
+  };
+}
+
+async function probeWindowMetrics(profileId) {
+  const measured = await callAPI('evaluate', {
+    profileId,
+    script: '({ innerWidth: window.innerWidth, innerHeight: window.innerHeight, outerWidth: window.outerWidth, outerHeight: window.outerHeight })',
+  });
+  return measured?.result || {};
+}
+
+export async function syncWindowViewportAfterResize(profileId, width, height, options = {}) {
+  const settleMs = Math.max(40, parseNumber(options.settleMs, 120));
+  const attempts = Math.max(1, Math.min(8, Math.floor(parseNumber(options.attempts, 4))));
+  const tolerancePx = Math.max(0, parseNumber(options.tolerancePx, 3));
+
+  const windowResult = await callAPI('window:resize', { profileId, width, height });
+  await sleep(settleMs);
+
+  let measured = {};
+  let verified = {};
+  let viewport = null;
+  let matched = false;
+  let target = { width: 1280, height: 720, frameW: 16, frameH: 88 };
+
+  for (let i = 0; i < attempts; i += 1) {
+    measured = await probeWindowMetrics(profileId);
+    target = computeTargetViewportFromWindowMetrics(measured);
+    viewport = await callAPI('page:setViewport', {
+      profileId,
+      width: target.width,
+      height: target.height,
+    });
+    await sleep(settleMs);
+    verified = await probeWindowMetrics(profileId);
+    const dw = Math.abs(parseNumber(verified?.innerWidth, 0) - target.width);
+    const dh = Math.abs(parseNumber(verified?.innerHeight, 0) - target.height);
+    if (dw <= tolerancePx && dh <= tolerancePx) {
+      matched = true;
+      break;
+    }
+  }
+
+  return {
+    window: windowResult,
+    measured,
+    verified,
+    targetViewport: {
+      width: target.width,
+      height: target.height,
+      frameW: target.frameW,
+      frameH: target.frameH,
+      matched,
+    },
+    viewport,
+  };
+}
 
 export async function handleStartCommand(args) {
   ensureCamoufox();
@@ -13,6 +148,19 @@ export async function handleStartCommand(args) {
 
   const urlIdx = args.indexOf('--url');
   const explicitUrl = urlIdx >= 0 ? args[urlIdx + 1] : undefined;
+  const widthIdx = args.indexOf('--width');
+  const heightIdx = args.indexOf('--height');
+  const explicitWidth = widthIdx >= 0 ? parseNumber(args[widthIdx + 1], NaN) : NaN;
+  const explicitHeight = heightIdx >= 0 ? parseNumber(args[heightIdx + 1], NaN) : NaN;
+  const hasExplicitWidth = Number.isFinite(explicitWidth);
+  const hasExplicitHeight = Number.isFinite(explicitHeight);
+  if (hasExplicitWidth !== hasExplicitHeight) {
+    throw new Error('Usage: camo start [profileId] [--url <url>] [--headless] [--width <w> --height <h>]');
+  }
+  if ((hasExplicitWidth && explicitWidth < START_WINDOW_MIN_WIDTH) || (hasExplicitHeight && explicitHeight < START_WINDOW_MIN_HEIGHT)) {
+    throw new Error(`Window size too small. Minimum is ${START_WINDOW_MIN_WIDTH}x${START_WINDOW_MIN_HEIGHT}`);
+  }
+  const hasExplicitWindowSize = hasExplicitWidth && hasExplicitHeight;
   const profileSet = new Set(listProfiles());
   let implicitUrl;
   
@@ -20,6 +168,7 @@ export async function handleStartCommand(args) {
   for (let i = 1; i < args.length; i++) {
     const arg = args[i];
     if (arg === '--url') { i++; continue; }
+    if (arg === '--width' || arg === '--height') { i++; continue; }
     if (arg === '--headless') continue;
     if (arg.startsWith('--')) continue;
 
@@ -56,6 +205,7 @@ export async function handleStartCommand(args) {
       message: 'Session already running',
       url: existing.current_url,
     }, null, 2));
+    startSessionWatchdog(profileId);
     return;
   }
 
@@ -84,6 +234,53 @@ export async function handleStartCommand(args) {
       url: targetUrl,
       headless,
     });
+    startSessionWatchdog(profileId);
+
+    if (!headless) {
+      let windowTarget = null;
+      if (hasExplicitWindowSize) {
+        windowTarget = {
+          width: Math.floor(explicitWidth),
+          height: Math.floor(explicitHeight),
+          source: 'explicit',
+        };
+      } else {
+        const rememberedWindow = getProfileWindowSize(profileId);
+        if (rememberedWindow) {
+          windowTarget = {
+            width: rememberedWindow.width,
+            height: rememberedWindow.height,
+            source: 'profile',
+            updatedAt: rememberedWindow.updatedAt,
+          };
+        } else {
+          const display = await callAPI('system:display', {}).catch(() => null);
+          windowTarget = computeStartWindowSize(display);
+        }
+      }
+
+      result.startWindow = {
+        width: windowTarget.width,
+        height: windowTarget.height,
+        source: windowTarget.source,
+      };
+
+      const syncResult = await syncWindowViewportAfterResize(
+        profileId,
+        windowTarget.width,
+        windowTarget.height,
+      ).catch((err) => ({ error: err?.message || String(err) }));
+      result.windowSync = syncResult;
+
+      const measuredOuterWidth = Number(syncResult?.verified?.outerWidth);
+      const measuredOuterHeight = Number(syncResult?.verified?.outerHeight);
+      const savedWindow = setProfileWindowSize(
+        profileId,
+        Number.isFinite(measuredOuterWidth) ? measuredOuterWidth : windowTarget.width,
+        Number.isFinite(measuredOuterHeight) ? measuredOuterHeight : windowTarget.height,
+      );
+      result.profileWindow = savedWindow?.window || null;
+    }
   }
   console.log(JSON.stringify(result, null, 2));
 }
@@ -92,10 +289,20 @@ export async function handleStopCommand(args) {
   await ensureBrowserService();
   const profileId = resolveProfileId(args, 1, getDefaultProfile);
   if (!profileId) throw new Error('Usage: camo stop [profileId]');
-  
-  const result = await callAPI('stop', { profileId });
-  releaseLock(profileId);
-  markSessionClosed(profileId);
+
+  let result = null;
+  let stopError = null;
+  try {
+    result = await callAPI('stop', { profileId });
+  } catch (err) {
+    stopError = err;
+  } finally {
+    stopSessionWatchdog(profileId);
+    releaseLock(profileId);
+    markSessionClosed(profileId);
+  }
+
+  if (stopError) throw stopError;
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -405,6 +612,7 @@ export async function handleShutdownCommand() {
     } catch {
       // Best effort cleanup
     }
+    stopSessionWatchdog(session.profileId);
     releaseLock(session.profileId);
     markSessionClosed(session.profileId);
   }
@@ -413,10 +621,12 @@ export async function handleShutdownCommand() {
   const registered = listRegisteredSessions();
   for (const reg of registered) {
     if (reg.status !== 'closed') {
+      stopSessionWatchdog(reg.profileId);
       markSessionClosed(reg.profileId);
       releaseLock(reg.profileId);
     }
   }
+  stopAllSessionWatchdogs();
   
   const result = await callAPI('service:shutdown', {});
   console.log(JSON.stringify(result, null, 2));

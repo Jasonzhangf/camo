@@ -19,6 +19,9 @@ describe('config utilities', () => {
       assert.strictEqual(typeof config.deleteProfile, 'function');
       assert.strictEqual(typeof config.setDefaultProfile, 'function');
       assert.strictEqual(typeof config.getDefaultProfile, 'function');
+      assert.strictEqual(typeof config.getProfileWindowSize, 'function');
+      assert.strictEqual(typeof config.setProfileWindowSize, 'function');
+      assert.strictEqual(typeof config.getProfileMetaFile, 'function');
     });
   });
 
@@ -150,12 +153,43 @@ describe('config utilities', () => {
     });
   });
 
+  describe('profile window persistence', () => {
+    it('should persist and read window size from profile meta', async () => {
+      const {
+        createProfile,
+        deleteProfile,
+        setProfileWindowSize,
+        getProfileWindowSize,
+        getProfileMetaFile,
+      } = await import('../../../src/utils/config.mjs');
+      const profileId = 'test-window-' + Date.now();
+
+      createProfile(profileId);
+      setProfileWindowSize(profileId, 1918, 1024);
+      const saved = getProfileWindowSize(profileId);
+      assert.ok(saved);
+      assert.strictEqual(saved.width, 1918);
+      assert.strictEqual(saved.height, 1024);
+      assert.ok(Number(saved.updatedAt) > 0);
+      assert.strictEqual(fs.existsSync(getProfileMetaFile(profileId)), true);
+
+      deleteProfile(profileId);
+    });
+
+    it('should return null for invalid saved sizes', async () => {
+      const { setProfileWindowSize } = await import('../../../src/utils/config.mjs');
+      const result = setProfileWindowSize('invalid/id', 1000, 800);
+      assert.strictEqual(result, null);
+    });
+  });
+
   describe('constants', () => {
     it('should export required constants', async () => {
       const config = await import('../../../src/utils/config.mjs');
       assert.ok(config.CONFIG_DIR);
       assert.ok(config.PROFILES_DIR);
       assert.ok(config.CONFIG_FILE);
+      assert.ok(config.PROFILE_META_FILE);
       assert.ok(config.BROWSER_SERVICE_URL);
     });
   });

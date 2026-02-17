@@ -1,0 +1,744 @@
+{
+  "version": 1,
+  "name": "xhs-unified-harvest-autoscript",
+  "source": "/Users/fanzhang/Documents/github/webauto/scripts/xiaohongshu/phase-unified-harvest.mjs",
+  "profileId": "xiaohongshu-batch-1",
+  "throttle": 900,
+  "defaults": {
+    "retry": {
+      "attempts": 2,
+      "backoffMs": 500
+    },
+    "impact": "subscription",
+    "onFailure": "chain_stop",
+    "validationMode": "none",
+    "recovery": {
+      "attempts": 0,
+      "actions": []
+    },
+    "pacing": {
+      "operationMinIntervalMs": 700,
+      "eventCooldownMs": 300,
+      "jitterMs": 220,
+      "navigationMinIntervalMs": 1800,
+      "timeoutMs": 180000
+    },
+    "timeoutMs": 180000
+  },
+  "metadata": {
+    "keyword": "工作服定制",
+    "tabCount": 4,
+    "noteIntervalMs": 900,
+    "maxNotes": 20,
+    "doHomepage": true,
+    "doImages": false,
+    "doComments": true,
+    "doLikes": true,
+    "doReply": false,
+    "doOcr": false,
+    "matchMode": "any",
+    "matchMinHits": 1,
+    "matchKeywords": [
+      "工作服定制"
+    ],
+    "likeKeywords": [
+      "工作服定制"
+    ],
+    "replyText": "感谢分享，已关注",
+    "notes": [
+      "open_next_detail intentionally stops script by throwing AUTOSCRIPT_DONE_* when exhausted.",
+      "file persistence/OCR pipeline remains external to autoscript runtime and should be handled by downstream consumer."
+    ]
+  },
+  "subscriptions": [
+    {
+      "id": "home_search_input",
+      "selector": "#search-input, input.search-input",
+      "events": [
+        "appear",
+        "exist",
+        "disappear"
+      ]
+    },
+    {
+      "id": "home_search_button",
+      "selector": ".input-button, .input-button .search-icon",
+      "events": [
+        "exist"
+      ]
+    },
+    {
+      "id": "search_result_item",
+      "selector": ".note-item",
+      "events": [
+        "appear",
+        "exist",
+        "change"
+      ]
+    },
+    {
+      "id": "detail_modal",
+      "selector": ".note-detail-mask, .note-detail-page, .note-detail-dialog, .note-detail-mask .detail-container, .note-detail-mask .media-container, .note-detail-mask .note-scroller, .note-detail-mask .note-content, .note-detail-mask .interaction-container, .note-detail-mask .comments-container",
+      "events": [
+        "appear",
+        "exist",
+        "disappear"
+      ]
+    },
+    {
+      "id": "detail_comment_item",
+      "selector": ".comment-item, [class*=\"comment-item\"]",
+      "events": [
+        "appear",
+        "exist",
+        "change"
+      ]
+    },
+    {
+      "id": "detail_show_more",
+      "selector": ".show-more, .reply-expand, [class*=\"expand\"]",
+      "events": [
+        "appear",
+        "exist"
+      ]
+    },
+    {
+      "id": "detail_discover_button",
+      "selector": "a[href*=\"/explore?channel_id=homefeed_recommend\"]",
+      "events": [
+        "appear",
+        "exist"
+      ]
+    },
+    {
+      "id": "login_guard",
+      "selector": ".login-container, .login-dialog, #login-container",
+      "events": [
+        "appear",
+        "exist"
+      ]
+    },
+    {
+      "id": "risk_guard",
+      "selector": ".qrcode-box, .captcha-container, [class*=\"captcha\"]",
+      "events": [
+        "appear",
+        "exist"
+      ]
+    }
+  ],
+  "operations": [
+    {
+      "id": "sync_window_viewport",
+      "action": "sync_window_viewport",
+      "params": {
+        "followWindow": true,
+        "settleMs": 220,
+        "attempts": 2
+      },
+      "trigger": "startup",
+      "once": true,
+      "retry": {
+        "attempts": 1,
+        "backoffMs": 0
+      },
+      "impact": "op",
+      "onFailure": "continue"
+    },
+    {
+      "id": "goto_home",
+      "action": "goto",
+      "params": {
+        "url": "https://www.xiaohongshu.com/explore"
+      },
+      "trigger": "startup",
+      "once": true,
+      "retry": {
+        "attempts": 2,
+        "backoffMs": 300
+      },
+      "validation": {
+        "mode": "post",
+        "post": {
+          "page": {
+            "hostIncludes": [
+              "xiaohongshu.com"
+            ],
+            "checkpointIn": [
+              "home_ready",
+              "search_ready"
+            ]
+          }
+        }
+      },
+      "checkpoint": {
+        "containerId": "xiaohongshu_home.discover_button",
+        "targetCheckpoint": "home_ready",
+        "recovery": {
+          "attempts": 0,
+          "actions": []
+        }
+      }
+    },
+    {
+      "id": "fill_keyword",
+      "action": "type",
+      "params": {
+        "selector": "#search-input",
+        "text": "工作服定制"
+      },
+      "trigger": "home_search_input.exist",
+      "dependsOn": [
+        "goto_home"
+      ],
+      "once": true,
+      "validation": {
+        "mode": "both",
+        "pre": {
+          "page": {
+            "hostIncludes": [
+              "xiaohongshu.com"
+            ],
+            "checkpointIn": [
+              "home_ready",
+              "search_ready"
+            ]
+          }
+        },
+        "post": {
+          "container": {
+            "selector": "#search-input",
+            "mustExist": true,
+            "minCount": 1
+          }
+        }
+      },
+      "checkpoint": {
+        "containerId": "xiaohongshu_home.search_input",
+        "targetCheckpoint": "search_ready",
+        "recovery": {
+          "attempts": 0,
+          "actions": []
+        }
+      }
+    },
+    {
+      "id": "submit_search",
+      "action": "xhs_submit_search",
+      "params": {
+        "keyword": "工作服定制"
+      },
+      "trigger": "home_search_input.exist",
+      "dependsOn": [
+        "fill_keyword"
+      ],
+      "once": true,
+      "timeoutMs": 120000,
+      "validation": {
+        "mode": "post",
+        "post": {
+          "page": {
+            "hostIncludes": [
+              "xiaohongshu.com"
+            ],
+            "checkpointIn": [
+              "search_ready",
+              "home_ready"
+            ]
+          }
+        }
+      },
+      "checkpoint": {
+        "containerId": "xiaohongshu_home.search_button",
+        "targetCheckpoint": "search_ready",
+        "recovery": {
+          "attempts": 0,
+          "actions": []
+        }
+      }
+    },
+    {
+      "id": "open_first_detail",
+      "action": "xhs_open_detail",
+      "params": {
+        "mode": "first",
+        "maxNotes": 20,
+        "keyword": "工作服定制"
+      },
+      "trigger": "search_result_item.exist",
+      "dependsOn": [
+        "submit_search"
+      ],
+      "once": true,
+      "timeoutMs": 90000,
+      "validation": {
+        "mode": "post",
+        "post": {
+          "page": {
+            "hostIncludes": [
+              "xiaohongshu.com"
+            ],
+            "checkpointIn": [
+              "detail_ready",
+              "comments_ready",
+              "search_ready"
+            ]
+          }
+        }
+      },
+      "checkpoint": {
+        "containerId": "xiaohongshu_search.search_result_item",
+        "targetCheckpoint": "detail_ready",
+        "recovery": {
+          "attempts": 0,
+          "actions": []
+        }
+      }
+    },
+    {
+      "id": "detail_harvest",
+      "enabled": true,
+      "action": "xhs_detail_harvest",
+      "params": {},
+      "trigger": "detail_modal.exist",
+      "dependsOn": [
+        "open_first_detail"
+      ],
+      "once": false,
+      "timeoutMs": 90000,
+      "impact": "op",
+      "onFailure": "continue",
+      "pacing": {
+        "operationMinIntervalMs": 2000,
+        "eventCooldownMs": 1200,
+        "jitterMs": 260
+      },
+      "validation": {
+        "mode": "both",
+        "pre": {
+          "page": {
+            "hostIncludes": [
+              "xiaohongshu.com"
+            ],
+            "checkpointIn": [
+              "detail_ready",
+              "comments_ready"
+            ]
+          },
+          "container": {
+            "selector": ".note-detail-mask, .note-detail-page, .note-detail-dialog",
+            "mustExist": true,
+            "minCount": 1
+          }
+        },
+        "post": {
+          "page": {
+            "hostIncludes": [
+              "xiaohongshu.com"
+            ],
+            "checkpointIn": [
+              "detail_ready",
+              "comments_ready"
+            ]
+          },
+          "container": {
+            "selector": ".note-detail-mask, .note-detail-page, .note-detail-dialog",
+            "mustExist": true,
+            "minCount": 1
+          }
+        }
+      },
+      "checkpoint": {
+        "containerId": "xiaohongshu_detail.modal_shell",
+        "targetCheckpoint": "detail_ready",
+        "recovery": {
+          "attempts": 0,
+          "actions": []
+        }
+      }
+    },
+    {
+      "id": "expand_replies",
+      "enabled": true,
+      "action": "xhs_expand_replies",
+      "params": {},
+      "trigger": "detail_show_more.exist",
+      "dependsOn": [
+        "open_first_detail"
+      ],
+      "once": false,
+      "retry": {
+        "attempts": 1,
+        "backoffMs": 0
+      },
+      "onFailure": "continue",
+      "impact": "op",
+      "pacing": {
+        "operationMinIntervalMs": 2500,
+        "eventCooldownMs": 1500,
+        "jitterMs": 220
+      }
+    },
+    {
+      "id": "comments_harvest",
+      "enabled": true,
+      "action": "xhs_comments_harvest",
+      "params": {},
+      "trigger": "detail_modal.exist",
+      "dependsOn": [
+        "detail_harvest"
+      ],
+      "once": false,
+      "timeoutMs": 90000,
+      "impact": "op",
+      "onFailure": "continue",
+      "pacing": {
+        "operationMinIntervalMs": 2400,
+        "eventCooldownMs": 1500,
+        "jitterMs": 280
+      },
+      "validation": {
+        "mode": "both",
+        "pre": {
+          "page": {
+            "hostIncludes": [
+              "xiaohongshu.com"
+            ],
+            "checkpointIn": [
+              "detail_ready",
+              "comments_ready"
+            ]
+          },
+          "container": {
+            "selector": ".note-detail-mask, .note-detail-page, .note-detail-dialog",
+            "mustExist": true,
+            "minCount": 1
+          }
+        },
+        "post": {
+          "page": {
+            "hostIncludes": [
+              "xiaohongshu.com"
+            ],
+            "checkpointIn": [
+              "detail_ready",
+              "comments_ready"
+            ]
+          },
+          "container": {
+            "selector": ".comment-item, [class*=\"comment-item\"]",
+            "mustExist": false,
+            "minCount": 0
+          }
+        }
+      },
+      "checkpoint": {
+        "containerId": "xiaohongshu_detail.comment_section.comment_item",
+        "targetCheckpoint": "comments_ready",
+        "recovery": {
+          "attempts": 0,
+          "actions": []
+        }
+      }
+    },
+    {
+      "id": "comment_match_gate",
+      "enabled": true,
+      "action": "xhs_comment_match",
+      "params": {
+        "keywords": [
+          "工作服定制"
+        ],
+        "mode": "any",
+        "minHits": 1
+      },
+      "trigger": "detail_modal.exist",
+      "dependsOn": [
+        "comments_harvest"
+      ],
+      "once": false,
+      "pacing": {
+        "operationMinIntervalMs": 2400,
+        "eventCooldownMs": 1200,
+        "jitterMs": 160
+      }
+    },
+    {
+      "id": "comment_like",
+      "enabled": true,
+      "action": "xhs_comment_like",
+      "params": {
+        "keywords": [
+          "工作服定制"
+        ],
+        "maxLikes": 2
+      },
+      "trigger": "detail_modal.exist",
+      "dependsOn": [
+        "comment_match_gate"
+      ],
+      "once": false,
+      "timeoutMs": 90000,
+      "retry": {
+        "attempts": 1,
+        "backoffMs": 0
+      },
+      "onFailure": "continue",
+      "impact": "op",
+      "pacing": {
+        "operationMinIntervalMs": 2600,
+        "eventCooldownMs": 1500,
+        "jitterMs": 300
+      }
+    },
+    {
+      "id": "comment_reply",
+      "enabled": false,
+      "action": "xhs_comment_reply",
+      "params": {
+        "replyText": "感谢分享，已关注"
+      },
+      "trigger": "detail_modal.exist",
+      "dependsOn": [
+        "comment_match_gate"
+      ],
+      "once": false,
+      "timeoutMs": 90000,
+      "retry": {
+        "attempts": 1,
+        "backoffMs": 0
+      },
+      "onFailure": "continue",
+      "impact": "op",
+      "pacing": {
+        "operationMinIntervalMs": 2600,
+        "eventCooldownMs": 1500,
+        "jitterMs": 300
+      }
+    },
+    {
+      "id": "close_detail",
+      "action": "xhs_close_detail",
+      "params": {},
+      "trigger": "detail_modal.exist",
+      "dependsOn": [
+        "comment_like"
+      ],
+      "once": false,
+      "pacing": {
+        "operationMinIntervalMs": 2500,
+        "eventCooldownMs": 1300,
+        "jitterMs": 180
+      },
+      "validation": {
+        "mode": "post",
+        "post": {
+          "page": {
+            "hostIncludes": [
+              "xiaohongshu.com"
+            ],
+            "checkpointIn": [
+              "home_ready",
+              "search_ready"
+            ]
+          }
+        }
+      },
+      "checkpoint": {
+        "containerId": "xiaohongshu_detail.discover_button",
+        "targetCheckpoint": "search_ready",
+        "recovery": {
+          "attempts": 0,
+          "actions": []
+        }
+      }
+    },
+    {
+      "id": "wait_between_notes",
+      "action": "wait",
+      "params": {
+        "ms": 900
+      },
+      "trigger": "detail_modal.disappear",
+      "dependsOn": [
+        "close_detail"
+      ],
+      "once": false,
+      "retry": {
+        "attempts": 1,
+        "backoffMs": 0
+      },
+      "impact": "op",
+      "onFailure": "continue",
+      "pacing": {
+        "operationMinIntervalMs": 900,
+        "eventCooldownMs": 450,
+        "jitterMs": 160
+      }
+    },
+    {
+      "id": "switch_tab_round_robin",
+      "action": "tab_pool_switch_next",
+      "params": {
+        "settleMs": 450
+      },
+      "trigger": "detail_modal.disappear",
+      "dependsOn": [
+        "wait_between_notes",
+        "ensure_tab_pool"
+      ],
+      "once": false,
+      "timeoutMs": 180000,
+      "retry": {
+        "attempts": 2,
+        "backoffMs": 500
+      },
+      "impact": "op",
+      "onFailure": "continue"
+    },
+    {
+      "id": "open_next_detail",
+      "action": "xhs_open_detail",
+      "params": {
+        "mode": "next",
+        "maxNotes": 20
+      },
+      "trigger": "detail_modal.disappear",
+      "dependsOn": [
+        "switch_tab_round_robin"
+      ],
+      "once": false,
+      "timeoutMs": 90000,
+      "retry": {
+        "attempts": 1,
+        "backoffMs": 0
+      },
+      "impact": "script",
+      "onFailure": "stop_all",
+      "checkpoint": {
+        "containerId": "xiaohongshu_search.search_result_item",
+        "targetCheckpoint": "detail_ready",
+        "recovery": {
+          "attempts": 0,
+          "actions": []
+        }
+      }
+    },
+    {
+      "id": "abort_on_login_guard",
+      "action": "raise_error",
+      "params": {
+        "code": "LOGIN_GUARD_DETECTED"
+      },
+      "trigger": "login_guard.appear",
+      "once": false,
+      "retry": {
+        "attempts": 1,
+        "backoffMs": 0
+      },
+      "impact": "script",
+      "onFailure": "stop_all",
+      "checkpoint": {
+        "containerId": "xiaohongshu_login.login_guard",
+        "targetCheckpoint": "login_guard",
+        "recovery": {
+          "attempts": 0,
+          "actions": []
+        }
+      }
+    },
+    {
+      "id": "abort_on_risk_guard",
+      "action": "raise_error",
+      "params": {
+        "code": "RISK_CONTROL_DETECTED"
+      },
+      "trigger": "risk_guard.appear",
+      "once": false,
+      "retry": {
+        "attempts": 1,
+        "backoffMs": 0
+      },
+      "impact": "script",
+      "onFailure": "stop_all",
+      "checkpoint": {
+        "containerId": "xiaohongshu_login.qrcode_guard",
+        "targetCheckpoint": "risk_control",
+        "recovery": {
+          "attempts": 0,
+          "actions": []
+        }
+      }
+    },
+    {
+      "id": "ensure_tab_pool",
+      "action": "ensure_tab_pool",
+      "params": {
+        "tabCount": 4,
+        "openDelayMs": 1200,
+        "normalizeTabs": false
+      },
+      "trigger": "detail_modal.disappear",
+      "dependsOn": [
+        "wait_between_notes"
+      ],
+      "once": true,
+      "timeoutMs": 180000,
+      "retry": {
+        "attempts": 2,
+        "backoffMs": 500
+      },
+      "impact": "script",
+      "onFailure": "stop_all",
+      "validation": {
+        "mode": "post",
+        "post": {
+          "page": {
+            "hostIncludes": [
+              "xiaohongshu.com"
+            ],
+            "checkpointIn": [
+              "search_ready",
+              "home_ready"
+            ]
+          }
+        }
+      },
+      "checkpoint": {
+        "targetCheckpoint": "search_ready",
+        "recovery": {
+          "attempts": 0,
+          "actions": []
+        }
+      }
+    },
+    {
+      "id": "verify_subscriptions_all_pages",
+      "action": "verify_subscriptions",
+      "params": {
+        "acrossPages": true,
+        "settleMs": 320,
+        "selectors": [
+          {
+            "id": "home_search_input",
+            "selector": "#search-input, input.search-input"
+          },
+          {
+            "id": "search_result_item",
+            "selector": ".note-item",
+            "visible": false,
+            "minCount": 1
+          }
+        ]
+      },
+      "trigger": "detail_modal.disappear",
+      "dependsOn": [
+        "ensure_tab_pool"
+      ],
+      "once": true,
+      "timeoutMs": 90000,
+      "impact": "script",
+      "onFailure": "stop_all"
+    }
+  ]
+}

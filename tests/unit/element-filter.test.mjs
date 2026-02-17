@@ -74,6 +74,18 @@ describe('ElementFilter', () => {
       const selector = { classes: ['class2'] };
       assert.strictEqual(filter.matchesSelector(element, selector), false);
     });
+
+    it('should match css id selector by element id', () => {
+      const element = { id: 'search-input', tag: 'input', classes: ['search-input'] };
+      const selector = { css: '#search-input' };
+      assert.strictEqual(filter.matchesSelector(element, selector), true);
+    });
+
+    it('should match css tag+class selector', () => {
+      const element = { id: null, tag: 'input', classes: ['search-input'] };
+      const selector = { css: 'input.search-input' };
+      assert.strictEqual(filter.matchesSelector(element, selector), true);
+    });
   });
 
   describe('filterByContainer', () => {

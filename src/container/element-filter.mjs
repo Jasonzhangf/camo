@@ -1,5 +1,24 @@
 // Container Element Filter - Filter DOM elements by visibility, container definitions
 
+function parseCssSelector(css) {
+  const raw = typeof css === 'string' ? css.trim() : '';
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => {
+      const tagMatch = item.match(/^[a-zA-Z][\w-]*/);
+      const idMatch = item.match(/#([\w-]+)/);
+      const classMatches = item.match(/\.([\w-]+)/g) || [];
+      return {
+        tag: tagMatch ? tagMatch[0].toLowerCase() : null,
+        id: idMatch ? idMatch[1] : null,
+        classes: classMatches.map((token) => token.slice(1)),
+      };
+    });
+}
+
 export class ElementFilter {
   constructor(options = {}) {
     this.viewportMargin = options.viewportMargin || 0;
@@ -52,13 +71,40 @@ export class ElementFilter {
 
   // Check if element matches selector definition
   matchesSelector(element, selector) {
+    if (!element || !selector) return false;
     if (selector.css && element.selector === selector.css) return true;
-    if (selector.id && element.id === selector.id) return true;
-    if (selector.classes) {
-      const elementClasses = new Set(element.classes || []);
-      if (selector.classes.every(c => elementClasses.has(c))) return true;
+
+    const elementTag = typeof element.tag === 'string' ? element.tag.toLowerCase() : null;
+    const elementId = typeof element.id === 'string' ? element.id : null;
+    const elementClasses = new Set(Array.isArray(element.classes) ? element.classes : []);
+
+    const cssVariants = parseCssSelector(selector.css);
+    if (cssVariants.length > 0) {
+      for (const cssVariant of cssVariants) {
+        let matched = true;
+        if (cssVariant.tag && elementTag !== cssVariant.tag) matched = false;
+        if (cssVariant.id && elementId !== cssVariant.id) matched = false;
+        if (matched && cssVariant.classes.length > 0) {
+          matched = cssVariant.classes.every((className) => elementClasses.has(className));
+        }
+        if (matched) return true;
+      }
     }
-    return false;
+
+    const requiredTag = selector.tag ? String(selector.tag).toLowerCase() : null;
+    const requiredId = selector.id ? String(selector.id) : null;
+    const requiredClasses = Array.isArray(selector.classes)
+      ? selector.classes.filter(Boolean).map((className) => String(className))
+      : [];
+
+    const hasStructuredSelector = Boolean(requiredTag || requiredId || requiredClasses.length > 0);
+    if (!hasStructuredSelector) return false;
+    if (requiredTag && elementTag !== requiredTag) return false;
+    if (requiredId && elementId !== requiredId) return false;
+    if (requiredClasses.length > 0 && !requiredClasses.every((className) => elementClasses.has(className))) {
+      return false;
+    }
+    return true;
   }
 
   // Main filter method

@@ -1,0 +1,154 @@
+import { describe, it, beforeEach, afterEach } from 'node:test';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import {
+  handleStopCommand,
+  computeStartWindowSize,
+  syncWindowViewportAfterResize,
+} from '../../../src/commands/browser.mjs';
+import { acquireLock, isLocked, releaseLock } from '../../../src/lifecycle/lock.mjs';
+import { registerSession, getSessionInfo, unregisterSession } from '../../../src/lifecycle/session-registry.mjs';
+
+const WATCHDOG_DIR = path.join(os.homedir(), '.webauto', 'run', 'camo-watchdogs');
+const originalFetch = global.fetch;
+const TEST_PROFILE = `test-browser-stop-${Date.now()}`;
+
+function getWatchdogFile(profileId) {
+  return path.join(WATCHDOG_DIR, `${profileId}.json`);
+}
+
+describe('browser command', () => {
+  beforeEach(() => {
+    fs.mkdirSync(WATCHDOG_DIR, { recursive: true });
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) {
+        return { ok: true, status: 200 };
+      }
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        if (body.action === 'stop') {
+          return {
+            ok: false,
+            status: 500,
+            json: async () => ({ error: 'stop failed for test' }),
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ ok: true }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => ({}) };
+    };
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    releaseLock(TEST_PROFILE);
+    unregisterSession(TEST_PROFILE);
+    const watchdogFile = getWatchdogFile(TEST_PROFILE);
+    if (fs.existsSync(watchdogFile)) fs.unlinkSync(watchdogFile);
+  });
+
+  it('cleans local lifecycle state even when remote stop fails', async () => {
+    acquireLock(TEST_PROFILE, { sessionId: 'sid-test' });
+    registerSession(TEST_PROFILE, { sessionId: 'sid-test' });
+    fs.writeFileSync(getWatchdogFile(TEST_PROFILE), JSON.stringify({ profileId: TEST_PROFILE, pid: -1 }));
+
+    await assert.rejects(
+      async () => handleStopCommand(['stop', TEST_PROFILE]),
+      /stop failed for test/,
+    );
+
+    assert.strictEqual(isLocked(TEST_PROFILE), false);
+    assert.strictEqual(getSessionInfo(TEST_PROFILE), null);
+    assert.strictEqual(fs.existsSync(getWatchdogFile(TEST_PROFILE)), false);
+  });
+});
+
+describe('browser start window sizing helpers', () => {
+  const prevReserve = process.env.CAMO_DEFAULT_WINDOW_VERTICAL_RESERVE;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    if (prevReserve === undefined) {
+      delete process.env.CAMO_DEFAULT_WINDOW_VERTICAL_RESERVE;
+    } else {
+      process.env.CAMO_DEFAULT_WINDOW_VERTICAL_RESERVE = prevReserve;
+    }
+  });
+
+  it('computes near-fullscreen size from work area by default', () => {
+    delete process.env.CAMO_DEFAULT_WINDOW_VERTICAL_RESERVE;
+    const result = computeStartWindowSize({
+      metrics: { workWidth: 2560, workHeight: 1415 },
+    });
+    assert.deepStrictEqual(result, {
+      width: 2560,
+      height: 1343,
+      reservePx: 72,
+      source: 'workArea',
+    });
+  });
+
+  it('falls back to sane defaults when display metrics are unavailable', () => {
+    const result = computeStartWindowSize(null);
+    assert.deepStrictEqual(result, {
+      width: 1920,
+      height: 1000,
+      reservePx: 72,
+      source: 'fallback',
+    });
+  });
+
+  it('syncs viewport after resizing startup window', async () => {
+    const actions = [];
+    let evaluateCalls = 0;
+    global.fetch = async (url, options = {}) => {
+      if (!String(url).includes('/command')) {
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      }
+      const body = JSON.parse(options.body || '{}');
+      actions.push(body);
+      if (body.action === 'window:resize') {
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      }
+      if (body.action === 'page:setViewport') {
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      }
+      if (body.action === 'evaluate') {
+        evaluateCalls += 1;
+        if (evaluateCalls === 1) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ result: { innerWidth: 1200, innerHeight: 700, outerWidth: 1366, outerHeight: 900 } }),
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ result: { innerWidth: 1246, innerHeight: 720, outerWidth: 1366, outerHeight: 900 } }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    const result = await syncWindowViewportAfterResize('profile-1', 1366, 900, {
+      settleMs: 1,
+      attempts: 2,
+      tolerancePx: 0,
+    });
+
+    const resizeAction = actions.find((item) => item.action === 'window:resize');
+    const setViewportAction = actions.find((item) => item.action === 'page:setViewport');
+    assert.ok(resizeAction);
+    assert.ok(setViewportAction);
+    assert.strictEqual(setViewportAction.args.width, 1246);
+    assert.strictEqual(setViewportAction.args.height, 720);
+    assert.strictEqual(result.targetViewport.matched, true);
+  });
+});

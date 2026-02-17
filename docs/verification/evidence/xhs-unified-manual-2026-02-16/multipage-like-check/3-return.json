@@ -1,0 +1,7 @@
+{
+  "ok": true,
+  "result": {
+    "clicked": true,
+    "selector": "a[href*=\"/explore?channel_id=homefeed_recommend\"]"
+  }
+}

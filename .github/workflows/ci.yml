@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: npm ci || npm install
 
+      - name: Check file size policy
+        run: npm run check:file-size
+
       - name: Run build
         run: npm run build
 

@@ -1,0 +1,17 @@
+{
+  "ok": true,
+  "profileId": "xiaohongshu-batch-1",
+  "count": 1,
+  "elements": [
+    {
+      "selector": ".comment-item",
+      "path": "root/12/0/3/1/2/0/1/0/0",
+      "tag": "div",
+      "id": "comment-6982e4840000000004002e11",
+      "classes": [
+        "comment-item"
+      ],
+      "text": "言言小吃货哎来晚了02-04江苏赞回复"
+    }
+  ]
+}

@@ -95,6 +95,15 @@ describe('session registry', () => {
     assert.strictEqual(getSessionInfo(id), null);
   });
 
+  it('should mark closed and unregister even when session file is corrupted', () => {
+    const id = TEST_PREFIX + '-8b';
+    registerSession(id);
+    fs.writeFileSync(getSessionFile(id), '{corrupted-json');
+    const removed = markSessionClosed(id);
+    assert.strictEqual(removed, true);
+    assert.strictEqual(getSessionInfo(id), null);
+  });
+
   it('should cleanup stale/closed/corrupted sessions', () => {
     const id1 = TEST_PREFIX + '-9';
     const id2 = TEST_PREFIX + '-10';

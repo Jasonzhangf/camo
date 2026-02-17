@@ -1,6 +1,11 @@
 // Camo Container Client - High-level API for container subscription
 
-import { callAPI, getSessionByProfile, checkBrowserService } from '../utils/browser-service.mjs';
+import {
+  checkBrowserService,
+  getDomSnapshotByProfile,
+  getSessionByProfile,
+  getViewportByProfile,
+} from '../utils/browser-service.mjs';
 import { getDefaultProfile } from '../utils/config.mjs';
 import { getChangeNotifier } from '../container/change-notifier.mjs';
 import { createElementFilter } from '../container/element-filter.mjs';
@@ -36,8 +41,7 @@ export class CamoContainerClient {
   async getSnapshot() {
     await this.ensureSession();
 
-    const result = await callAPI(`/session/${this.session.session_id}/dom-tree`, { method: 'POST' });
-    this.lastSnapshot = result.dom_tree || result;
+    this.lastSnapshot = await getDomSnapshotByProfile(this.profileId);
     return this.lastSnapshot;
   }
 
@@ -45,8 +49,7 @@ export class CamoContainerClient {
     await this.ensureSession();
 
     try {
-      const result = await callAPI(`/session/${this.session.session_id}/viewport`);
-      this.viewport = result.viewport || this.viewport;
+      this.viewport = await getViewportByProfile(this.profileId);
     } catch {}
 
     return this.viewport;

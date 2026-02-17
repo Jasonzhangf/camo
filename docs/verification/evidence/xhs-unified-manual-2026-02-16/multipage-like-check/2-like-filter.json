@@ -1,0 +1,27 @@
+{
+  "ok": true,
+  "profileId": "xiaohongshu-batch-1",
+  "count": 2,
+  "elements": [
+    {
+      "selector": ".comment-item",
+      "path": "root/12/0/3/1/2/0/1/0/0",
+      "tag": "div",
+      "id": "comment-6984bb08000000000601edb0",
+      "classes": [
+        "comment-item"
+      ],
+      "text": "关欣活动搭建我认识一家，做华为和比亚迪工服的，单价在100以上可以接受吗？02-05广东赞1"
+    },
+    {
+      "selector": ".comment-item",
+      "path": "root/12/0/3/1/2/0/1/1/0",
+      "tag": "div",
+      "id": "comment-69870f060000000006032635",
+      "classes": [
+        "comment-item"
+      ],
+      "text": "河北服装加工源头额 不会吧02-07河北赞回复"
+    }
+  ]
+}

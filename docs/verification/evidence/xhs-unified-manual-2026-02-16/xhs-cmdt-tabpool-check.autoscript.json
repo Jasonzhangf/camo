@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "name": "xhs-cmdt-tabpool-check",
+  "profileId": "xiaohongshu-batch-1",
+  "throttle": 900,
+  "defaults": {
+    "retry": { "attempts": 1, "backoffMs": 200 },
+    "impact": "subscription",
+    "onFailure": "chain_stop",
+    "validationMode": "none",
+    "pacing": {
+      "operationMinIntervalMs": 500,
+      "eventCooldownMs": 200,
+      "jitterMs": 0,
+      "navigationMinIntervalMs": 1000,
+      "timeoutMs": 120000
+    },
+    "timeoutMs": 120000
+  },
+  "subscriptions": [],
+  "operations": [
+    {
+      "id": "ensure_tab_pool",
+      "action": "ensure_tab_pool",
+      "params": { "tabCount": 3, "openDelayMs": 600 },
+      "trigger": "startup",
+      "once": true,
+      "impact": "script",
+      "onFailure": "stop_all"
+    },
+    {
+      "id": "finish",
+      "action": "raise_error",
+      "params": { "code": "AUTOSCRIPT_DONE_CMDT_TABPOOL_CHECK" },
+      "trigger": "startup",
+      "dependsOn": ["ensure_tab_pool"],
+      "once": true,
+      "impact": "script",
+      "onFailure": "stop_all"
+    }
+  ]
+}

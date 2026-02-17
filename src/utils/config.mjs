@@ -6,6 +6,7 @@ import os from 'node:os';
 export const CONFIG_DIR = path.join(os.homedir(), '.webauto');
 export const PROFILES_DIR = path.join(CONFIG_DIR, 'profiles');
 export const CONFIG_FILE = path.join(CONFIG_DIR, 'camo-cli.json');
+export const PROFILE_META_FILE = 'camo-profile.json';
 export const BROWSER_SERVICE_URL = process.env.WEBAUTO_BROWSER_URL || 'http://127.0.0.1:7704';
 
 export function ensureDir(p) {
@@ -55,13 +56,13 @@ export function createProfile(profileId) {
   if (!isValidProfileId(profileId)) {
     throw new Error('Invalid profileId. Use only letters, numbers, dot, underscore, dash.');
   }
-  const profileDir = path.join(PROFILES_DIR, profileId);
+  const profileDir = getProfileDir(profileId);
   if (fs.existsSync(profileDir)) throw new Error(`Profile already exists: ${profileId}`);
   ensureDir(profileDir);
 }
 
 export function deleteProfile(profileId) {
-  const profileDir = path.join(PROFILES_DIR, profileId);
+  const profileDir = getProfileDir(profileId);
   if (!fs.existsSync(profileDir)) throw new Error(`Profile not found: ${profileId}`);
   fs.rmSync(profileDir, { recursive: true, force: true });
 }
@@ -80,6 +81,61 @@ export function setRepoRoot(repoRoot) {
 
 export function getDefaultProfile() {
   return loadConfig().defaultProfile;
+}
+
+export function getProfileDir(profileId) {
+  return path.join(PROFILES_DIR, String(profileId || '').trim());
+}
+
+export function getProfileMetaFile(profileId) {
+  return path.join(getProfileDir(profileId), PROFILE_META_FILE);
+}
+
+function loadProfileMeta(profileId) {
+  if (!isValidProfileId(profileId)) return {};
+  return readJson(getProfileMetaFile(profileId)) || {};
+}
+
+function saveProfileMeta(profileId, patch) {
+  if (!isValidProfileId(profileId)) return null;
+  const profileDir = getProfileDir(profileId);
+  ensureDir(profileDir);
+  const current = loadProfileMeta(profileId);
+  const next = {
+    ...current,
+    ...patch,
+    updatedAt: Date.now(),
+  };
+  writeJson(getProfileMetaFile(profileId), next);
+  return next;
+}
+
+export function getProfileWindowSize(profileId) {
+  const meta = loadProfileMeta(profileId);
+  const width = Number(meta?.window?.width);
+  const height = Number(meta?.window?.height);
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+  if (width < 320 || height < 240) return null;
+  return {
+    width: Math.floor(width),
+    height: Math.floor(height),
+    updatedAt: Number(meta?.window?.updatedAt) || Number(meta?.updatedAt) || null,
+  };
+}
+
+export function setProfileWindowSize(profileId, width, height) {
+  const parsedWidth = Number(width);
+  const parsedHeight = Number(height);
+  if (!Number.isFinite(parsedWidth) || !Number.isFinite(parsedHeight)) return null;
+  if (parsedWidth < 320 || parsedHeight < 240) return null;
+  const now = Date.now();
+  return saveProfileMeta(profileId, {
+    window: {
+      width: Math.floor(parsedWidth),
+      height: Math.floor(parsedHeight),
+      updatedAt: now,
+    },
+  });
 }
 
 const START_SCRIPT_REL = path.join('runtime', 'infra', 'utils', 'scripts', 'service', 'start-browser-service.mjs');
