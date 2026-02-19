@@ -23,6 +23,7 @@ describe('help utilities', () => {
       assert.ok(logs.length > 0);
       assert.ok(logs.some(l => l.includes('camo') || l.includes('Usage')));
       assert.ok(logs.some(l => l.includes('--devtools')));
+      assert.ok(logs.some(l => l.includes('devtools logs')));
     });
   });
 

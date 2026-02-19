@@ -63,6 +63,11 @@ PAGES:
   switch-page [profileId] <index>
   list-pages [profileId]
 
+DEVTOOLS:
+  devtools logs [profileId] [--limit 120] [--since <unix_ms>] [--levels error,warn] [--clear]
+  devtools eval [profileId] <expression> [--profile <id>]
+  devtools clear [profileId]
+
 COOKIES:
   cookies get [profileId]                          Get all cookies for profile
   cookies save [profileId] --path <file>           Save cookies to file
@@ -99,6 +104,8 @@ EXAMPLES:
   camo start worker-1 --headless --alias shard1 --idle-timeout 45m
   camo start worker-1 --devtools
   camo start myprofile --width 1920 --height 1020
+  camo devtools eval myprofile "document.title"
+  camo devtools logs myprofile --levels error,warn --limit 50
   camo stop --id inst_xxxxxxxx
   camo stop --alias shard1
   camo stop idle

@@ -13,6 +13,7 @@ import { handleSystemCommand } from './commands/system.mjs';
 import { handleContainerCommand } from './commands/container.mjs';
 import { handleAutoscriptCommand } from './commands/autoscript.mjs';
 import { handleEventsCommand } from './commands/events.mjs';
+import { handleDevtoolsCommand } from './commands/devtools.mjs';
 import {
   handleStartCommand, handleStopCommand, handleStatusCommand,
   handleGotoCommand, handleBackCommand, handleScreenshotCommand,
@@ -62,6 +63,13 @@ function inferProfileId(cmd, args) {
       return null;
     }
     return positionals[0] || null;
+  }
+
+  if (cmd === 'devtools') {
+    const sub = positionals[0] || null;
+    if (sub === 'eval' || sub === 'logs' || sub === 'clear') {
+      return positionals[1] || null;
+    }
   }
 
   if (cmd === 'autoscript' && positionals[0] === 'run') {
@@ -192,6 +200,11 @@ async function main() {
     return;
   }
 
+  if (cmd === 'devtools') {
+    await runTrackedCommand(cmd, args, () => handleDevtoolsCommand(args));
+    return;
+  }
+
   // Lifecycle commands
   if (cmd === 'cleanup') {
     await runTrackedCommand(cmd, args, () => handleCleanupCommand(args));
@@ -237,7 +250,7 @@ async function main() {
     'start', 'stop', 'close', 'status', 'list', 'goto', 'navigate', 'back', 'screenshot',
     'new-page', 'close-page', 'switch-page', 'list-pages', 'shutdown',
     'scroll', 'click', 'type', 'highlight', 'clear-highlight', 'viewport',
-    'cookies', 'window', 'mouse', 'system', 'container', 'autoscript', 'events',
+    'cookies', 'window', 'mouse', 'system', 'container', 'autoscript', 'events', 'devtools',
   ]);
 
   if (!serviceCommands.has(cmd)) {

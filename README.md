@@ -42,6 +42,12 @@ camo start worker-1 --headless --alias shard1 --idle-timeout 30m
 # Start with devtools (headful only)
 camo start worker-1 --devtools
 
+# Evaluate JS (devtools-style input in page context)
+camo devtools eval worker-1 "document.title"
+
+# Read captured console entries
+camo devtools logs worker-1 --levels error,warn --limit 50
+
 # Navigate
 camo goto https://www.xiaohongshu.com
 
@@ -120,6 +126,14 @@ camo type [profileId] <selector> <text>        # Type text into element
 camo highlight [profileId] <selector>          # Highlight element (red border, 2s)
 camo clear-highlight [profileId]               # Clear all highlights
 camo viewport [profileId] --width <w> --height <h>
+```
+
+### Devtools
+
+```bash
+camo devtools logs [profileId] [--limit 120] [--since <unix_ms>] [--levels error,warn] [--clear]
+camo devtools eval [profileId] <expression> [--profile <id>]
+camo devtools clear [profileId]
 ```
 
 ### Pages
