@@ -24,6 +24,8 @@ describe('help utilities', () => {
       assert.ok(logs.some(l => l.includes('camo') || l.includes('Usage')));
       assert.ok(logs.some(l => l.includes('--devtools')));
       assert.ok(logs.some(l => l.includes('devtools logs')));
+      assert.ok(logs.some(l => l.includes('record start')));
+      assert.ok(logs.some(l => l.includes('highlight-mode')));
     });
   });
 

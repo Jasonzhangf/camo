@@ -38,6 +38,10 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Run mode coverage gate (record/highlight, >=90%)
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 20
+        run: npm run test:coverage:modes
+
       - name: Test global install (Unix)
         run: npm install -g .
         if: matrix.os != 'windows-latest'

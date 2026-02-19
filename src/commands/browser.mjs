@@ -1,7 +1,9 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import {
   listProfiles,
   getDefaultProfile,
+  getHighlightMode,
   getProfileWindowSize,
   setProfileWindowSize,
 } from '../utils/config.mjs';
@@ -10,6 +12,7 @@ import { resolveProfileId, ensureUrlScheme, looksLikeUrlToken, getPositionals } 
 import { acquireLock, releaseLock, cleanupStaleLocks } from '../lifecycle/lock.mjs';
 import {
   buildSelectorClickScript,
+  buildScrollTargetScript,
   buildSelectorTypeScript,
 } from '../container/runtime-core/operations/selector-scripts.mjs';
 import {
@@ -81,6 +84,12 @@ function validateAlias(alias) {
     throw new Error('Invalid --alias. Use only letters, numbers, dot, underscore, dash.');
   }
   return text.slice(0, 64);
+}
+
+function resolveHighlightEnabled(args) {
+  if (args.includes('--highlight')) return true;
+  if (args.includes('--no-highlight')) return false;
+  return getHighlightMode();
 }
 
 function formatDurationMs(ms) {
@@ -319,12 +328,27 @@ export async function handleStartCommand(args) {
   const idleTimeoutRaw = readFlagValue(args, ['--idle-timeout']);
   const parsedIdleTimeoutMs = parseDurationMs(idleTimeoutRaw, DEFAULT_HEADLESS_IDLE_TIMEOUT_MS);
   const wantsDevtools = args.includes('--devtools');
+  const wantsRecord = args.includes('--record');
+  const recordName = readFlagValue(args, ['--record-name']);
+  const recordOutputRaw = readFlagValue(args, ['--record-output']);
+  const recordOverlay = args.includes('--no-record-overlay')
+    ? false
+    : args.includes('--record-overlay')
+      ? true
+      : null;
   if (hasExplicitWidth !== hasExplicitHeight) {
-    throw new Error('Usage: camo start [profileId] [--url <url>] [--headless] [--devtools] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]');
+    throw new Error('Usage: camo start [profileId] [--url <url>] [--headless] [--devtools] [--record] [--record-name <name>] [--record-output <path>] [--record-overlay|--no-record-overlay] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]');
   }
   if ((hasExplicitWidth && explicitWidth < START_WINDOW_MIN_WIDTH) || (hasExplicitHeight && explicitHeight < START_WINDOW_MIN_HEIGHT)) {
     throw new Error(`Window size too small. Minimum is ${START_WINDOW_MIN_WIDTH}x${START_WINDOW_MIN_HEIGHT}`);
   }
+  if (args.includes('--record-name') && !recordName) {
+    throw new Error('Usage: camo start [profileId] --record-name <name>');
+  }
+  if (args.includes('--record-output') && !recordOutputRaw) {
+    throw new Error('Usage: camo start [profileId] --record-output <path>');
+  }
+  const recordOutput = recordOutputRaw ? path.resolve(recordOutputRaw) : null;
   const hasExplicitWindowSize = hasExplicitWidth && hasExplicitHeight;
   const profileSet = new Set(listProfiles());
   let implicitUrl;
@@ -334,8 +358,9 @@ export async function handleStartCommand(args) {
     const arg = args[i];
     if (arg === '--url') { i++; continue; }
     if (arg === '--width' || arg === '--height') { i++; continue; }
-    if (arg === '--alias' || arg === '--idle-timeout') { i++; continue; }
+    if (arg === '--alias' || arg === '--idle-timeout' || arg === '--record-name' || arg === '--record-output') { i++; continue; }
     if (arg === '--headless') continue;
+    if (arg === '--record' || arg === '--record-overlay' || arg === '--no-record-overlay') continue;
     if (arg.startsWith('--')) continue;
 
     if (looksLikeUrlToken(arg) && !profileSet.has(arg)) {
@@ -398,6 +423,14 @@ export async function handleStartCommand(args) {
     if (!existingHeadless && wantsDevtools) {
       payload.devtools = await requestDevtoolsOpen(profileId);
     }
+    if (wantsRecord) {
+      payload.recording = await callAPI('record:start', {
+        profileId,
+        ...(recordName ? { name: recordName } : {}),
+        ...(recordOutput ? { outputPath: recordOutput } : {}),
+        ...(recordOverlay !== null ? { overlay: recordOverlay } : {}),
+      });
+    }
     console.log(JSON.stringify(payload, null, 2));
     startSessionWatchdog(profileId);
     return;
@@ -423,6 +456,10 @@ export async function handleStartCommand(args) {
     url: targetUrl ? ensureUrlScheme(targetUrl) : undefined,
     headless,
     devtools: wantsDevtools,
+    ...(wantsRecord ? { record: true } : {}),
+    ...(recordName ? { recordName } : {}),
+    ...(recordOutput ? { recordOutput } : {}),
+    ...(recordOverlay !== null ? { recordOverlay } : {}),
   });
   
   if (result?.ok) {
@@ -729,32 +766,55 @@ export async function handleScrollCommand(args) {
   await ensureBrowserService();
   const directionFlags = new Set(['--up', '--down', '--left', '--right']);
   const isFlag = (arg) => arg?.startsWith('--');
+  const selectorIdx = args.indexOf('--selector');
+  const selector = selectorIdx >= 0 ? String(args[selectorIdx + 1] || '').trim() : null;
+  const highlight = resolveHighlightEnabled(args);
 
   let profileId = null;
   for (let i = 1; i < args.length; i++) {
     const arg = args[i];
     if (directionFlags.has(arg)) continue;
     if (arg === '--amount') { i++; continue; }
+    if (arg === '--selector') { i++; continue; }
+    if (arg === '--highlight' || arg === '--no-highlight') continue;
     if (isFlag(arg)) continue;
     profileId = arg;
     break;
   }
   if (!profileId) profileId = getDefaultProfile();
-  if (!profileId) throw new Error('Usage: camo scroll [profileId] [--down|--up|--left|--right] [--amount <px>]');
+  if (!profileId) throw new Error('Usage: camo scroll [profileId] [--down|--up|--left|--right] [--amount <px>] [--selector <css>] [--highlight|--no-highlight]');
+  if (selectorIdx >= 0 && !selector) {
+    throw new Error('Usage: camo scroll [profileId] --selector <css>');
+  }
 
   const direction = args.includes('--up') ? 'up' : args.includes('--left') ? 'left' : args.includes('--right') ? 'right' : 'down';
   const amountIdx = args.indexOf('--amount');
   const amount = amountIdx >= 0 ? Number(args[amountIdx + 1]) || 300 : 300;
 
+  const target = await callAPI('evaluate', {
+    profileId,
+    script: buildScrollTargetScript({ selector, highlight }),
+  });
+  const centerX = Number(target?.result?.center?.x);
+  const centerY = Number(target?.result?.center?.y);
+  if (Number.isFinite(centerX) && Number.isFinite(centerY)) {
+    await callAPI('mouse:move', { profileId, x: centerX, y: centerY, steps: 2 });
+  }
+
   const deltaX = direction === 'left' ? -amount : direction === 'right' ? amount : 0;
   const deltaY = direction === 'up' ? -amount : direction === 'down' ? amount : 0;
   const result = await callAPI('mouse:wheel', { profileId, deltaX, deltaY });
-  console.log(JSON.stringify(result, null, 2));
+  console.log(JSON.stringify({
+    ...result,
+    scrollTarget: target?.result || null,
+    highlight,
+  }, null, 2));
 }
 
 export async function handleClickCommand(args) {
   await ensureBrowserService();
   const positionals = getPositionals(args);
+  const highlight = resolveHighlightEnabled(args);
   let profileId;
   let selector;
 
@@ -766,12 +826,12 @@ export async function handleClickCommand(args) {
     selector = positionals[1];
   }
 
-  if (!profileId) throw new Error('Usage: camo click [profileId] <selector>');
-  if (!selector) throw new Error('Usage: camo click [profileId] <selector>');
+  if (!profileId) throw new Error('Usage: camo click [profileId] <selector> [--highlight|--no-highlight]');
+  if (!selector) throw new Error('Usage: camo click [profileId] <selector> [--highlight|--no-highlight]');
 
   const result = await callAPI('evaluate', {
     profileId,
-    script: buildSelectorClickScript({ selector, highlight: false }),
+    script: buildSelectorClickScript({ selector, highlight }),
   });
   console.log(JSON.stringify(result, null, 2));
 }
@@ -779,6 +839,7 @@ export async function handleClickCommand(args) {
 export async function handleTypeCommand(args) {
   await ensureBrowserService();
   const positionals = getPositionals(args);
+  const highlight = resolveHighlightEnabled(args);
   let profileId;
   let selector;
   let text;
@@ -793,12 +854,12 @@ export async function handleTypeCommand(args) {
     text = positionals[2];
   }
 
-  if (!profileId) throw new Error('Usage: camo type [profileId] <selector> <text>');
-  if (!selector || text === undefined) throw new Error('Usage: camo type [profileId] <selector> <text>');
+  if (!profileId) throw new Error('Usage: camo type [profileId] <selector> <text> [--highlight|--no-highlight]');
+  if (!selector || text === undefined) throw new Error('Usage: camo type [profileId] <selector> <text> [--highlight|--no-highlight]');
 
   const result = await callAPI('evaluate', {
     profileId,
-    script: buildSelectorTypeScript({ selector, highlight: false, text }),
+    script: buildSelectorTypeScript({ selector, highlight, text }),
   });
   console.log(JSON.stringify(result, null, 2));
 }

@@ -5,6 +5,9 @@ import path from 'node:path';
 import os from 'node:os';
 import {
   handleStopCommand,
+  handleClickCommand,
+  handleTypeCommand,
+  handleScrollCommand,
   computeStartWindowSize,
   syncWindowViewportAfterResize,
   requestDevtoolsOpen,
@@ -299,6 +302,86 @@ describe('browser command', () => {
     assert.strictEqual(result.verified, false);
     assert.strictEqual(result.attempts.length, 1);
     assert.strictEqual(result.attempts[0].ok, false);
+  });
+
+  it('passes highlight=true to click script when --highlight is used', async () => {
+    const profileId = `${TEST_PROFILE}-click-highlight`;
+    const actions = [];
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) return { ok: true, status: 200 };
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        actions.push(body);
+        if (body.action === 'evaluate') {
+          return { ok: true, status: 200, json: async () => ({ ok: true, result: { ok: true } }) };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    await handleClickCommand(['click', profileId, '#btn', '--highlight']);
+    const evaluate = actions.find((item) => item.action === 'evaluate');
+    assert.ok(evaluate);
+    assert.ok(String(evaluate.args?.script || '').includes('highlight: true'));
+  });
+
+  it('passes highlight=false to type script when --no-highlight is used', async () => {
+    const profileId = `${TEST_PROFILE}-type-no-highlight`;
+    const actions = [];
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) return { ok: true, status: 200 };
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        actions.push(body);
+        if (body.action === 'evaluate') {
+          return { ok: true, status: 200, json: async () => ({ ok: true, result: { ok: true } }) };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    await handleTypeCommand(['type', profileId, '#input', 'hello', '--no-highlight']);
+    const evaluate = actions.find((item) => item.action === 'evaluate');
+    assert.ok(evaluate);
+    assert.ok(String(evaluate.args?.script || '').includes('highlight: false'));
+  });
+
+  it('scroll highlights visible target and moves pointer before wheel', async () => {
+    const profileId = `${TEST_PROFILE}-scroll-highlight`;
+    const actions = [];
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) return { ok: true, status: 200 };
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        actions.push(body);
+        if (body.action === 'evaluate') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ ok: true, result: { center: { x: 320, y: 480 }, source: 'selector' } }),
+          };
+        }
+        if (body.action === 'mouse:move' || body.action === 'mouse:wheel') {
+          return { ok: true, status: 200, json: async () => ({ ok: true }) };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    await handleScrollCommand([
+      'scroll',
+      profileId,
+      '--down',
+      '--amount',
+      '120',
+      '--selector',
+      '.feed-list',
+      '--highlight',
+    ]);
+    const orderedActions = actions.map((item) => item.action);
+    assert.deepStrictEqual(orderedActions.slice(0, 3), ['evaluate', 'mouse:move', 'mouse:wheel']);
+    assert.ok(String(actions[0]?.args?.script || '').includes('.feed-list'));
+    assert.strictEqual(actions[2]?.args?.deltaY, 120);
   });
 });
 

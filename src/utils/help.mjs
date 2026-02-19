@@ -21,10 +21,11 @@ INITIALIZATION:
 
 CONFIG:
   config repo-root [path]                   Get or set persisted webauto repo root
+  highlight-mode [status|on|off]            Global highlight mode for click/type/scroll (default: on)
 
 BROWSER CONTROL:
   init                                      Ensure camoufox + ensure browser-service daemon
-  start [profileId] [--url <url>] [--headless] [--devtools] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]
+  start [profileId] [--url <url>] [--headless] [--devtools] [--record] [--record-name <name>] [--record-output <path>] [--record-overlay|--no-record-overlay] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]
   stop [profileId]
   stop --id <instanceId>                    Stop by instance id
   stop --alias <alias>                      Stop by alias
@@ -50,9 +51,9 @@ NAVIGATION:
   screenshot [profileId] [--output <file>] [--full]
 
 INTERACTION:
-  scroll [profileId] [--down|--up|--left|--right] [--amount <px>]
-  click [profileId] <selector>              Click element by CSS selector
-  type [profileId] <selector> <text>        Type text into element
+  scroll [profileId] [--down|--up|--left|--right] [--amount <px>] [--selector <css>] [--highlight|--no-highlight]
+  click [profileId] <selector> [--highlight|--no-highlight]  Click visible element by CSS selector
+  type [profileId] <selector> <text> [--highlight|--no-highlight]  Type into visible input element
   highlight [profileId] <selector>          Highlight element (red border, 2s)
   clear-highlight [profileId]               Clear all highlights
   viewport [profileId] --width <w> --height <h>
@@ -67,6 +68,11 @@ DEVTOOLS:
   devtools logs [profileId] [--limit 120] [--since <unix_ms>] [--levels error,warn] [--clear]
   devtools eval [profileId] <expression> [--profile <id>]
   devtools clear [profileId]
+
+RECORDING:
+  record start [profileId] [--name <name>] [--output <file>] [--overlay|--no-overlay]
+  record stop [profileId] [--reason <text>]
+  record status [profileId]
 
 COOKIES:
   cookies get [profileId]                          Get all cookies for profile
@@ -103,17 +109,22 @@ EXAMPLES:
   camo start --url https://example.com --alias main
   camo start worker-1 --headless --alias shard1 --idle-timeout 45m
   camo start worker-1 --devtools
+  camo start worker-1 --record --record-name xhs-debug --record-output ./logs/xhs-debug.jsonl --record-overlay
   camo start myprofile --width 1920 --height 1020
+  camo highlight-mode on
   camo devtools eval myprofile "document.title"
   camo devtools logs myprofile --levels error,warn --limit 50
+  camo record start myprofile --name session-a --output ./logs/session-a.jsonl
+  camo record status myprofile
+  camo record stop myprofile
   camo stop --id inst_xxxxxxxx
   camo stop --alias shard1
   camo stop idle
   camo close all
   camo goto https://www.xiaohongshu.com
-  camo scroll --down --amount 500
-  camo click "#search-input"
-  camo type "#search-input" "hello world"
+  camo scroll --down --amount 500 --selector ".feed-list"
+  camo click "#search-input" --highlight
+  camo type "#search-input" "hello world" --highlight
   camo highlight ".post-card"
   camo viewport --width 1920 --height 1080
   camo cookies get

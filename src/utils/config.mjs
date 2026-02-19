@@ -32,6 +32,7 @@ export function loadConfig() {
   return {
     defaultProfile: typeof raw.defaultProfile === 'string' ? raw.defaultProfile : null,
     repoRoot: typeof raw.repoRoot === 'string' ? raw.repoRoot : null,
+    highlightMode: typeof raw.highlightMode === 'boolean' ? raw.highlightMode : true,
   };
 }
 
@@ -81,6 +82,17 @@ export function setRepoRoot(repoRoot) {
 
 export function getDefaultProfile() {
   return loadConfig().defaultProfile;
+}
+
+export function getHighlightMode() {
+  return loadConfig().highlightMode !== false;
+}
+
+export function setHighlightMode(enabled) {
+  const cfg = loadConfig();
+  cfg.highlightMode = enabled !== false;
+  saveConfig(cfg);
+  return cfg.highlightMode;
 }
 
 export function getProfileDir(profileId) {

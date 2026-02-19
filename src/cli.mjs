@@ -14,6 +14,8 @@ import { handleContainerCommand } from './commands/container.mjs';
 import { handleAutoscriptCommand } from './commands/autoscript.mjs';
 import { handleEventsCommand } from './commands/events.mjs';
 import { handleDevtoolsCommand } from './commands/devtools.mjs';
+import { handleRecordCommand } from './commands/record.mjs';
+import { handleHighlightModeCommand } from './commands/highlight-mode.mjs';
 import {
   handleStartCommand, handleStopCommand, handleStatusCommand,
   handleGotoCommand, handleBackCommand, handleScreenshotCommand,
@@ -69,6 +71,23 @@ function inferProfileId(cmd, args) {
     const sub = positionals[0] || null;
     if (sub === 'eval' || sub === 'logs' || sub === 'clear') {
       return positionals[1] || null;
+    }
+  }
+
+  if (cmd === 'record') {
+    const explicit = readFlagValue(args, ['--profile', '-p']);
+    if (explicit) return explicit;
+    const sub = positionals[0] || null;
+    const values = [];
+    for (let i = 2; i < args.length; i += 1) {
+      const token = args[i];
+      if (!token || String(token).startsWith('-')) continue;
+      const prev = args[i - 1];
+      if (prev && ['--name', '--output', '--reason'].includes(prev)) continue;
+      values.push(String(token));
+    }
+    if (sub === 'start' || sub === 'stop' || sub === 'status') {
+      return values[0] || null;
     }
   }
 
@@ -205,6 +224,16 @@ async function main() {
     return;
   }
 
+  if (cmd === 'record') {
+    await runTrackedCommand(cmd, args, () => handleRecordCommand(args));
+    return;
+  }
+
+  if (cmd === 'highlight-mode') {
+    await runTrackedCommand(cmd, args, () => handleHighlightModeCommand(args));
+    return;
+  }
+
   // Lifecycle commands
   if (cmd === 'cleanup') {
     await runTrackedCommand(cmd, args, () => handleCleanupCommand(args));
@@ -250,7 +279,7 @@ async function main() {
     'start', 'stop', 'close', 'status', 'list', 'goto', 'navigate', 'back', 'screenshot',
     'new-page', 'close-page', 'switch-page', 'list-pages', 'shutdown',
     'scroll', 'click', 'type', 'highlight', 'clear-highlight', 'viewport',
-    'cookies', 'window', 'mouse', 'system', 'container', 'autoscript', 'events', 'devtools',
+    'cookies', 'window', 'mouse', 'system', 'container', 'autoscript', 'events', 'devtools', 'record', 'highlight-mode',
   ]);
 
   if (!serviceCommands.has(cmd)) {
@@ -324,6 +353,12 @@ async function main() {
         break;
       case 'system':
         await handleSystemCommand(args);
+        break;
+      case 'record':
+        await handleRecordCommand(args);
+        break;
+      case 'highlight-mode':
+        await handleHighlightModeCommand(args);
         break;
     }
   });

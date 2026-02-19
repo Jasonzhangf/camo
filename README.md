@@ -5,6 +5,17 @@
 
 A cross-platform command-line interface for Camoufox browser automation.
 
+## What Camo Provides
+
+- Browser lifecycle management: start/stop/list sessions, idle cleanup, lock cleanup.
+- Profile-first automation: persistent profile dirs, fingerprint support, remembered window size.
+- Browser control primitives: navigation, tabs, viewport/window, mouse and keyboard actions.
+- Devtools debugging helpers: open devtools, evaluate JS quickly, collect browser console logs.
+- Session recorder: JSONL interaction capture (click/input/scroll/keyboard + page visits) with runtime toggle.
+- Container subscription layer: selector registration, filter/list/watch in viewport.
+- Autoscript runtime: validate/explain/run/resume/mock-run with snapshot and replay.
+- Progress stream: local websocket daemon (`/events`) with tail/recent/emit commands.
+
 ## Installation
 
 ### npm (Recommended)
@@ -48,13 +59,66 @@ camo devtools eval worker-1 "document.title"
 # Read captured console entries
 camo devtools logs worker-1 --levels error,warn --limit 50
 
+# Start recording into JSONL (with in-page toggle)
+camo record start worker-1 --name run-a --output ./logs/run-a.jsonl --overlay
+
 # Navigate
 camo goto https://www.xiaohongshu.com
 
 # Interact
+camo highlight-mode on
+camo click "#search-input" --highlight
+camo type "#search-input" "hello world" --highlight
+camo scroll --down --amount 500 --selector ".feed-list"
+```
+
+## Core Workflows
+
+### 1) Interactive browser session
+
+```bash
+camo init
+camo profile create myprofile
+camo profile default myprofile
+camo start --url https://example.com --alias main
 camo click "#search-input"
 camo type "#search-input" "hello world"
-camo scroll --down --amount 500
+```
+
+### 2) Headless worker with idle auto-stop
+
+```bash
+camo start worker-1 --headless --alias shard1 --idle-timeout 30m
+camo instances
+camo stop idle
+```
+
+### 3) Devtools-style debugging
+
+```bash
+camo start myprofile --devtools
+camo devtools eval myprofile "document.title"
+camo devtools eval myprofile "(console.error('check-error'), location.href)"
+camo devtools logs myprofile --levels error,warn --limit 50
+camo devtools clear myprofile
+```
+
+### 4) Run autoscript with live progress
+
+```bash
+camo autoscript validate ./autoscripts/xhs.autoscript.json
+camo autoscript run ./autoscripts/xhs.autoscript.json --profile myprofile \
+  --jsonl-file ./runs/xhs/run.jsonl \
+  --summary-file ./runs/xhs/summary.json
+camo events tail --profile myprofile --mode autoscript
+```
+
+### 5) Record manual interactions as JSONL
+
+```bash
+camo start myprofile --record --record-name xhs-debug --record-output ./logs/xhs-debug.jsonl --record-overlay
+camo record status myprofile
+camo record stop myprofile
 ```
 
 ## Commands
@@ -77,10 +141,17 @@ camo init list                         # List available OS and regions
 camo create fingerprint --os <os> --region <region>
 ```
 
+### Config
+
+```bash
+camo config repo-root [path]           # Get/set persisted webauto repo root
+camo highlight-mode [status|on|off]    # Global highlight mode for click/type/scroll
+```
+
 ### Browser Control
 
 ```bash
-camo start [profileId] [--url <url>] [--headless] [--devtools] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]
+camo start [profileId] [--url <url>] [--headless] [--devtools] [--record] [--record-name <name>] [--record-output <path>] [--record-overlay|--no-record-overlay] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]
 camo stop [profileId]
 camo stop --id <instanceId>
 camo stop --alias <alias>
@@ -95,6 +166,7 @@ If no saved size exists, it defaults to near-fullscreen (full width, slight vert
 Use `--width/--height` to override and update the saved profile size.
 For headless sessions, default idle timeout is `30m` (auto-stop on inactivity). Use `--idle-timeout` (e.g. `45m`, `1800s`, `0`) to customize.
 Use `--devtools` to open browser developer tools in headed mode (cannot be combined with `--headless`).
+Use `--record` to auto-enable JSONL recording at startup; `--record-name`, `--record-output`, and `--record-overlay` customize file naming/output and floating toggle UI.
 
 ### Lifecycle & Cleanup
 
@@ -106,7 +178,6 @@ camo cleanup all                       # Cleanup all active sessions
 camo cleanup locks                     # Cleanup stale lock files
 camo force-stop [profileId]            # Force stop session (for stuck sessions)
 camo lock list                         # List active session locks
-camo recover [profileId]               # Recover orphaned session
 ```
 
 ### Navigation
@@ -120,9 +191,9 @@ camo screenshot [profileId] [--output <file>] [--full]
 ### Interaction
 
 ```bash
-camo scroll [profileId] [--down|--up|--left|--right] [--amount <px>]
-camo click [profileId] <selector>              # Click element by CSS selector
-camo type [profileId] <selector> <text>        # Type text into element
+camo scroll [profileId] [--down|--up|--left|--right] [--amount <px>] [--selector <css>] [--highlight|--no-highlight]
+camo click [profileId] <selector> [--highlight|--no-highlight]  # Click visible element by CSS selector
+camo type [profileId] <selector> <text> [--highlight|--no-highlight]  # Type into visible input element
 camo highlight [profileId] <selector>          # Highlight element (red border, 2s)
 camo clear-highlight [profileId]               # Clear all highlights
 camo viewport [profileId] --width <w> --height <h>
@@ -135,6 +206,26 @@ camo devtools logs [profileId] [--limit 120] [--since <unix_ms>] [--levels error
 camo devtools eval [profileId] <expression> [--profile <id>]
 camo devtools clear [profileId]
 ```
+
+`devtools logs` reads entries from an injected in-page console collector.
+Supported levels: `log`, `info`, `warn`, `error`, `debug`.
+
+### Recording
+
+```bash
+camo record start [profileId] [--name <name>] [--output <file>] [--overlay|--no-overlay]
+camo record stop [profileId] [--reason <text>]
+camo record status [profileId]
+```
+
+Recorder JSONL events include:
+- `page.visit`
+- `interaction.click`
+- `interaction.keydown`
+- `interaction.input`
+- `interaction.wheel`
+- `interaction.scroll`
+- `recording.start|stop|toggled|runtime_ready`
 
 ### Pages
 
@@ -353,6 +444,7 @@ Condition types:
 - `WEBAUTO_CONTAINER_ROOT` - User container root override (default: `~/.webauto/container-lib`)
 - `CAMO_PROGRESS_EVENTS_FILE` - Optional progress event JSONL path override
 - `CAMO_PROGRESS_WS_HOST` / `CAMO_PROGRESS_WS_PORT` - Progress websocket daemon bind address (default: `127.0.0.1:7788`)
+- `CAMO_DEFAULT_WINDOW_VERTICAL_RESERVE` - Reserved vertical pixels for default headful auto-size
 
 ## Session Persistence
 
@@ -360,7 +452,6 @@ Camo CLI persists session information locally:
 
 - Sessions are registered in `~/.webauto/sessions/`
 - On restart, `camo sessions` / `camo instances` shows live + orphaned sessions
-- Use `camo recover <profileId>` to reconnect or cleanup orphaned sessions
 - Stale sessions (>7 days) are automatically cleaned up
 
 ## Requirements

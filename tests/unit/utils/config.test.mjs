@@ -19,6 +19,8 @@ describe('config utilities', () => {
       assert.strictEqual(typeof config.deleteProfile, 'function');
       assert.strictEqual(typeof config.setDefaultProfile, 'function');
       assert.strictEqual(typeof config.getDefaultProfile, 'function');
+      assert.strictEqual(typeof config.getHighlightMode, 'function');
+      assert.strictEqual(typeof config.setHighlightMode, 'function');
       assert.strictEqual(typeof config.getProfileWindowSize, 'function');
       assert.strictEqual(typeof config.setProfileWindowSize, 'function');
       assert.strictEqual(typeof config.getProfileMetaFile, 'function');
@@ -109,6 +111,17 @@ describe('config utilities', () => {
       assert.ok(cfg !== null);
       assert.ok('defaultProfile' in cfg);
       assert.ok('repoRoot' in cfg);
+      assert.ok('highlightMode' in cfg);
+    });
+  });
+
+  describe('highlight mode config', () => {
+    it('should set and get highlight mode', async () => {
+      const { getHighlightMode, setHighlightMode } = await import('../../../src/utils/config.mjs');
+      setHighlightMode(false);
+      assert.strictEqual(getHighlightMode(), false);
+      setHighlightMode(true);
+      assert.strictEqual(getHighlightMode(), true);
     });
   });
 
