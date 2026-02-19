@@ -9,6 +9,10 @@ import { callAPI, ensureCamoufox, ensureBrowserService, getSessionByProfile, che
 import { resolveProfileId, ensureUrlScheme, looksLikeUrlToken, getPositionals } from '../utils/args.mjs';
 import { acquireLock, releaseLock, cleanupStaleLocks } from '../lifecycle/lock.mjs';
 import {
+  buildSelectorClickScript,
+  buildSelectorTypeScript,
+} from '../container/runtime-core/operations/selector-scripts.mjs';
+import {
   registerSession,
   updateSession,
   getSessionInfo,
@@ -26,6 +30,9 @@ const START_WINDOW_MIN_HEIGHT = 700;
 const START_WINDOW_MAX_RESERVE = 240;
 const START_WINDOW_DEFAULT_RESERVE = 72;
 const DEFAULT_HEADLESS_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const DEVTOOLS_SHORTCUTS = process.platform === 'darwin'
+  ? ['Meta+Alt+I', 'F12']
+  : ['F12', 'Control+Shift+I'];
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -119,6 +126,67 @@ async function stopAndCleanupProfile(profileId, options = {}) {
     serviceUp,
     result,
     error: error ? (error.message || String(error)) : null,
+  };
+}
+
+async function probeViewportSize(profileId) {
+  try {
+    const payload = await callAPI('evaluate', {
+      profileId,
+      script: '(() => ({ width: Number(window.innerWidth || 0), height: Number(window.innerHeight || 0) }))()',
+    });
+    const size = payload?.result || payload?.data || payload || {};
+    const width = Number(size?.width || 0);
+    const height = Number(size?.height || 0);
+    if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+    return { width, height };
+  } catch {
+    return null;
+  }
+}
+
+export async function requestDevtoolsOpen(profileId, options = {}) {
+  const id = String(profileId || '').trim();
+  if (!id) {
+    return { ok: false, requested: false, reason: 'profile_required', shortcuts: [] };
+  }
+
+  const shortcuts = Array.isArray(options.shortcuts) && options.shortcuts.length
+    ? options.shortcuts.map((item) => String(item || '').trim()).filter(Boolean)
+    : DEVTOOLS_SHORTCUTS;
+  const settleMs = Math.max(0, parseNumber(options.settleMs, 180));
+  const before = await probeViewportSize(id);
+  const attempts = [];
+
+  for (const key of shortcuts) {
+    try {
+      await callAPI('keyboard:press', { profileId: id, key });
+      attempts.push({ key, ok: true });
+      if (settleMs > 0) {
+        // Allow browser UI animation to settle after shortcut.
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(settleMs);
+      }
+    } catch (err) {
+      attempts.push({ key, ok: false, error: err?.message || String(err) });
+    }
+  }
+
+  const after = await probeViewportSize(id);
+  const beforeHeight = Number(before?.height || 0);
+  const afterHeight = Number(after?.height || 0);
+  const viewportReduced = beforeHeight > 0 && afterHeight > 0 && afterHeight < (beforeHeight - 100);
+  const successCount = attempts.filter((item) => item.ok).length;
+
+  return {
+    ok: successCount > 0,
+    requested: true,
+    shortcuts,
+    attempts,
+    before,
+    after,
+    verified: viewportReduced,
+    verification: viewportReduced ? 'viewport_height_reduced' : 'shortcut_dispatched',
   };
 }
 
@@ -250,8 +318,9 @@ export async function handleStartCommand(args) {
   const alias = validateAlias(readFlagValue(args, ['--alias']));
   const idleTimeoutRaw = readFlagValue(args, ['--idle-timeout']);
   const parsedIdleTimeoutMs = parseDurationMs(idleTimeoutRaw, DEFAULT_HEADLESS_IDLE_TIMEOUT_MS);
+  const wantsDevtools = args.includes('--devtools');
   if (hasExplicitWidth !== hasExplicitHeight) {
-    throw new Error('Usage: camo start [profileId] [--url <url>] [--headless] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]');
+    throw new Error('Usage: camo start [profileId] [--url <url>] [--headless] [--devtools] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]');
   }
   if ((hasExplicitWidth && explicitWidth < START_WINDOW_MIN_WIDTH) || (hasExplicitHeight && explicitHeight < START_WINDOW_MIN_HEIGHT)) {
     throw new Error(`Window size too small. Minimum is ${START_WINDOW_MIN_WIDTH}x${START_WINDOW_MIN_HEIGHT}`);
@@ -308,7 +377,7 @@ export async function handleStartCommand(args) {
         alias: alias || null,
       });
     const idleState = computeIdleState(record);
-    console.log(JSON.stringify({
+    const payload = {
       ok: true,
       sessionId: existing.session_id || existing.profileId,
       instanceId: record.instanceId,
@@ -323,7 +392,13 @@ export async function handleStartCommand(args) {
         byId: `camo stop --id ${record.instanceId}`,
         byAlias: record.alias ? `camo stop --alias ${record.alias}` : null,
       },
-    }, null, 2));
+    };
+    const existingMode = String(existing?.mode || record?.mode || '').toLowerCase();
+    const existingHeadless = existing?.headless === true || existingMode.includes('headless');
+    if (!existingHeadless && wantsDevtools) {
+      payload.devtools = await requestDevtoolsOpen(profileId);
+    }
+    console.log(JSON.stringify(payload, null, 2));
     startSessionWatchdog(profileId);
     return;
   }
@@ -338,12 +413,16 @@ export async function handleStartCommand(args) {
   }
 
   const headless = args.includes('--headless');
+  if (wantsDevtools && headless) {
+    throw new Error('--devtools is not supported with --headless');
+  }
   const idleTimeoutMs = headless ? parsedIdleTimeoutMs : 0;
   const targetUrl = explicitUrl || implicitUrl;
   const result = await callAPI('start', {
     profileId,
     url: targetUrl ? ensureUrlScheme(targetUrl) : undefined,
     headless,
+    devtools: wantsDevtools,
   });
   
   if (result?.ok) {
@@ -416,6 +495,9 @@ export async function handleStartCommand(args) {
         Number.isFinite(measuredOuterHeight) ? measuredOuterHeight : windowTarget.height,
       );
       result.profileWindow = savedWindow?.window || null;
+      if (wantsDevtools) {
+        result.devtools = await requestDevtoolsOpen(profileId);
+      }
     }
   }
   console.log(JSON.stringify(result, null, 2));
@@ -426,6 +508,12 @@ export async function handleStopCommand(args) {
   const target = rawTarget.toLowerCase();
   const idTarget = readFlagValue(args, ['--id']);
   const aliasTarget = readFlagValue(args, ['--alias']);
+  if (args.includes('--id') && !idTarget) {
+    throw new Error('Usage: camo stop --id <instanceId>');
+  }
+  if (args.includes('--alias') && !aliasTarget) {
+    throw new Error('Usage: camo stop --alias <alias>');
+  }
   const stopIdle = target === 'idle' || args.includes('--idle');
   const stopAll = target === 'all';
   const serviceUp = await checkBrowserService();
@@ -465,11 +553,41 @@ export async function handleStopCommand(args) {
 
   if (stopIdle) {
     const now = Date.now();
-    const idleTargets = listRegisteredSessions()
+    const registeredSessions = listRegisteredSessions();
+    let liveSessions = [];
+    if (serviceUp) {
+      try {
+        const status = await callAPI('getStatus', {});
+        liveSessions = Array.isArray(status?.sessions) ? status.sessions : [];
+      } catch {
+        // Ignore and fallback to local registry.
+      }
+    }
+    const regMap = new Map(
+      registeredSessions
+        .filter((item) => item && String(item?.status || '').trim() === 'active')
+        .map((item) => [String(item.profileId || '').trim(), item]),
+    );
+    const idleTargets = new Set(
+      registeredSessions
       .filter((item) => String(item?.status || '').trim() === 'active')
       .map((item) => ({ session: item, idle: computeIdleState(item, now) }))
       .filter((item) => item.idle.idle)
-      .map((item) => item.session.profileId);
+      .map((item) => item.session.profileId),
+    );
+    let orphanLiveHeadlessCount = 0;
+    for (const live of liveSessions) {
+      const liveProfileId = String(live?.profileId || '').trim();
+      if (!liveProfileId) continue;
+      if (regMap.has(liveProfileId) || idleTargets.has(liveProfileId)) continue;
+      const mode = String(live?.mode || '').toLowerCase();
+      const liveHeadless = live?.headless === true || mode.includes('headless');
+      // Live but unregistered headless sessions are treated as idle-orphan targets.
+      if (liveHeadless) {
+        idleTargets.add(liveProfileId);
+        orphanLiveHeadlessCount += 1;
+      }
+    }
     const results = [];
     for (const profileId of idleTargets) {
       // eslint-disable-next-line no-await-in-loop
@@ -479,7 +597,8 @@ export async function handleStopCommand(args) {
       ok: true,
       mode: 'idle',
       serviceUp,
-      targetCount: idleTargets.length,
+      targetCount: idleTargets.size,
+      orphanLiveHeadlessCount,
       closed: results.filter((item) => item.ok).length,
       failed: results.filter((item) => !item.ok).length,
       results,
@@ -652,14 +771,7 @@ export async function handleClickCommand(args) {
 
   const result = await callAPI('evaluate', {
     profileId,
-    script: `(async () => {
-      const el = document.querySelector(${JSON.stringify(selector)});
-      if (!el) throw new Error('Element not found: ' + ${JSON.stringify(selector)});
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      await new Promise(r => setTimeout(r, 200));
-      el.click();
-      return { clicked: true, selector: ${JSON.stringify(selector)} };
-    })()`
+    script: buildSelectorClickScript({ selector, highlight: false }),
   });
   console.log(JSON.stringify(result, null, 2));
 }
@@ -686,18 +798,7 @@ export async function handleTypeCommand(args) {
 
   const result = await callAPI('evaluate', {
     profileId,
-    script: `(async () => {
-      const el = document.querySelector(${JSON.stringify(selector)});
-      if (!el) throw new Error('Element not found: ' + ${JSON.stringify(selector)});
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      await new Promise(r => setTimeout(r, 200));
-      el.focus();
-      el.value = '';
-      el.value = ${JSON.stringify(text)};
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-      return { typed: true, selector: ${JSON.stringify(selector)}, length: ${text.length} };
-    })()`
+    script: buildSelectorTypeScript({ selector, highlight: false, text }),
   });
   console.log(JSON.stringify(result, null, 2));
 }

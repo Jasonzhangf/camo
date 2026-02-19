@@ -39,6 +39,9 @@ camo start --url https://example.com --alias main
 # Start headless worker (auto-kill after idle timeout)
 camo start worker-1 --headless --alias shard1 --idle-timeout 30m
 
+# Start with devtools (headful only)
+camo start worker-1 --devtools
+
 # Navigate
 camo goto https://www.xiaohongshu.com
 
@@ -71,7 +74,7 @@ camo create fingerprint --os <os> --region <region>
 ### Browser Control
 
 ```bash
-camo start [profileId] [--url <url>] [--headless] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]
+camo start [profileId] [--url <url>] [--headless] [--devtools] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]
 camo stop [profileId]
 camo stop --id <instanceId>
 camo stop --alias <alias>
@@ -85,6 +88,7 @@ camo shutdown                          # Shutdown browser-service (all sessions)
 If no saved size exists, it defaults to near-fullscreen (full width, slight vertical reserve).  
 Use `--width/--height` to override and update the saved profile size.
 For headless sessions, default idle timeout is `30m` (auto-stop on inactivity). Use `--idle-timeout` (e.g. `45m`, `1800s`, `0`) to customize.
+Use `--devtools` to open browser developer tools in headed mode (cannot be combined with `--headless`).
 
 ### Lifecycle & Cleanup
 

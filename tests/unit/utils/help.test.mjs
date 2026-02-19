@@ -22,6 +22,7 @@ describe('help utilities', () => {
       console.log = originalLog;
       assert.ok(logs.length > 0);
       assert.ok(logs.some(l => l.includes('camo') || l.includes('Usage')));
+      assert.ok(logs.some(l => l.includes('--devtools')));
     });
   });
 

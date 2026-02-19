@@ -7,6 +7,7 @@ import {
   handleStopCommand,
   computeStartWindowSize,
   syncWindowViewportAfterResize,
+  requestDevtoolsOpen,
 } from '../../../src/commands/browser.mjs';
 import { acquireLock, isLocked, releaseLock } from '../../../src/lifecycle/lock.mjs';
 import { registerSession, getSessionInfo, unregisterSession } from '../../../src/lifecycle/session-registry.mjs';
@@ -89,6 +90,17 @@ describe('browser command', () => {
     assert.strictEqual(isLocked(profileId), false);
     unregisterSession(profileId);
     releaseLock(profileId);
+  });
+
+  it('rejects stop --alias/--id without value to avoid stopping default profile', async () => {
+    await assert.rejects(
+      async () => handleStopCommand(['stop', '--alias']),
+      /Usage: camo stop --alias <alias>/,
+    );
+    await assert.rejects(
+      async () => handleStopCommand(['stop', '--id']),
+      /Usage: camo stop --id <instanceId>/,
+    );
   });
 
   it('supports close all', async () => {
@@ -189,6 +201,104 @@ describe('browser command', () => {
     unregisterSession(activeProfile);
     releaseLock(idleProfile);
     releaseLock(activeProfile);
+  });
+
+  it('stop idle includes live headless sessions missing local registry', async () => {
+    const orphanLiveProfile = `${TEST_PROFILE}-orphan-live-headless`;
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) return { ok: true, status: 200 };
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        if (body.action === 'getStatus') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              sessions: [
+                { profileId: orphanLiveProfile, mode: 'headless' },
+              ],
+            }),
+          };
+        }
+        if (body.action === 'stop') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ ok: true, profileId: body?.args?.profileId || null }),
+          };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    const logs = [];
+    const originalConsoleLog = console.log;
+    console.log = (value) => logs.push(value);
+    try {
+      await handleStopCommand(['stop', 'idle']);
+    } finally {
+      console.log = originalConsoleLog;
+    }
+
+    const payload = JSON.parse(String(logs.at(-1) || '{}'));
+    assert.strictEqual(payload.ok, true);
+    assert.strictEqual(payload.mode, 'idle');
+    assert.strictEqual(payload.targetCount, 1);
+    assert.strictEqual(payload.orphanLiveHeadlessCount, 1);
+    assert.strictEqual(payload.results[0]?.profileId, orphanLiveProfile);
+  });
+
+  it('dispatches devtools shortcut and reports viewport-based verification', async () => {
+    const profileId = `${TEST_PROFILE}-devtools-ok`;
+    let evalCall = 0;
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) return { ok: true, status: 200 };
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        if (body.action === 'keyboard:press') {
+          return { ok: true, status: 200, json: async () => ({ ok: true }) };
+        }
+        if (body.action === 'evaluate') {
+          evalCall += 1;
+          const size = evalCall === 1
+            ? { width: 1600, height: 900 }
+            : { width: 1600, height: 720 };
+          return { ok: true, status: 200, json: async () => ({ ok: true, result: size }) };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    const result = await requestDevtoolsOpen(profileId, { shortcuts: ['F12'], settleMs: 0 });
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.requested, true);
+    assert.strictEqual(result.verified, true);
+    assert.strictEqual(result.attempts.length, 1);
+    assert.strictEqual(result.attempts[0].ok, true);
+  });
+
+  it('returns failure when all devtools shortcut dispatches fail', async () => {
+    const profileId = `${TEST_PROFILE}-devtools-fail`;
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) return { ok: true, status: 200 };
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        if (body.action === 'keyboard:press') {
+          return { ok: false, status: 500, json: async () => ({ error: 'keyboard failed' }) };
+        }
+        if (body.action === 'evaluate') {
+          return { ok: true, status: 200, json: async () => ({ ok: true, result: { width: 1600, height: 900 } }) };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    const result = await requestDevtoolsOpen(profileId, { shortcuts: ['F12'], settleMs: 0 });
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.requested, true);
+    assert.strictEqual(result.verified, false);
+    assert.strictEqual(result.attempts.length, 1);
+    assert.strictEqual(result.attempts[0].ok, false);
   });
 });
 
