@@ -72,6 +72,25 @@ camo type "#search-input" "hello world" --highlight
 camo scroll --down --amount 500 --selector ".feed-list"
 ```
 
+## Codex Skill (`camoufox`)
+
+This repository includes a Codex skill at `skills/camoufox`.
+
+Install or refresh it locally:
+
+```bash
+mkdir -p ~/.codex/skills
+rsync -a ./skills/camoufox/ ~/.codex/skills/camoufox/
+```
+
+Use it in Codex with `$camoufox` (or by asking for camo CLI workflows directly).
+
+Layered capability model:
+- Observe/Debug: visible DOM filtering, URL/context checks, devtools eval/logs.
+- User Ops: click/type/scroll/keyboard/tab/window operations with optional highlight.
+- Orchestration: container subscription + autoscript flows.
+- Progress/Recovery: events/status/cleanup for runtime diagnostics.
+
 ## Core Workflows
 
 ### 1) Interactive browser session

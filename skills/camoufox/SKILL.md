@@ -1,14 +1,11 @@
 ---
 name: camoufox
-description: Use this skill only when executing Camoufox tasks through the local camo CLI, covering profile/session lifecycle, container subscription, autoscript orchestration, events, and cleanup diagnostics.
-license: Complete terms in LICENSE.txt
-metadata:
-  short-description: camo-only runbook for Camoufox
+description: Use camo CLI for Camoufox automation with layered observe, operate, orchestrate, and recover flows.
 ---
 
 # Camoufox (`camo`) Skill
 
-This skill is **camo CLI only**.
+`camo` only. Keep this skill short and operational.
 
 ## Hard Constraint
 
@@ -29,42 +26,59 @@ camo <command> --help
 
 Then report capability gap instead of switching control surface.
 
+## Capability Map (L1)
+
+1) Observe / Debug  
+- DOM + visible filtering: `container filter/list/watch`  
+- URL / page context: `status`, `list-pages`, `devtools eval`  
+- Console capture: `devtools logs`
+
+2) User-like Operations  
+- Click / type / scroll / key / mouse / tab / viewport / window  
+- Optional operation highlighting: `highlight-mode`, `--highlight`
+
+3) Orchestration  
+- Subscription sets: `container init/register/targets/watch`  
+- Scripted flow: `autoscript validate/explain/run/resume/mock-run`
+
+4) Progress / Recovery  
+- Real-time and replay events: `events serve/tail/recent/emit`  
+- Lifecycle and cleanup: `sessions/status/cleanup/force-stop/shutdown`
+
 ## Trigger Conditions
 
-- User asks to manage Camoufox profiles/sessions with CLI.
-- User asks to operate browser via CLI (`start/goto/click/type/scroll/screenshot/...`).
-- User asks for container subscription operations (`container init/register/watch/...`).
-- User asks for autoscript orchestration (`autoscript validate/explain/run/resume/...`).
-- User asks to observe progress via ws/jsonl events (`events serve/tail/recent/emit`).
-- User asks to recover stuck sessions/locks with cleanup commands.
+- User asks for any camo CLI browser/session/profile workflow.
+- User asks for DOM probing or visible-only element filtering.
+- User asks for devtools-style eval/console debugging.
+- User asks for simulated user actions (click/type/scroll/keyboard/tab).
+- User asks for subscription/autoscript orchestration or runtime recovery.
 
 ## Standard Execution Order
 
-1. Confirm command availability
+1. Check command surface
    - `which camo`
    - `camo --help`
-2. Prepare profile/default profile
+2. Prepare profile/session
    - `camo profile create ...` / `camo profile default ...`
-3. Start or reuse browser session
+3. Start/reuse browser
    - `camo start ...` / `camo status ...`
-4. Execute workflow command path
-   - browser primitives (`goto/click/type/...`) or
-   - container/subscription (`container ...`) or
-   - autoscript strategy (`autoscript ...`)
+4. Execute by layer
+   - Observe/Debug or User Ops or Orchestration
 5. Collect evidence
    - `camo status`, `camo sessions`, `camo screenshot ...`
    - `camo events recent` / `camo events tail ...`
-6. Cleanup when needed
+6. Cleanup if needed
    - `camo cleanup ...`, `camo force-stop ...`, `camo shutdown`
 
-## Core Command Families
+## Core Commands (Compact)
 
 - Profile management: `profiles`, `profile list/create/delete/default`
 - Initialization/config: `init`, `init geoip`, `init list`, `create fingerprint`, `create profile`, `config repo-root`
 - Browser/session lifecycle: `start`, `stop`, `status`, `list`, `sessions`, `cleanup`, `force-stop`, `lock`, `unlock`
-- Browser actions: `goto`, `back`, `scroll`, `click`, `type`, `screenshot`, `highlight`, `clear-highlight`, `viewport`
+- Browser actions: `goto`, `back`, `scroll`, `click`, `type`, `screenshot`, `highlight`, `clear-highlight`, `viewport`, `window`, `mouse`
 - Pages/tabs: `new-page`, `close-page`, `switch-page`, `list-pages`
-- Cookies/window/mouse/system: `cookies ...`, `window move/resize`, `mouse move/click/wheel`, `system display`, `shutdown`
+- Debug: `devtools eval/logs/clear`
+- Cookies/system: `cookies ...`, `system display`, `shutdown`
 - Container subscription layer: `container init/sets/register/targets/filter/watch/list`
 - Autoscript strategy layer: `autoscript scaffold/validate/explain/snapshot/replay/run/resume/mock-run`
 - Progress events: `events serve/tail/recent/emit` (non-events commands auto-start daemon)
@@ -76,18 +90,19 @@ Then report capability gap instead of switching control surface.
 - `CAMO_PROGRESS_EVENTS_FILE` (optional progress JSONL path)
 - `CAMO_PROGRESS_WS_HOST` / `CAMO_PROGRESS_WS_PORT` (progress ws daemon host/port)
 
-## Minimum Verification Checklist
+## Quick Verification
 
-After making changes to camo flow, verify at least:
+Run after skill changes:
 
 ```bash
 camo --help
+camo devtools --help
 camo container --help
 camo autoscript --help
 camo events --help
 ```
 
-For autoscript/runtime related updates, also verify:
+For autoscript path:
 
 ```bash
 camo autoscript scaffold xhs-unified --output /tmp/xhs-unified.sample.json

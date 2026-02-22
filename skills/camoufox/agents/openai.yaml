@@ -1,7 +1,7 @@
 interface:
   display_name: "Camoufox camo CLI"
-  short_description: "Use only local camo CLI commands (browser + container + autoscript + events)"
-  default_prompt: "Use $camoufox and only run camo CLI commands for profile/session lifecycle, browser actions, container subscriptions, autoscript orchestration, progress events, and cleanup diagnostics."
+  short_description: "camo-only layered runbook: observe/debug, user ops, orchestration, recovery"
+  default_prompt: "Use $camoufox and only run camo CLI commands. Execute by layers: observe/debug (DOM visible filter, devtools), user-like ops (click/type/scroll/tab), orchestration (container/autoscript), and progress/recovery (events/cleanup)."
 
 policy:
   allow_implicit_invocation: true
