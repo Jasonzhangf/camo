@@ -126,12 +126,23 @@ export function buildSelectorTypeScript({ selector, highlight, text }) {
     }
 
     if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-      el.value = ${textLiteral};
+      const prototype = el instanceof HTMLTextAreaElement
+        ? window.HTMLTextAreaElement.prototype
+        : window.HTMLInputElement.prototype;
+      const valueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+      if (typeof valueSetter === 'function') {
+        valueSetter.call(el, ${textLiteral});
+      } else {
+        el.value = ${textLiteral};
+      }
     } else if (el instanceof HTMLElement && el.isContentEditable) {
       el.textContent = ${textLiteral};
     }
 
-    el.dispatchEvent(new Event('input', { bubbles: true }));
+    const inputEvent = typeof InputEvent === 'function'
+      ? new InputEvent('input', { bubbles: true, cancelable: true, data: ${textLiteral}, inputType: 'insertText' })
+      : new Event('input', { bubbles: true, cancelable: true });
+    el.dispatchEvent(inputEvent);
     el.dispatchEvent(new Event('change', { bubbles: true }));
     if (${highlightLiteral} && el instanceof HTMLElement) {
       setTimeout(() => { el.style.outline = restoreOutline; }, 260);
