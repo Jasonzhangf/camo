@@ -63,7 +63,7 @@ describe('xhs unified autoscript template', () => {
     const closeOp = likesOnly.operations.find((op) => op.id === 'close_detail');
     assert.strictEqual(likeOp.enabled, true);
     assert.strictEqual(replyOp.enabled, false);
-    assert.deepStrictEqual(closeOp.dependsOn, ['comment_match_gate']);
+    assert.deepStrictEqual(closeOp.dependsOn, ['comment_like']);
     assert.deepStrictEqual(likeOp.params.keywords, ['好评', '推荐']);
 
     const replyEnabled = buildXhsUnifiedAutoscript({
@@ -74,8 +74,17 @@ describe('xhs unified autoscript template', () => {
     const replyEnabledOp = replyEnabled.operations.find((op) => op.id === 'comment_reply');
     const closeReply = replyEnabled.operations.find((op) => op.id === 'close_detail');
     assert.strictEqual(replyEnabledOp.enabled, true);
-    assert.deepStrictEqual(closeReply.dependsOn, ['comment_match_gate']);
+    assert.deepStrictEqual(closeReply.dependsOn, ['comment_reply']);
     assert.strictEqual(replyEnabledOp.params.replyText, '谢谢分享');
+
+    const likesAndReply = buildXhsUnifiedAutoscript({
+      doLikes: true,
+      doReply: true,
+      likeKeywords: '好评',
+      replyText: '谢谢',
+    });
+    const closeBoth = likesAndReply.operations.find((op) => op.id === 'close_detail');
+    assert.deepStrictEqual(closeBoth.dependsOn, ['comment_like', 'comment_reply']);
   });
 
   it('respects numeric options and keyword defaults', () => {

@@ -31,12 +31,15 @@ function splitCsv(value) {
     .filter(Boolean);
 }
 
-function pickCloseDependency(options) {
-  if (options.doReply || options.doLikes) return 'comment_match_gate';
-  if (options.matchGateEnabled) return 'comment_match_gate';
-  if (options.commentsHarvestEnabled) return 'comments_harvest';
-  if (options.detailHarvestEnabled) return 'detail_harvest';
-  return 'open_first_detail';
+function pickCloseDependencies(options) {
+  const deps = [];
+  if (options.doLikes) deps.push('comment_like');
+  if (options.doReply) deps.push('comment_reply');
+  if (deps.length > 0) return deps;
+  if (options.matchGateEnabled) return ['comment_match_gate'];
+  if (options.commentsHarvestEnabled) return ['comments_harvest'];
+  if (options.detailHarvestEnabled) return ['detail_harvest'];
+  return ['open_first_detail'];
 }
 
 function buildOpenFirstDetailScript(maxNotes, keyword) {
@@ -486,7 +489,7 @@ export function buildXhsUnifiedAutoscript(rawOptions = {}) {
   const detailHarvestEnabled = doHomepage || doImages || doComments || doLikes || doReply || doOcr;
   const commentsHarvestEnabled = doComments || doLikes || doReply;
   const matchGateEnabled = doLikes || doReply;
-  const closeDependsOn = pickCloseDependency({
+  const closeDependsOn = pickCloseDependencies({
     doReply,
     doLikes,
     matchGateEnabled,
@@ -793,7 +796,7 @@ export function buildXhsUnifiedAutoscript(rawOptions = {}) {
         action: 'xhs_close_detail',
         params: {},
         trigger: 'detail_modal.exist',
-        dependsOn: [closeDependsOn],
+        dependsOn: closeDependsOn,
         once: false,
         oncePerAppear: true,
         pacing: { operationMinIntervalMs: 2500, eventCooldownMs: 1300, jitterMs: 180 },
