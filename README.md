@@ -302,7 +302,6 @@ camo container list [profileId]
 ### Autoscript
 
 ```bash
-camo autoscript scaffold xhs-unified [--output <file>] [options]
 camo autoscript validate <file>
 camo autoscript explain <file>
 camo autoscript snapshot <jsonl-file> [--out <snapshot-file>]
@@ -375,55 +374,38 @@ camo container watch xiaohongshu-batch-1 --throttle 500
 ### Autoscript Mode (Subscription + Operations)
 
 ```bash
-# Generate xiaohongshu unified-harvest migration script from webauto phase-unified-harvest
-camo autoscript scaffold xhs-unified \
-  --output ./autoscripts/xiaohongshu/unified-harvest.autoscript.json \
-  --profile xiaohongshu-batch-1 \
-  --keyword "手机膜" \
-  --tab-count 4 \
-  --note-interval 900 \
-  --do-comments \
-  --do-likes \
-  --max-notes 30
-
 # Validate + explain + run
-camo autoscript validate ./autoscripts/xiaohongshu/unified-harvest.autoscript.json
-camo autoscript explain ./autoscripts/xiaohongshu/unified-harvest.autoscript.json
-camo autoscript run ./autoscripts/xiaohongshu/unified-harvest.autoscript.json \
-  --profile xiaohongshu-batch-1 \
-  --jsonl-file ./runs/xhs-unified/run.jsonl \
-  --summary-file ./runs/xhs-unified/run.summary.json
+camo autoscript validate ./autoscripts/my-flow.autoscript.json
+camo autoscript explain ./autoscripts/my-flow.autoscript.json
+camo autoscript run ./autoscripts/my-flow.autoscript.json \
+  --profile my-profile \
+  --jsonl-file ./runs/my-flow/run.jsonl \
+  --summary-file ./runs/my-flow/run.summary.json
 
 # Build snapshot + replay summary from existing JSONL
-camo autoscript snapshot ./runs/xhs-unified/run.jsonl \
-  --out ./runs/xhs-unified/run.snapshot.json
-camo autoscript replay ./runs/xhs-unified/run.jsonl \
-  --summary-file ./runs/xhs-unified/replay.summary.json
+camo autoscript snapshot ./runs/my-flow/run.jsonl \
+  --out ./runs/my-flow/run.snapshot.json
+camo autoscript replay ./runs/my-flow/run.jsonl \
+  --summary-file ./runs/my-flow/replay.summary.json
 
 # Resume from a snapshot (optionally force rerun from a node)
-camo autoscript resume ./autoscripts/xiaohongshu/unified-harvest.autoscript.json \
-  --snapshot ./runs/xhs-unified/run.snapshot.json \
-  --from-node comments_harvest \
-  --profile xiaohongshu-batch-1
+camo autoscript resume ./autoscripts/my-flow.autoscript.json \
+  --snapshot ./runs/my-flow/run.snapshot.json \
+  --from-node some_operation \
+  --profile my-profile
 
 # Mock replay mode for deterministic local debugging
-camo autoscript mock-run ./autoscripts/xiaohongshu/unified-harvest.autoscript.json \
-  --fixture ./autoscripts/xiaohongshu/fixtures/mock-run.json \
-  --summary-file ./runs/xhs-unified/mock.summary.json
+camo autoscript mock-run ./autoscripts/my-flow.autoscript.json \
+  --fixture ./autoscripts/fixtures/mock-run.json \
+  --summary-file ./runs/my-flow/mock.summary.json
 ```
-
-The xhs-unified scaffold includes anti-risk defaults:
-- operation pacing (`operationMinIntervalMs`, `eventCooldownMs`, `jitterMs`)
-- navigation/tab switch cooldown (`navigationMinIntervalMs`)
-- per-operation timeout budget (`timeoutMs`)
-- multi-tab rotation (`ensure_tab_pool`, `tab_pool_switch_next`)
 
 Example script:
 
 ```json
 {
-  "name": "xhs-login-flow",
-  "profileId": "xiaohongshu-batch-1",
+  "name": "generic-login-flow",
+  "profileId": "my-profile",
   "throttle": 500,
   "subscriptions": [
     { "id": "login_input", "selector": "#login-input" },

@@ -155,7 +155,6 @@ CONTAINER FILTER & SUBSCRIPTION:
   container list [profileId]                        List visible elements in viewport
 
 AUTOSCRIPT (STRATEGY LAYER):
-  autoscript scaffold xhs-unified [--output <file>]        Generate xiaohongshu unified-harvest autoscript template
   autoscript validate <file>                        Validate autoscript schema and references
   autoscript explain <file>                         Print normalized graph and defaults
   autoscript snapshot <jsonl-file> [--out <snapshot-file>] Build resumable snapshot from run JSONL

@@ -287,7 +287,7 @@ describe('autoscript runtime', () => {
 
     const result = await runner.runOperation({
       id: 'detail_harvest',
-      action: 'xhs_detail_harvest',
+      action: 'evaluate',
       trigger: { type: 'subscription_event', subscriptionId: 'detail_modal', event: 'exist' },
       retry: { attempts: 1, backoffMs: 0 },
       impact: 'op',
@@ -327,7 +327,7 @@ describe('autoscript runtime', () => {
 
     const result = await runner.runOperation({
       id: 'comments_harvest',
-      action: 'xhs_comments_harvest',
+      action: 'evaluate',
       trigger: { type: 'subscription_event', subscriptionId: 'detail_modal', event: 'exist' },
       retry: { attempts: 2, backoffMs: 0 },
       impact: 'op',

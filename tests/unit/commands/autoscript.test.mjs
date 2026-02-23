@@ -60,36 +60,6 @@ describe('autoscript command', () => {
     assert.strictEqual(typeof mod.handleAutoscriptCommand, 'function');
   });
 
-  it('supports scaffold xhs-unified', async () => {
-    const mod = await import('../../../src/commands/autoscript.mjs');
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-autoscript-scaffold-'));
-    const outputPath = path.join(tmpDir, 'xhs-autoscript.json');
-    const logs = await withCapturedConsole(async ({ logs: captured }) => {
-      await mod.handleAutoscriptCommand([
-        'autoscript',
-        'scaffold',
-        'xhs-unified',
-        '--output',
-        outputPath,
-        '--profile',
-        'p1',
-        '--keyword',
-        '手机膜',
-        '--do-likes',
-      ]);
-      return captured;
-    });
-
-    assert.ok(fs.existsSync(outputPath));
-    const payload = JSON.parse(fs.readFileSync(outputPath, 'utf8'));
-    assert.strictEqual(payload.profileId, 'p1');
-    assert.ok(payload.operations.some((op) => op.id === 'comment_like' && op.enabled === true));
-    const commentsHarvest = payload.operations.find((op) => op.id === 'comments_harvest');
-    assert.strictEqual(payload.metadata.persistComments, true);
-    assert.strictEqual(commentsHarvest?.params?.includeComments, true);
-    assert.ok(logs.some((line) => line.includes('"command": "autoscript.scaffold"')));
-  });
-
   it('builds snapshot and replay summary from jsonl logs', async () => {
     const mod = await import('../../../src/commands/autoscript.mjs');
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-autoscript-log-tools-'));

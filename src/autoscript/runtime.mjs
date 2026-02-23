@@ -339,15 +339,6 @@ export class AutoscriptRunner {
       'tab_pool_switch_slot',
       'sync_window_viewport',
       'verify_subscriptions',
-      'xhs_submit_search',
-      'xhs_open_detail',
-      'xhs_detail_harvest',
-      'xhs_expand_replies',
-      'xhs_comments_harvest',
-      'xhs_comment_match',
-      'xhs_comment_like',
-      'xhs_comment_reply',
-      'xhs_close_detail',
     ].includes(action)) {
       return 45_000;
     }
@@ -361,6 +352,14 @@ export class AutoscriptRunner {
     const pacing = this.resolvePacing(operation);
     if (Number.isFinite(pacing.timeoutMs) && pacing.timeoutMs > 0) return pacing.timeoutMs;
     return this.getDefaultTimeoutMs(operation);
+  }
+
+  resolvePlatform(operation) {
+    const candidate = operation?.params?.platform
+      ?? operation?.platform
+      ?? this.script?.defaults?.platform
+      ?? 'generic';
+    return String(candidate || 'generic').trim().toLowerCase() || 'generic';
   }
 
   buildTriggerKey(operation, event) {
@@ -477,13 +476,14 @@ export class AutoscriptRunner {
         data: { phase },
       };
     }
+    const platform = this.resolvePlatform(operation);
     const validation = operation.validation || {};
     return validateOperation({
       profileId: this.profileId,
       validationSpec: validation,
       phase,
       context,
-      platform: 'xiaohongshu',
+      platform,
     });
   }
 
@@ -567,11 +567,12 @@ export class AutoscriptRunner {
       return { ok: false, code: 'RECOVERY_NOT_CONFIGURED', message: 'recovery not configured' };
     }
 
+    const platform = this.resolvePlatform(operation);
     const checkpointDoc = await captureCheckpoint({
       profileId: this.profileId,
       containerId: checkpoint.containerId || null,
       selector: operation.params?.selector || null,
-      platform: 'xiaohongshu',
+      platform,
     });
     const baseCheckpoint = checkpointDoc?.data || {};
 
@@ -585,7 +586,7 @@ export class AutoscriptRunner {
           containerId: checkpoint.containerId || null,
           selector: operation.params?.selector || null,
           targetCheckpoint: checkpoint.targetCheckpoint || null,
-          platform: 'xiaohongshu',
+          platform,
         });
         this.log('autoscript:recovery_action', {
           operationId: operation.id,

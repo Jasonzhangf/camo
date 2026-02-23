@@ -1,9 +1,6 @@
-import { executeXhsAutoscriptOperation, isXhsAutoscriptAction } from './xhs.mjs';
-
 export async function executeAutoscriptAction({ profileId, action, params = {} }) {
-  if (isXhsAutoscriptAction(action)) {
-    return executeXhsAutoscriptOperation({ profileId, action, params });
-  }
+  void profileId;
+  void action;
+  void params;
   return null;
 }
-

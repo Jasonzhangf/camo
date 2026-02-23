@@ -40,14 +40,28 @@ export const XHS_CHECKPOINTS = {
   ],
 };
 
-export async function detectCheckpoint({ profileId, platform = 'xiaohongshu' }) {
-  if (platform !== 'xiaohongshu') {
-    return asErrorPayload('UNSUPPORTED_PLATFORM', `Unsupported platform: ${platform}`);
-  }
-
+export async function detectCheckpoint({ profileId, platform = 'generic' }) {
   try {
     const session = await ensureActiveSession(profileId);
     const resolvedProfile = session.profileId || profileId;
+
+    if (platform !== 'xiaohongshu') {
+      const url = await getCurrentUrl(resolvedProfile);
+      return {
+        ok: true,
+        code: 'CHECKPOINT_DETECTED',
+        message: 'Checkpoint detected',
+        data: {
+          profileId: resolvedProfile,
+          platform,
+          checkpoint: 'unknown',
+          url,
+          signals: [],
+          selectorHits: {},
+        },
+      };
+    }
+
     const [url, snapshot] = await Promise.all([
       getCurrentUrl(resolvedProfile),
       getDomSnapshotByProfile(resolvedProfile),
@@ -103,7 +117,7 @@ export async function captureCheckpoint({
   profileId,
   containerId = null,
   selector = null,
-  platform = 'xiaohongshu',
+  platform = 'generic',
 }) {
   try {
     const session = await ensureActiveSession(profileId);
@@ -139,7 +153,7 @@ export async function restoreCheckpoint({
   containerId = null,
   selector = null,
   targetCheckpoint = null,
-  platform = 'xiaohongshu',
+  platform = 'generic',
 }) {
   try {
     const session = await ensureActiveSession(profileId);

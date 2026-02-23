@@ -3,7 +3,6 @@ import path from 'node:path';
 import { getDefaultProfile } from '../utils/config.mjs';
 import { explainAutoscript, loadAndValidateAutoscript } from '../autoscript/schema.mjs';
 import { AutoscriptRunner } from '../autoscript/runtime.mjs';
-import { buildXhsUnifiedAutoscript } from '../autoscript/xhs-unified-template.mjs';
 import { safeAppendProgressEvent } from '../events/progress-log.mjs';
 
 function readFlagValue(args, names) {
@@ -29,22 +28,6 @@ function collectPositionals(args, startIndex = 2, valueFlags = new Set(['--profi
     out.push(arg);
   }
   return out;
-}
-
-function readToggleFlag(args, name, fallback) {
-  const on = `--${name}`;
-  const off = `--no-${name}`;
-  if (args.includes(off)) return false;
-  if (args.includes(on)) return true;
-  return fallback;
-}
-
-function readIntegerFlag(args, names, fallback, min = 1) {
-  const raw = readFlagValue(args, names);
-  if (raw === null || raw === undefined || raw === '') return fallback;
-  const num = Number(raw);
-  if (!Number.isFinite(num)) return fallback;
-  return Math.max(min, Math.floor(num));
 }
 
 function appendJsonLine(filePath, payload) {
@@ -593,89 +576,6 @@ function createMockOperationExecutor(fixture) {
   };
 }
 
-async function handleScaffold(args) {
-  const valueFlags = new Set([
-    '--profile', '-p',
-    '--keyword', '-k',
-    '--env',
-    '--output', '-o',
-    '--output-root',
-    '--throttle',
-    '--tab-count',
-    '--note-interval',
-    '--max-notes',
-    '--max-likes',
-    '--match-mode',
-    '--match-min-hits',
-    '--match-keywords',
-    '--like-keywords',
-    '--reply-text',
-    '--jsonl-file',
-    '--jsonl',
-  ]);
-  const positionals = collectPositionals(args, 2, valueFlags);
-  const template = positionals[0];
-  if (template !== 'xhs-unified') {
-    throw new Error('Usage: camo autoscript scaffold xhs-unified [--output <file>] [options]');
-  }
-
-  const outputPath = readFlagValue(args, ['--output', '-o'])
-    || path.resolve('autoscripts/xiaohongshu/unified-harvest.autoscript.json');
-  const profileId = readFlagValue(args, ['--profile', '-p']) || getDefaultProfile() || 'xiaohongshu-batch-1';
-  const keyword = readFlagValue(args, ['--keyword', '-k']) || '手机膜';
-  const env = readFlagValue(args, ['--env']) || 'debug';
-  const outputRoot = readFlagValue(args, ['--output-root']) || '';
-  const throttle = readIntegerFlag(args, ['--throttle'], 500, 100);
-  const tabCount = readIntegerFlag(args, ['--tab-count'], 4, 1);
-  const noteIntervalMs = readIntegerFlag(args, ['--note-interval'], 900, 200);
-  const maxNotes = readIntegerFlag(args, ['--max-notes'], 30, 1);
-  const maxLikesPerRound = readIntegerFlag(args, ['--max-likes'], 2, 1);
-  const matchMinHits = readIntegerFlag(args, ['--match-min-hits'], 1, 1);
-  const matchMode = readFlagValue(args, ['--match-mode']) || 'any';
-  const matchKeywords = readFlagValue(args, ['--match-keywords']) || keyword;
-  const likeKeywords = readFlagValue(args, ['--like-keywords']) || '';
-  const replyText = readFlagValue(args, ['--reply-text']) || '感谢分享，已关注';
-
-  const script = buildXhsUnifiedAutoscript({
-    profileId,
-    keyword,
-    env,
-    outputRoot,
-    throttle,
-    tabCount,
-    noteIntervalMs,
-    maxNotes,
-    maxLikesPerRound,
-    matchMode,
-    matchMinHits,
-    matchKeywords,
-    likeKeywords,
-    replyText,
-    doHomepage: readToggleFlag(args, 'do-homepage', true),
-    doImages: readToggleFlag(args, 'do-images', false),
-    doComments: readToggleFlag(args, 'do-comments', true),
-    doLikes: readToggleFlag(args, 'do-likes', false),
-    doReply: readToggleFlag(args, 'do-reply', false),
-    doOcr: readToggleFlag(args, 'do-ocr', false),
-    persistComments: readToggleFlag(args, 'persist-comments', true),
-  });
-
-  const resolvedPath = path.resolve(outputPath);
-  fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
-  fs.writeFileSync(resolvedPath, `${JSON.stringify(script, null, 2)}\n`, 'utf8');
-
-  console.log(JSON.stringify({
-    ok: true,
-    command: 'autoscript.scaffold',
-    template,
-    file: resolvedPath,
-    profileId: script.profileId,
-    operationCount: script.operations.length,
-    subscriptionCount: script.subscriptions.length,
-    hint: `Run: camo autoscript validate ${resolvedPath}`,
-  }, null, 2));
-}
-
 async function handleValidate(args) {
   const filePath = collectPositionals(args)[0];
   if (!filePath) {
@@ -1067,8 +967,6 @@ async function handleMockRun(args) {
 export async function handleAutoscriptCommand(args) {
   const sub = args[1];
   switch (sub) {
-    case 'scaffold':
-      return handleScaffold(args);
     case 'validate':
       return handleValidate(args);
     case 'explain':
@@ -1084,10 +982,9 @@ export async function handleAutoscriptCommand(args) {
     case 'mock-run':
       return handleMockRun(args);
     default:
-      console.log(`Usage: camo autoscript <scaffold|validate|explain|snapshot|replay|run|resume|mock-run> [args]
+      console.log(`Usage: camo autoscript <validate|explain|snapshot|replay|run|resume|mock-run> [args]
 
 Commands:
-  scaffold xhs-unified [--output <file>] [options]          Generate xiaohongshu unified-harvest autoscript
   validate <file>                                   Validate autoscript schema and references
   explain <file>                                    Print normalized graph and defaults
   snapshot <jsonl-file> [--out <snapshot-file>]     Build resumable snapshot from run JSONL

@@ -9,7 +9,7 @@ import {
   normalizeArray,
 } from './utils.mjs';
 
-async function validatePage(profileId, spec = {}, platform = 'xiaohongshu') {
+async function validatePage(profileId, spec = {}, platform = 'generic') {
   const url = await getCurrentUrl(profileId);
   const includes = normalizeArray(spec.urlIncludes || []);
   const excludes = normalizeArray(spec.urlExcludes || []);
@@ -74,7 +74,7 @@ export async function validateOperation({
   validationSpec = {},
   phase = 'pre',
   context = {},
-  platform = 'xiaohongshu',
+  platform = 'generic',
 }) {
   try {
     const mode = String(validationSpec.mode || 'none').toLowerCase();
