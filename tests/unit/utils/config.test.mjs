@@ -24,6 +24,90 @@ describe('config utilities', () => {
       assert.strictEqual(typeof config.getProfileWindowSize, 'function');
       assert.strictEqual(typeof config.setProfileWindowSize, 'function');
       assert.strictEqual(typeof config.getProfileMetaFile, 'function');
+      assert.strictEqual(typeof config.resolveWebautoRoot, 'function');
+      assert.strictEqual(typeof config.resolveProfilesDir, 'function');
+    });
+  });
+
+  describe('resolveWebautoRoot', () => {
+    it('prefers explicit WEBAUTO_DATA_ROOT without appending .webauto', async () => {
+      const { resolveWebautoRoot } = await import('../../../src/utils/config.mjs');
+      const resolved = resolveWebautoRoot({
+        platform: 'win32',
+        hasDDrive: true,
+        env: { WEBAUTO_DATA_ROOT: 'D:\\webauto' },
+      });
+      assert.equal(resolved, path.win32.join('D:', 'webauto'));
+    });
+
+    it('prefers explicit WEBAUTO_HOME without appending .webauto', async () => {
+      const { resolveWebautoRoot } = await import('../../../src/utils/config.mjs');
+      const resolved = resolveWebautoRoot({
+        platform: 'win32',
+        hasDDrive: true,
+        env: { WEBAUTO_HOME: 'D:\\webauto' },
+      });
+      assert.equal(resolved, path.win32.join('D:', 'webauto'));
+    });
+
+    it('uses WEBAUTO_HOME as direct root path', async () => {
+      const { resolveWebautoRoot } = await import('../../../src/utils/config.mjs');
+      const resolved = resolveWebautoRoot({
+        platform: 'darwin',
+        env: { WEBAUTO_HOME: '/tmp/custom-webauto-home' },
+      });
+      assert.equal(resolved, '/tmp/custom-webauto-home');
+    });
+
+    it('keeps backward compatibility for parent root input', async () => {
+      const { resolveWebautoRoot } = await import('../../../src/utils/config.mjs');
+      const resolved = resolveWebautoRoot({
+        platform: 'darwin',
+        env: { WEBAUTO_ROOT: '/tmp/portable-root' },
+      });
+      assert.equal(resolved, path.join('/tmp/portable-root', '.webauto'));
+    });
+
+    it('defaults to D:\\webauto on windows when D drive exists', async () => {
+      const { resolveWebautoRoot } = await import('../../../src/utils/config.mjs');
+      const resolved = resolveWebautoRoot({
+        platform: 'win32',
+        hasDDrive: true,
+        env: {},
+      });
+      assert.equal(resolved, path.win32.join('D:', 'webauto'));
+    });
+
+    it('falls back to ~/.webauto on windows when D drive is missing', async () => {
+      const { resolveWebautoRoot } = await import('../../../src/utils/config.mjs');
+      const home = path.join('C:', 'Users', 'tester');
+      const resolved = resolveWebautoRoot({
+        platform: 'win32',
+        hasDDrive: false,
+        homeDir: home,
+        env: {},
+      });
+      assert.equal(resolved, path.win32.join(home, '.webauto'));
+    });
+  });
+
+  describe('resolveProfilesDir', () => {
+    it('uses WEBAUTO_PROFILE_ROOT when provided', async () => {
+      const { resolveProfilesDir } = await import('../../../src/utils/config.mjs');
+      const resolved = resolveProfilesDir({
+        platform: 'win32',
+        env: { WEBAUTO_PROFILE_ROOT: 'E:\\profiles' },
+      });
+      assert.equal(resolved, path.win32.join('E:', 'profiles'));
+    });
+
+    it('defaults to <root>/profiles', async () => {
+      const { resolveProfilesDir } = await import('../../../src/utils/config.mjs');
+      const resolved = resolveProfilesDir({
+        platform: 'darwin',
+        env: { WEBAUTO_DATA_ROOT: '/tmp/webauto-data' },
+      });
+      assert.equal(resolved, '/tmp/webauto-data/profiles');
     });
   });
 

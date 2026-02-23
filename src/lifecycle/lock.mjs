@@ -5,9 +5,9 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
+import { CONFIG_DIR } from '../utils/config.mjs';
 
-const LOCK_DIR = path.join(os.homedir(), '.webauto', 'locks');
+const LOCK_DIR = path.join(CONFIG_DIR, 'locks');
 
 function ensureLockDir() {
   if (!fs.existsSync(LOCK_DIR)) {

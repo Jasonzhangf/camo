@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { resolveWebautoRoot } from '../../../utils/config.mjs';
 
 function sanitizeForPath(name, fallback = 'unknown') {
   const text = String(name || '').trim();
@@ -14,8 +15,9 @@ function resolveDownloadRoot(customRoot) {
   if (fromParams) return path.resolve(fromParams);
   const fromEnv = String(process.env.WEBAUTO_DOWNLOAD_ROOT || process.env.WEBAUTO_DOWNLOAD_DIR || '').trim();
   if (fromEnv) return path.resolve(fromEnv);
-  const home = process.env.HOME || process.env.USERPROFILE || os.homedir();
-  return path.join(home, '.webauto', 'download');
+  return path.join(resolveWebautoRoot({
+    homeDir: process.env.HOME || process.env.USERPROFILE || os.homedir(),
+  }), 'download');
 }
 
 export function resolveXhsOutputContext({

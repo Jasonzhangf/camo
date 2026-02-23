@@ -40,6 +40,7 @@ describe('browser-service utilities', () => {
       assert.strictEqual(typeof bs.ensureCamoufox, 'function');
       assert.strictEqual(typeof bs.ensureBrowserService, 'function');
       assert.strictEqual(typeof bs.findRepoRootCandidate, 'function');
+      assert.strictEqual(typeof bs.findInstallRootCandidate, 'function');
       assert.strictEqual(typeof bs.getDomSnapshotByProfile, 'function');
     });
   });
@@ -198,6 +199,14 @@ describe('browser-service utilities', () => {
     it('should return null or a valid path', async () => {
       const { findRepoRootCandidate } = await import('../../../src/utils/browser-service.mjs');
       const result = findRepoRootCandidate();
+      assert.ok(result === null || typeof result === 'string');
+    });
+  });
+
+  describe('findInstallRootCandidate', () => {
+    it('should return null or a valid path', async () => {
+      const { findInstallRootCandidate } = await import('../../../src/utils/browser-service.mjs');
+      const result = findInstallRootCandidate();
       assert.ok(result === null || typeof result === 'string');
     });
   });

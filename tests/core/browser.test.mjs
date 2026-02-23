@@ -2,7 +2,6 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 
 import {
   detectCamoufoxPath,
@@ -11,10 +10,11 @@ import {
   ensureProfile,
   isBrowserRunning,
 } from '../../src/core/browser.mjs';
+import { PROFILES_DIR } from '../../src/utils/config.mjs';
 
 describe('Core Browser Module', () => {
   const testProfile = 'test-core-browser';
-  const testProfileDir = path.join(os.homedir(), '.webauto', 'profiles', testProfile);
+  const testProfileDir = path.join(PROFILES_DIR, testProfile);
 
   afterEach(() => {
     // Cleanup test profile
@@ -36,7 +36,7 @@ describe('Core Browser Module', () => {
   describe('getProfileDir', () => {
     it('should return a valid path', () => {
       const dir = getProfileDir(testProfile);
-      assert.ok(dir.includes('.webauto'));
+      assert.equal(dir, testProfileDir);
       assert.ok(dir.includes(testProfile));
     });
   });

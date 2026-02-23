@@ -2,11 +2,11 @@ import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { acquireLock, isLocked, releaseLock } from '../../../src/lifecycle/lock.mjs';
 import { registerSession, getSessionInfo, unregisterSession } from '../../../src/lifecycle/session-registry.mjs';
+import { CONFIG_DIR } from '../../../src/utils/config.mjs';
 
-const WATCHDOG_DIR = path.join(os.homedir(), '.webauto', 'run', 'camo-watchdogs');
+const WATCHDOG_DIR = path.join(CONFIG_DIR, 'run', 'camo-watchdogs');
 const originalFetch = global.fetch;
 const TEST_PROFILE = `test-lifecycle-cleanup-${Date.now()}`;
 

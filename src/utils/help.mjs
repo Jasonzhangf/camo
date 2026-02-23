@@ -173,7 +173,11 @@ PROGRESS EVENTS:
 
 ENV:
   WEBAUTO_BROWSER_URL                       Default: http://127.0.0.1:7704
-  WEBAUTO_REPO_ROOT                         Optional explicit webauto repo root
+  WEBAUTO_INSTALL_DIR                       Optional @web-auto/webauto install dir
+  WEBAUTO_REPO_ROOT                         Optional webauto repo root (dev mode)
+  WEBAUTO_DATA_ROOT / WEBAUTO_HOME         Optional data root (Windows default D:\\webauto)
+  WEBAUTO_PROFILE_ROOT                      Optional profile dir override
+  WEBAUTO_ROOT                              Legacy data root (auto-appends .webauto if needed)
   CAMO_PROGRESS_EVENTS_FILE                 Optional path override for progress jsonl
   CAMO_PROGRESS_WS_HOST / CAMO_PROGRESS_WS_PORT   Progress daemon host/port (defaults: 127.0.0.1:7788)
 `);

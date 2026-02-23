@@ -5,10 +5,7 @@
 import { spawn, execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
-
-const CONFIG_DIR = path.join(os.homedir(), '.webauto');
-const PROFILES_DIR = path.join(CONFIG_DIR, 'profiles');
+import { PROFILES_DIR } from '../utils/config.mjs';
 
 // Active browser instances registry (in-memory)
 const activeBrowsers = new Map();
@@ -267,4 +264,3 @@ export async function getCurrentPage(profileId) {
 export function getActiveBrowser(profileId) {
   return activeBrowsers.get(profileId) || null;
 }
-

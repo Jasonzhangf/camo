@@ -2,8 +2,8 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { handleWindowCommand } from '../../../src/commands/window.mjs';
+import { PROFILES_DIR } from '../../../src/utils/config.mjs';
 
 const originalFetch = global.fetch;
 const originalConsoleLog = console.log;
@@ -90,7 +90,7 @@ describe('window command', () => {
   afterEach(() => {
     global.fetch = originalFetch;
     console.log = originalConsoleLog;
-    const profileDir = path.join(os.homedir(), '.webauto', 'profiles', TEST_PROFILE);
+    const profileDir = path.join(PROFILES_DIR, TEST_PROFILE);
     if (fs.existsSync(profileDir)) fs.rmSync(profileDir, { recursive: true, force: true });
   });
 

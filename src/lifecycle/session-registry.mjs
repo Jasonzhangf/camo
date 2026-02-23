@@ -5,10 +5,10 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import crypto from 'node:crypto';
+import { CONFIG_DIR } from '../utils/config.mjs';
 
-const SESSION_DIR = path.join(os.homedir(), '.webauto', 'sessions');
+const SESSION_DIR = path.join(CONFIG_DIR, 'sessions');
 
 function ensureSessionDir() {
   if (!fs.existsSync(SESSION_DIR)) {

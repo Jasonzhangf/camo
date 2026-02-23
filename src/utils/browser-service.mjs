@@ -1,10 +1,14 @@
 #!/usr/bin/env node
-import { execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { BROWSER_SERVICE_URL, loadConfig, setRepoRoot } from './config.mjs';
 import { touchSessionActivity } from '../lifecycle/session-registry.mjs';
+
+const require = createRequire(import.meta.url);
 
 function shouldTrackSessionActivity(action, payload) {
   const profileId = String(payload?.profileId || '').trim();
@@ -304,10 +308,16 @@ export function ensureCamoufox() {
 }
 
 const START_SCRIPT_REL = path.join('runtime', 'infra', 'utils', 'scripts', 'service', 'start-browser-service.mjs');
+const CONTROLLER_SERVER_REL = path.join('services', 'controller', 'src', 'server.mjs');
 
 function hasStartScript(root) {
   if (!root) return false;
   return fs.existsSync(path.join(root, START_SCRIPT_REL));
+}
+
+function hasControllerServer(root) {
+  if (!root) return false;
+  return fs.existsSync(path.join(root, CONTROLLER_SERVER_REL));
 }
 
 function walkUpForRepoRoot(startDir) {
@@ -353,6 +363,27 @@ function scanCommonRepoRoots() {
     }
   }
 
+  return null;
+}
+
+function scanCommonInstallRoots() {
+  const home = os.homedir();
+  const appData = String(process.env.APPDATA || path.join(home, 'AppData', 'Roaming'));
+  const npmPrefix = String(process.env.npm_config_prefix || '').trim();
+  const nodeModuleRoots = [
+    path.join(appData, 'npm', 'node_modules'),
+    path.join(home, 'AppData', 'Roaming', 'npm', 'node_modules'),
+    npmPrefix ? path.join(npmPrefix, 'node_modules') : '',
+    npmPrefix ? path.join(npmPrefix, 'lib', 'node_modules') : '',
+    '/usr/local/lib/node_modules',
+    '/usr/lib/node_modules',
+    path.join(home, '.npm-global', 'lib', 'node_modules'),
+  ].filter(Boolean);
+
+  for (const root of nodeModuleRoots) {
+    const candidate = path.join(root, '@web-auto', 'webauto');
+    if (hasControllerServer(candidate)) return candidate;
+  }
   return null;
 }
 
@@ -404,20 +435,68 @@ export function findRepoRootCandidate() {
   return null;
 }
 
+export function findInstallRootCandidate() {
+  const cfg = loadConfig();
+  const currentDir = path.dirname(fileURLToPath(import.meta.url));
+  const siblingInScopedNodeModules = path.resolve(currentDir, '..', '..', '..', 'webauto');
+  const candidates = [
+    process.env.WEBAUTO_INSTALL_DIR,
+    process.env.WEBAUTO_PACKAGE_ROOT,
+    process.env.WEBAUTO_REPO_ROOT,
+    cfg.repoRoot,
+    siblingInScopedNodeModules,
+    process.cwd(),
+  ].filter(Boolean);
+
+  try {
+    const pkgPath = require.resolve('@web-auto/webauto/package.json');
+    candidates.push(path.dirname(pkgPath));
+  } catch {
+    // ignore resolution failures in npx-only environments
+  }
+
+  const seen = new Set();
+  for (const raw of candidates) {
+    const resolved = path.resolve(String(raw));
+    if (seen.has(resolved)) continue;
+    seen.add(resolved);
+    if (hasControllerServer(resolved)) return resolved;
+  }
+
+  return scanCommonInstallRoots();
+}
+
 export async function ensureBrowserService() {
   if (await checkBrowserService()) return;
 
   const repoRoot = findRepoRootCandidate();
-  if (!repoRoot) {
-    throw new Error(
-      `Cannot locate browser-service start script (${START_SCRIPT_REL}). ` +
-      'Run from webauto repo once or set WEBAUTO_REPO_ROOT=/path/to/webauto.',
-    );
+  if (repoRoot) {
+    const scriptPath = path.join(repoRoot, START_SCRIPT_REL);
+    console.log('Starting browser-service daemon...');
+    execSync(`node "${scriptPath}"`, { stdio: 'inherit', cwd: repoRoot });
+  } else {
+    const installRoot = findInstallRootCandidate();
+    if (!installRoot) {
+      throw new Error(
+        `Cannot locate browser-service launcher (${START_SCRIPT_REL} or ${CONTROLLER_SERVER_REL}). ` +
+        'Set WEBAUTO_INSTALL_DIR=<@web-auto/webauto install dir> or WEBAUTO_REPO_ROOT=<repo root>.',
+      );
+    }
+    const scriptPath = path.join(installRoot, CONTROLLER_SERVER_REL);
+    const env = {
+      ...process.env,
+      WEBAUTO_REPO_ROOT: String(process.env.WEBAUTO_REPO_ROOT || '').trim() || installRoot,
+    };
+    const child = spawn(process.execPath, [scriptPath], {
+      cwd: installRoot,
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+      env,
+    });
+    child.unref();
+    console.log(`Starting browser-service daemon (packaged webauto, pid=${child.pid || 'unknown'})...`);
   }
-
-  const scriptPath = path.join(repoRoot, START_SCRIPT_REL);
-  console.log('Starting browser-service daemon...');
-  execSync(`node "${scriptPath}"`, { stdio: 'inherit', cwd: repoRoot });
 
   for (let i = 0; i < 20; i += 1) {
     await new Promise((r) => setTimeout(r, 400));

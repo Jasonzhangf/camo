@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { callAPI } from '../utils/browser-service.mjs';
+import { CONFIG_DIR } from '../utils/config.mjs';
 import { releaseLock } from './lock.mjs';
 import { getSessionInfo, markSessionClosed } from './session-registry.mjs';
 
-const WATCHDOG_DIR = path.join(os.homedir(), '.webauto', 'run', 'camo-watchdogs');
+const WATCHDOG_DIR = path.join(CONFIG_DIR, 'run', 'camo-watchdogs');
 const DEFAULT_HEADLESS_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
 function ensureWatchdogDir() {

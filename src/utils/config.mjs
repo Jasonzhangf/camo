@@ -3,8 +3,63 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-export const CONFIG_DIR = path.join(os.homedir(), '.webauto');
-export const PROFILES_DIR = path.join(CONFIG_DIR, 'profiles');
+function hasDrive(letter) {
+  if (process.platform !== 'win32') return false;
+  try {
+    return fs.existsSync(`${String(letter || '').replace(/[^A-Za-z]/g, '').toUpperCase()}:\\`);
+  } catch {
+    return false;
+  }
+}
+
+function normalizePathForPlatform(input, platform = process.platform) {
+  const raw = String(input || '').trim();
+  const isWinPath = platform === 'win32' || /^[A-Za-z]:[\\/]/.test(raw);
+  const pathApi = isWinPath ? path.win32 : path;
+  return isWinPath ? pathApi.normalize(raw) : path.resolve(raw);
+}
+
+function normalizeLegacyWebautoRoot(input, platform = process.platform) {
+  const pathApi = platform === 'win32' ? path.win32 : path;
+  const resolved = normalizePathForPlatform(input, platform);
+  const base = pathApi.basename(resolved).toLowerCase();
+  if (base === '.webauto' || base === 'webauto') return resolved;
+  return pathApi.join(resolved, '.webauto');
+}
+
+export function resolveWebautoRoot(options = {}) {
+  const env = options.env || process.env;
+  const platform = String(options.platform || process.platform);
+  const pathApi = platform === 'win32' ? path.win32 : path;
+  const homeDir = String(options.homeDir || os.homedir());
+  const explicitDataRoot = String(env.WEBAUTO_DATA_ROOT || env.WEBAUTO_HOME || '').trim();
+  if (explicitDataRoot) return normalizePathForPlatform(explicitDataRoot, platform);
+
+  const legacyRoot = String(env.WEBAUTO_ROOT || env.WEBAUTO_PORTABLE_ROOT || '').trim();
+  if (legacyRoot) return normalizeLegacyWebautoRoot(legacyRoot, platform);
+
+  const dDriveExists = typeof options.hasDDrive === 'boolean'
+    ? options.hasDDrive
+    : hasDrive('D');
+  if (platform === 'win32') {
+    return dDriveExists ? 'D:\\webauto' : pathApi.join(homeDir, '.webauto');
+  }
+  return pathApi.join(homeDir, '.webauto');
+}
+
+export function resolveProfilesDir(options = {}) {
+  const env = options.env || process.env;
+  const platform = String(options.platform || process.platform);
+  const explicitProfileRoot = String(env.WEBAUTO_PROFILE_ROOT || '').trim();
+  if (explicitProfileRoot) {
+    return normalizePathForPlatform(explicitProfileRoot, platform);
+  }
+  const pathApi = platform === 'win32' ? path.win32 : path;
+  return pathApi.join(resolveWebautoRoot(options), 'profiles');
+}
+
+export const CONFIG_DIR = resolveWebautoRoot();
+export const PROFILES_DIR = resolveProfilesDir();
 export const CONFIG_FILE = path.join(CONFIG_DIR, 'camo-cli.json');
 export const PROFILE_META_FILE = 'camo-profile.json';
 export const BROWSER_SERVICE_URL = process.env.WEBAUTO_BROWSER_URL || 'http://127.0.0.1:7704';

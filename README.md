@@ -459,7 +459,11 @@ Condition types:
 ### Environment Variables
 
 - `WEBAUTO_BROWSER_URL` - Browser service URL (default: `http://127.0.0.1:7704`)
-- `WEBAUTO_REPO_ROOT` - WebAuto repository root (optional)
+- `WEBAUTO_INSTALL_DIR` - `@web-auto/webauto` 安装目录（可选，首次安装兜底）
+- `WEBAUTO_REPO_ROOT` - WebAuto repository root (optional, dev mode)
+- `WEBAUTO_DATA_ROOT` / `WEBAUTO_HOME` - 用户数据目录（Windows 默认 `D:/webauto`，无 D 盘回退 `~/.webauto`）
+- `WEBAUTO_PROFILE_ROOT` - Profile 目录覆盖（默认 `<data-root>/profiles`）
+- `WEBAUTO_ROOT` - 兼容旧变量（当值不是 `webauto/.webauto` 目录时会自动补 `.webauto`）
 - `WEBAUTO_CONTAINER_ROOT` - User container root override (default: `~/.webauto/container-lib`)
 - `CAMO_PROGRESS_EVENTS_FILE` - Optional progress event JSONL path override
 - `CAMO_PROGRESS_WS_HOST` / `CAMO_PROGRESS_WS_PORT` - Progress websocket daemon bind address (default: `127.0.0.1:7788`)
