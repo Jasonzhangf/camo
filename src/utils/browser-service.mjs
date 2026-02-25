@@ -9,7 +9,7 @@ import { BROWSER_SERVICE_URL, loadConfig, setRepoRoot } from './config.mjs';
 import { touchSessionActivity } from '../lifecycle/session-registry.mjs';
 
 const require = createRequire(import.meta.url);
-const DEFAULT_API_TIMEOUT_MS = 30000;
+const DEFAULT_API_TIMEOUT_MS = 90000;
 
 function resolveApiTimeoutMs(options = {}) {
   const optionValue = Number(options?.timeoutMs);
