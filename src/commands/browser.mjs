@@ -9,11 +9,10 @@ import {
 } from '../utils/config.mjs';
 import { callAPI, ensureCamoufox, ensureBrowserService, getSessionByProfile, checkBrowserService } from '../utils/browser-service.mjs';
 import { resolveProfileId, ensureUrlScheme, looksLikeUrlToken, getPositionals } from '../utils/args.mjs';
+import { ensureJsExecutionEnabled } from '../utils/js-policy.mjs';
 import { acquireLock, releaseLock, cleanupStaleLocks } from '../lifecycle/lock.mjs';
 import {
-  buildSelectorClickScript,
   buildScrollTargetScript,
-  buildSelectorTypeScript,
 } from '../container/runtime-core/operations/selector-scripts.mjs';
 import {
   registerSession,
@@ -31,11 +30,15 @@ import { startSessionWatchdog, stopAllSessionWatchdogs, stopSessionWatchdog } fr
 const START_WINDOW_MIN_WIDTH = 960;
 const START_WINDOW_MIN_HEIGHT = 700;
 const START_WINDOW_MAX_RESERVE = 240;
-const START_WINDOW_DEFAULT_RESERVE = 72;
+const START_WINDOW_DEFAULT_RESERVE = 0;
 const DEFAULT_HEADLESS_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 const DEVTOOLS_SHORTCUTS = process.platform === 'darwin'
   ? ['Meta+Alt+I', 'F12']
   : ['F12', 'Control+Shift+I'];
+const INPUT_ACTION_TIMEOUT_MS = Math.max(
+  1000,
+  parseNumber(process.env.CAMO_INPUT_ACTION_TIMEOUT_MS, 30000),
+);
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -75,6 +78,167 @@ function parseDurationMs(raw, fallbackMs) {
   const unit = matched[2] || 'm';
   const factor = unit === 'h' ? 3600000 : unit === 'm' ? 60000 : unit === 's' ? 1000 : 1;
   return Math.floor(value * factor);
+}
+
+function assertExistingProfile(profileId, profileSet = null) {
+  const id = String(profileId || '').trim();
+  if (!id) throw new Error('profileId is required');
+  const known = profileSet || new Set(listProfiles());
+  if (!known.has(id)) {
+    throw new Error(`profile not found: ${id}. create it first with "camo profile create ${id}"`);
+  }
+  return id;
+}
+
+async function resolveVisibleTargetPoint(profileId, selector, options = {}) {
+  const selectorLiteral = JSON.stringify(String(selector || '').trim());
+  const highlight = options.highlight === true;
+  const payload = await callAPI('evaluate', {
+    profileId,
+    script: `(() => {
+      const selector = ${selectorLiteral};
+      const highlight = ${highlight ? 'true' : 'false'};
+      const nodes = Array.from(document.querySelectorAll(selector));
+      const isVisible = (node) => {
+        if (!(node instanceof Element)) return false;
+        const rect = node.getBoundingClientRect?.();
+        if (!rect || rect.width <= 0 || rect.height <= 0) return false;
+        try {
+          const style = window.getComputedStyle(node);
+          if (!style) return false;
+          if (style.display === 'none') return false;
+          if (style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+          const opacity = Number.parseFloat(String(style.opacity || '1'));
+          if (Number.isFinite(opacity) && opacity <= 0.01) return false;
+        } catch {
+          return false;
+        }
+        return true;
+      };
+      const hitVisible = (node) => {
+        if (!(node instanceof Element)) return false;
+        const rect = node.getBoundingClientRect?.();
+        if (!rect) return false;
+        const x = Math.max(0, Math.min((window.innerWidth || 1) - 1, Math.round(rect.left + rect.width / 2)));
+        const y = Math.max(0, Math.min((window.innerHeight || 1) - 1, Math.round(rect.top + rect.height / 2)));
+        const top = document.elementFromPoint(x, y);
+        if (!top) return false;
+        return top === node || node.contains(top) || top.contains(node);
+      };
+      const target = nodes.find((item) => isVisible(item) && hitVisible(item))
+        || nodes.find((item) => isVisible(item))
+        || nodes[0]
+        || null;
+      if (!target) {
+        return { ok: false, error: 'selector_not_found', selector };
+      }
+      const rect = target.getBoundingClientRect?.() || { left: 0, top: 0, width: 1, height: 1 };
+      const center = {
+        x: Math.max(1, Math.min((window.innerWidth || 1) - 1, Math.round(rect.left + Math.max(1, rect.width / 2)))),
+        y: Math.max(1, Math.min((window.innerHeight || 1) - 1, Math.round(rect.top + Math.max(1, rect.height / 2)))),
+      };
+      if (highlight) {
+        try {
+          const id = 'webauto-action-highlight-overlay';
+          const old = document.getElementById(id);
+          if (old) old.remove();
+          const overlay = document.createElement('div');
+          overlay.id = id;
+          overlay.style.position = 'fixed';
+          overlay.style.left = rect.left + 'px';
+          overlay.style.top = rect.top + 'px';
+          overlay.style.width = rect.width + 'px';
+          overlay.style.height = rect.height + 'px';
+          overlay.style.border = '2px solid #00A8FF';
+          overlay.style.borderRadius = '8px';
+          overlay.style.background = 'rgba(0,168,255,0.12)';
+          overlay.style.pointerEvents = 'none';
+          overlay.style.zIndex = '2147483647';
+          overlay.style.transition = 'opacity 120ms ease';
+          overlay.style.opacity = '1';
+          document.documentElement.appendChild(overlay);
+          setTimeout(() => {
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 180);
+          }, 260);
+        } catch {}
+      }
+      return {
+        ok: true,
+        selector,
+        center,
+        rect: {
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+        },
+        viewport: {
+          width: Number(window.innerWidth || 0),
+          height: Number(window.innerHeight || 0),
+        },
+      };
+    })()`,
+  }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
+  const result = payload?.result || payload?.data?.result || payload?.data || payload || null;
+  if (!result || result.ok !== true || !result.center) {
+    throw new Error(`Element not found: ${selector}`);
+  }
+  return result;
+}
+
+function isTargetFullyInViewport(target, margin = 6) {
+  const rect = target?.rect && typeof target.rect === 'object' ? target.rect : null;
+  const viewport = target?.viewport && typeof target.viewport === 'object' ? target.viewport : null;
+  if (!rect || !viewport) return true;
+  const vw = Number(viewport.width || 0);
+  const vh = Number(viewport.height || 0);
+  if (!Number.isFinite(vw) || !Number.isFinite(vh) || vw <= 0 || vh <= 0) return true;
+  const left = Number(rect.left || 0);
+  const top = Number(rect.top || 0);
+  const width = Math.max(0, Number(rect.width || 0));
+  const height = Math.max(0, Number(rect.height || 0));
+  const right = left + width;
+  const bottom = top + height;
+  const m = Math.max(0, Number(margin) || 0);
+  return left >= m && top >= m && right <= (vw - m) && bottom <= (vh - m);
+}
+
+async function ensureClickTargetInViewport(profileId, selector, initialTarget, options = {}) {
+  let target = initialTarget;
+  const maxSteps = Math.max(0, Number(options.maxAutoScrollSteps ?? 8) || 8);
+  const settleMs = Math.max(0, Number(options.autoScrollSettleMs ?? 140) || 140);
+  let autoScrolled = 0;
+
+  while (autoScrolled < maxSteps && !isTargetFullyInViewport(target)) {
+    const rect = target?.rect && typeof target.rect === 'object' ? target.rect : {};
+    const viewport = target?.viewport && typeof target.viewport === 'object' ? target.viewport : {};
+    const vw = Math.max(1, Number(viewport.width || 1));
+    const vh = Math.max(1, Number(viewport.height || 1));
+    const rawCenterY = Number(rect.top || 0) + Math.max(1, Number(rect.height || 0)) / 2;
+    const desiredCenterY = clamp(Math.round(vh * 0.45), 80, Math.max(80, vh - 80));
+    let deltaY = Math.round(rawCenterY - desiredCenterY);
+    deltaY = clamp(deltaY, -900, 900);
+    if (Math.abs(deltaY) < 100) {
+      deltaY = deltaY >= 0 ? 120 : -120;
+    }
+    const anchorX = clamp(Math.round(vw / 2), 1, Math.max(1, vw - 1));
+    const anchorY = clamp(Math.round(vh / 2), 1, Math.max(1, vh - 1));
+
+    await callAPI('mouse:move', { profileId, x: anchorX, y: anchorY, steps: 1 }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
+    await callAPI('mouse:wheel', { profileId, deltaX: 0, deltaY }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
+    autoScrolled += 1;
+    if (settleMs > 0) {
+      await sleep(settleMs);
+    }
+    target = await resolveVisibleTargetPoint(profileId, selector, { highlight: false });
+  }
+
+  return {
+    target,
+    autoScrolled,
+    targetFullyVisible: isTargetFullyInViewport(target),
+  };
 }
 
 function validateAlias(alias) {
@@ -378,6 +542,7 @@ export async function handleStartCommand(args) {
       throw new Error('No default profile set. Run: camo profile default <profileId>');
     }
   }
+  assertExistingProfile(profileId, profileSet);
   if (alias && isSessionAliasTaken(alias, profileId)) {
     throw new Error(`Alias is already in use: ${alias}`);
   }
@@ -497,17 +662,28 @@ export async function handleStartCommand(args) {
           source: 'explicit',
         };
       } else {
+        const display = await callAPI('system:display', {}).catch(() => null);
+        const displayTarget = computeStartWindowSize(display);
         const rememberedWindow = getProfileWindowSize(profileId);
         if (rememberedWindow) {
-          windowTarget = {
+          const rememberedTarget = {
             width: rememberedWindow.width,
             height: rememberedWindow.height,
             source: 'profile',
             updatedAt: rememberedWindow.updatedAt,
           };
+          const canTrustDisplayTarget = displayTarget?.source && displayTarget.source !== 'fallback';
+          const refreshFromDisplay = canTrustDisplayTarget
+            && (
+              rememberedTarget.height < Math.floor(displayTarget.height * 0.92)
+              || rememberedTarget.width < Math.floor(displayTarget.width * 0.92)
+            );
+          windowTarget = refreshFromDisplay ? {
+            ...displayTarget,
+            source: 'display',
+          } : rememberedTarget;
         } else {
-          const display = await callAPI('system:display', {}).catch(() => null);
-          windowTarget = computeStartWindowSize(display);
+          windowTarget = displayTarget;
         }
       }
 
@@ -704,6 +880,7 @@ export async function handleStatusCommand(args) {
 export async function handleGotoCommand(args) {
   await ensureBrowserService();
   const positionals = getPositionals(args);
+  const profileSet = new Set(listProfiles());
 
   let profileId;
   let url;
@@ -718,6 +895,13 @@ export async function handleGotoCommand(args) {
 
   if (!profileId) throw new Error('Usage: camo goto [profileId] <url> (or set default profile first)');
   if (!url) throw new Error('Usage: camo goto [profileId] <url>');
+  assertExistingProfile(profileId, profileSet);
+  const active = await getSessionByProfile(profileId);
+  if (!active) {
+    throw new Error(
+      `No active session for profile: ${profileId}. Start via "camo start ${profileId}" (or UI CLI startup) before goto.`,
+    );
+  }
   
   const result = await callAPI('goto', { profileId, url: ensureUrlScheme(url) });
   updateSession(profileId, { url: ensureUrlScheme(url), lastSeen: Date.now() });
@@ -768,7 +952,8 @@ export async function handleScrollCommand(args) {
   const isFlag = (arg) => arg?.startsWith('--');
   const selectorIdx = args.indexOf('--selector');
   const selector = selectorIdx >= 0 ? String(args[selectorIdx + 1] || '').trim() : null;
-  const highlight = resolveHighlightEnabled(args);
+  const highlightRequested = resolveHighlightEnabled(args);
+  const highlight = highlightRequested;
 
   let profileId = null;
   for (let i = 1; i < args.length; i++) {
@@ -794,16 +979,15 @@ export async function handleScrollCommand(args) {
   const target = await callAPI('evaluate', {
     profileId,
     script: buildScrollTargetScript({ selector, highlight }),
-  });
+  }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
   const centerX = Number(target?.result?.center?.x);
   const centerY = Number(target?.result?.center?.y);
   if (Number.isFinite(centerX) && Number.isFinite(centerY)) {
-    await callAPI('mouse:move', { profileId, x: centerX, y: centerY, steps: 2 });
+    await callAPI('mouse:move', { profileId, x: centerX, y: centerY, steps: 2 }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
   }
-
   const deltaX = direction === 'left' ? -amount : direction === 'right' ? amount : 0;
   const deltaY = direction === 'up' ? -amount : direction === 'down' ? amount : 0;
-  const result = await callAPI('mouse:wheel', { profileId, deltaX, deltaY });
+  const result = await callAPI('mouse:wheel', { profileId, deltaX, deltaY }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
   console.log(JSON.stringify({
     ...result,
     scrollTarget: target?.result || null,
@@ -829,11 +1013,33 @@ export async function handleClickCommand(args) {
   if (!profileId) throw new Error('Usage: camo click [profileId] <selector> [--highlight|--no-highlight]');
   if (!selector) throw new Error('Usage: camo click [profileId] <selector> [--highlight|--no-highlight]');
 
-  const result = await callAPI('evaluate', {
-    profileId,
-    script: buildSelectorClickScript({ selector, highlight }),
+  let target = await resolveVisibleTargetPoint(profileId, selector, { highlight });
+  const ensured = await ensureClickTargetInViewport(profileId, selector, target, {
+    maxAutoScrollSteps: 3,
   });
-  console.log(JSON.stringify(result, null, 2));
+  if (!ensured.targetFullyVisible) {
+    throw new Error(`Click target not fully visible after ${ensured.autoScrolled} auto-scroll attempts: ${selector}`);
+  }
+  target = ensured.target;
+  if (highlight) {
+    target = await resolveVisibleTargetPoint(profileId, selector, { highlight: true });
+  }
+  await callAPI('mouse:move', { profileId, x: target.center.x, y: target.center.y, steps: 2 }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
+  const result = await callAPI('mouse:click', {
+    profileId,
+    x: target.center.x,
+    y: target.center.y,
+    button: 'left',
+    clicks: 1,
+  }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
+  console.log(JSON.stringify({
+    ...result,
+    selector,
+    highlight,
+    autoScrolled: ensured.autoScrolled,
+    targetFullyVisible: ensured.targetFullyVisible,
+    target,
+  }, null, 2));
 }
 
 export async function handleTypeCommand(args) {
@@ -857,15 +1063,36 @@ export async function handleTypeCommand(args) {
   if (!profileId) throw new Error('Usage: camo type [profileId] <selector> <text> [--highlight|--no-highlight]');
   if (!selector || text === undefined) throw new Error('Usage: camo type [profileId] <selector> <text> [--highlight|--no-highlight]');
 
-  const result = await callAPI('evaluate', {
+  const target = await resolveVisibleTargetPoint(profileId, selector, { highlight });
+  await callAPI('mouse:move', { profileId, x: target.center.x, y: target.center.y, steps: 2 }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
+  await callAPI('mouse:click', {
     profileId,
-    script: buildSelectorTypeScript({ selector, highlight, text }),
-  });
-  console.log(JSON.stringify(result, null, 2));
+    x: target.center.x,
+    y: target.center.y,
+    button: 'left',
+    clicks: 1,
+  }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
+  await callAPI('keyboard:press', {
+    profileId,
+    key: process.platform === 'darwin' ? 'Meta+A' : 'Control+A',
+  }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
+  await callAPI('keyboard:press', { profileId, key: 'Backspace' }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
+  const result = await callAPI('keyboard:type', {
+    profileId,
+    text: String(text),
+  }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
+  console.log(JSON.stringify({
+    ...result,
+    selector,
+    typed: String(text).length,
+    highlight,
+    target,
+  }, null, 2));
 }
 
 export async function handleHighlightCommand(args) {
   await ensureBrowserService();
+  ensureJsExecutionEnabled('highlight command');
   const positionals = getPositionals(args);
   let profileId;
   let selector;
@@ -898,6 +1125,7 @@ export async function handleHighlightCommand(args) {
 
 export async function handleClearHighlightCommand(args) {
   await ensureBrowserService();
+  ensureJsExecutionEnabled('clear-highlight command');
   const profileId = resolveProfileId(args, 1, getDefaultProfile);
   if (!profileId) throw new Error('Usage: camo clear-highlight [profileId]');
 

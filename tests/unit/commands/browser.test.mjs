@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   handleStopCommand,
+  handleGotoCommand,
   handleClickCommand,
   handleTypeCommand,
   handleScrollCommand,
@@ -13,11 +14,12 @@ import {
 } from '../../../src/commands/browser.mjs';
 import { acquireLock, isLocked, releaseLock } from '../../../src/lifecycle/lock.mjs';
 import { registerSession, getSessionInfo, unregisterSession } from '../../../src/lifecycle/session-registry.mjs';
-import { CONFIG_DIR } from '../../../src/utils/config.mjs';
+import { CONFIG_DIR, PROFILES_DIR } from '../../../src/utils/config.mjs';
 
 const WATCHDOG_DIR = path.join(CONFIG_DIR, 'run', 'camo-watchdogs');
 const originalFetch = global.fetch;
 const TEST_PROFILE = `test-browser-stop-${Date.now()}`;
+const createdProfiles = new Set();
 
 function getWatchdogFile(profileId) {
   return path.join(WATCHDOG_DIR, `${profileId}.json`);
@@ -55,6 +57,11 @@ describe('browser command', () => {
     unregisterSession(TEST_PROFILE);
     const watchdogFile = getWatchdogFile(TEST_PROFILE);
     if (fs.existsSync(watchdogFile)) fs.unlinkSync(watchdogFile);
+    for (const profileId of createdProfiles) {
+      const profileDir = path.join(PROFILES_DIR, profileId);
+      fs.rmSync(profileDir, { recursive: true, force: true });
+    }
+    createdProfiles.clear();
   });
 
   it('cleans local lifecycle state even when remote stop fails', async () => {
@@ -104,6 +111,49 @@ describe('browser command', () => {
       async () => handleStopCommand(['stop', '--id']),
       /Usage: camo stop --id <instanceId>/,
     );
+  });
+
+  it('rejects goto when profile does not exist locally', async () => {
+    global.fetch = async (url) => {
+      if (String(url).includes('/health')) return { ok: true, status: 200 };
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    await assert.rejects(
+      async () => handleGotoCommand(['goto', `${TEST_PROFILE}-missing`, 'https://example.com']),
+      /profile not found/i,
+    );
+  });
+
+  it('rejects goto when profile exists but has no active session', async () => {
+    const profileId = `${TEST_PROFILE}-no-session`;
+    const profileDir = path.join(PROFILES_DIR, profileId);
+    fs.mkdirSync(profileDir, { recursive: true });
+    createdProfiles.add(profileId);
+    const actions = [];
+
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) return { ok: true, status: 200 };
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        actions.push(body.action);
+        if (body.action === 'getStatus') {
+          return { ok: true, status: 200, json: async () => ({ sessions: [] }) };
+        }
+        if (body.action === 'page:list') {
+          return { ok: true, status: 200, json: async () => ({ ok: true, pages: [] }) };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    await assert.rejects(
+      async () => handleGotoCommand(['goto', profileId, 'https://example.com']),
+      /No active session for profile/i,
+    );
+    assert.ok(actions.includes('getStatus'));
+    assert.ok(actions.includes('page:list'));
+    assert.ok(!actions.includes('goto'));
   });
 
   it('supports close all', async () => {
@@ -304,7 +354,7 @@ describe('browser command', () => {
     assert.strictEqual(result.attempts[0].ok, false);
   });
 
-  it('passes highlight=true to click script when --highlight is used', async () => {
+  it('click uses device actions after resolving selector target', async () => {
     const profileId = `${TEST_PROFILE}-click-highlight`;
     const actions = [];
     global.fetch = async (url, options = {}) => {
@@ -313,19 +363,120 @@ describe('browser command', () => {
         const body = JSON.parse(options.body || '{}');
         actions.push(body);
         if (body.action === 'evaluate') {
-          return { ok: true, status: 200, json: async () => ({ ok: true, result: { ok: true } }) };
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              ok: true,
+              result: {
+                ok: true,
+                center: { x: 321, y: 477 },
+                rawCenter: { x: 321, y: 477 },
+                viewport: { width: 1280, height: 720 },
+                rect: { left: 300, top: 450, width: 42, height: 54 },
+              },
+            }),
+          };
+        }
+        if (body.action === 'mouse:move' || body.action === 'mouse:click') {
+          return { ok: true, status: 200, json: async () => ({ ok: true }) };
         }
       }
       return { ok: true, status: 200, json: async () => ({ ok: true }) };
     };
 
     await handleClickCommand(['click', profileId, '#btn', '--highlight']);
-    const evaluate = actions.find((item) => item.action === 'evaluate');
-    assert.ok(evaluate);
-    assert.ok(String(evaluate.args?.script || '').includes('highlight: true'));
+    assert.deepStrictEqual(actions.map((item) => item.action), ['evaluate', 'evaluate', 'mouse:move', 'mouse:click']);
   });
 
-  it('passes highlight=false to type script when --no-highlight is used', async () => {
+  it('click auto-scrolls to fully visible target before clicking', async () => {
+    const profileId = `${TEST_PROFILE}-click-autoscroll`;
+    const actions = [];
+    let offscreen = true;
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) return { ok: true, status: 200 };
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        actions.push(body);
+        if (body.action === 'evaluate') {
+          const rect = offscreen
+            ? { left: 260, top: -120, width: 220, height: 120 }
+            : { left: 260, top: 90, width: 220, height: 120 };
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              ok: true,
+              result: {
+                ok: true,
+                center: { x: 370, y: 150 },
+                rawCenter: { x: 370, y: rect.top + rect.height / 2 },
+                viewport: { width: 1280, height: 720 },
+                rect,
+              },
+            }),
+          };
+        }
+        if (body.action === 'mouse:wheel') {
+          offscreen = false;
+          return { ok: true, status: 200, json: async () => ({ ok: true }) };
+        }
+        if (body.action === 'mouse:move' || body.action === 'mouse:click') {
+          return { ok: true, status: 200, json: async () => ({ ok: true }) };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    await handleClickCommand(['click', profileId, '#btn', '--no-highlight']);
+    const ordered = actions.map((item) => item.action);
+    assert.ok(ordered.includes('mouse:wheel'));
+    assert.strictEqual(ordered[ordered.length - 1], 'mouse:click');
+  });
+
+  it('click fails after 3 auto-scroll attempts when target stays partially visible', async () => {
+    const profileId = `${TEST_PROFILE}-click-autoscroll-fail`;
+    const actions = [];
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) return { ok: true, status: 200 };
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        actions.push(body);
+        if (body.action === 'evaluate') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              ok: true,
+              result: {
+                ok: true,
+                center: { x: 370, y: 1 },
+                rawCenter: { x: 370, y: -80 },
+                viewport: { width: 1280, height: 720 },
+                rect: { left: 260, top: -140, width: 220, height: 120 },
+              },
+            }),
+          };
+        }
+        if (body.action === 'mouse:move' || body.action === 'mouse:wheel') {
+          return { ok: true, status: 200, json: async () => ({ ok: true }) };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    await assert.rejects(
+      async () => handleClickCommand(['click', profileId, '#btn', '--no-highlight']),
+      /not fully visible/i,
+    );
+    const ordered = actions.map((item) => item.action);
+    const wheelCount = ordered.filter((name) => name === 'mouse:wheel').length;
+    const clickCount = ordered.filter((name) => name === 'mouse:click').length;
+    assert.strictEqual(wheelCount, 3);
+    assert.strictEqual(clickCount, 0);
+  });
+
+  it('type uses device keyboard flow after resolving selector target', async () => {
     const profileId = `${TEST_PROFILE}-type-no-highlight`;
     const actions = [];
     global.fetch = async (url, options = {}) => {
@@ -334,16 +485,33 @@ describe('browser command', () => {
         const body = JSON.parse(options.body || '{}');
         actions.push(body);
         if (body.action === 'evaluate') {
-          return { ok: true, status: 200, json: async () => ({ ok: true, result: { ok: true } }) };
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              ok: true,
+              result: {
+                ok: true,
+                center: { x: 420, y: 260 },
+                rawCenter: { x: 420, y: 260 },
+                viewport: { width: 1280, height: 720 },
+                rect: { left: 320, top: 240, width: 200, height: 40 },
+              },
+            }),
+          };
+        }
+        if (body.action === 'mouse:move' || body.action === 'mouse:click' || body.action === 'keyboard:press' || body.action === 'keyboard:type') {
+          return { ok: true, status: 200, json: async () => ({ ok: true }) };
         }
       }
       return { ok: true, status: 200, json: async () => ({ ok: true }) };
     };
 
     await handleTypeCommand(['type', profileId, '#input', 'hello', '--no-highlight']);
-    const evaluate = actions.find((item) => item.action === 'evaluate');
-    assert.ok(evaluate);
-    assert.ok(String(evaluate.args?.script || '').includes('highlight: false'));
+    assert.deepStrictEqual(
+      actions.map((item) => item.action),
+      ['evaluate', 'mouse:move', 'mouse:click', 'keyboard:press', 'keyboard:press', 'keyboard:type'],
+    );
   });
 
   it('scroll highlights visible target and moves pointer before wheel', async () => {
@@ -404,8 +572,8 @@ describe('browser start window sizing helpers', () => {
     });
     assert.deepStrictEqual(result, {
       width: 2560,
-      height: 1343,
-      reservePx: 72,
+      height: 1415,
+      reservePx: 0,
       source: 'workArea',
     });
   });
@@ -415,7 +583,7 @@ describe('browser start window sizing helpers', () => {
     assert.deepStrictEqual(result, {
       width: 1920,
       height: 1000,
-      reservePx: 72,
+      reservePx: 0,
       source: 'fallback',
     });
   });

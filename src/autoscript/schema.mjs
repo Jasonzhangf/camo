@@ -127,9 +127,14 @@ function normalizeSubscription(item, index, defaults) {
   const selector = toTrimmedString(item.selector);
   if (!selector) return null;
   const events = toArray(item.events).map((name) => toTrimmedString(name)).filter(Boolean);
+  const pageUrlIncludes = toArray(item.pageUrlIncludes).map((token) => toTrimmedString(token)).filter(Boolean);
+  const pageUrlExcludes = toArray(item.pageUrlExcludes).map((token) => toTrimmedString(token)).filter(Boolean);
   return {
     id,
     selector,
+    visible: item.visible !== false,
+    pageUrlIncludes,
+    pageUrlExcludes,
     events: events.length > 0 ? events : ['appear', 'exist', 'disappear', 'change'],
     dependsOn: toArray(item.dependsOn).map((x) => toTrimmedString(x)).filter(Boolean),
     retry: normalizeRetry(item.retry, defaults.retry),
@@ -243,6 +248,7 @@ export function normalizeAutoscript(raw, sourcePath = null) {
       retry: normalizeRetry(defaults.retry, {}),
       impact: toTrimmedString(defaults.impact || 'op') || 'op',
       onFailure: toTrimmedString(defaults.onFailure || 'chain_stop') || 'chain_stop',
+      filterMode: toTrimmedString(defaults.filterMode || 'strict') || 'strict',
       validationMode: toTrimmedString(defaults.validationMode || 'none') || 'none',
       recovery: normalizeRecovery(defaults.recovery, {}),
       pacing: normalizePacing(defaults.pacing, {}),

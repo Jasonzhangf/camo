@@ -101,6 +101,29 @@ describe('browser-service utilities', () => {
         /Bad request/
       );
     });
+
+    it('should timeout when browser-service does not respond', async () => {
+      global.fetch = async (_url, options = {}) => new Promise((_resolve, reject) => {
+        const signal = options?.signal;
+        if (!signal) return;
+        if (signal.aborted) {
+          const error = new Error('aborted');
+          error.name = 'AbortError';
+          reject(error);
+          return;
+        }
+        signal.addEventListener('abort', () => {
+          const error = new Error('aborted');
+          error.name = 'AbortError';
+          reject(error);
+        }, { once: true });
+      });
+      const { callAPI } = await import('../../../src/utils/browser-service.mjs');
+      await assert.rejects(
+        async () => callAPI('mouse:move', { profileId: 'profile-a', x: 1, y: 2 }, { timeoutMs: 10 }),
+        /timeout/i,
+      );
+    });
   });
 
   describe('getSessionByProfile', () => {

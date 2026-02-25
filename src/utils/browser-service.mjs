@@ -9,6 +9,31 @@ import { BROWSER_SERVICE_URL, loadConfig, setRepoRoot } from './config.mjs';
 import { touchSessionActivity } from '../lifecycle/session-registry.mjs';
 
 const require = createRequire(import.meta.url);
+const DEFAULT_API_TIMEOUT_MS = 30000;
+
+function resolveApiTimeoutMs(options = {}) {
+  const optionValue = Number(options?.timeoutMs);
+  if (Number.isFinite(optionValue) && optionValue > 0) {
+    return Math.max(1000, Math.floor(optionValue));
+  }
+  const envValue = Number(process.env.CAMO_API_TIMEOUT_MS);
+  if (Number.isFinite(envValue) && envValue > 0) {
+    return Math.max(1000, Math.floor(envValue));
+  }
+  return DEFAULT_API_TIMEOUT_MS;
+}
+
+function isTimeoutError(error) {
+  const name = String(error?.name || '').toLowerCase();
+  const message = String(error?.message || '').toLowerCase();
+  return (
+    name.includes('timeout')
+    || name.includes('abort')
+    || message.includes('timeout')
+    || message.includes('timed out')
+    || message.includes('aborted')
+  );
+}
 
 function shouldTrackSessionActivity(action, payload) {
   const profileId = String(payload?.profileId || '').trim();
@@ -17,12 +42,22 @@ function shouldTrackSessionActivity(action, payload) {
   return true;
 }
 
-export async function callAPI(action, payload = {}) {
-  const r = await fetch(`${BROWSER_SERVICE_URL}/command`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, args: payload }),
-  });
+export async function callAPI(action, payload = {}, options = {}) {
+  const timeoutMs = resolveApiTimeoutMs(options);
+  let r;
+  try {
+    r = await fetch(`${BROWSER_SERVICE_URL}/command`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, args: payload }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    if (isTimeoutError(error)) {
+      throw new Error(`browser-service timeout after ${timeoutMs}ms: ${action}`);
+    }
+    throw error;
+  }
 
   let body;
   try {

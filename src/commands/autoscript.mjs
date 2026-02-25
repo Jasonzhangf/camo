@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { getDefaultProfile } from '../utils/config.mjs';
+import { getDefaultProfile, listProfiles } from '../utils/config.mjs';
 import { explainAutoscript, loadAndValidateAutoscript } from '../autoscript/schema.mjs';
 import { AutoscriptRunner } from '../autoscript/runtime.mjs';
 import { safeAppendProgressEvent } from '../events/progress-log.mjs';
@@ -28,6 +28,18 @@ function collectPositionals(args, startIndex = 2, valueFlags = new Set(['--profi
     out.push(arg);
   }
   return out;
+}
+
+function assertExistingProfile(profileId) {
+  const id = String(profileId || '').trim();
+  if (!id) {
+    throw new Error('profileId is required');
+  }
+  const known = new Set(listProfiles());
+  if (!known.has(id)) {
+    throw new Error(`profile not found: ${id}. create it first with "camo profile create ${id}"`);
+  }
+  return id;
 }
 
 function appendJsonLine(filePath, payload) {
@@ -783,6 +795,7 @@ async function handleRun(args) {
   if (!profileId) {
     throw new Error('profileId is required. Set in script or pass --profile <id>');
   }
+  assertExistingProfile(profileId);
 
   await executeAutoscriptRuntime({
     commandName: 'autoscript.run',
@@ -896,6 +909,7 @@ async function handleResume(args) {
   if (!profileId) {
     throw new Error('profileId is required. Set in script or pass --profile <id>');
   }
+  assertExistingProfile(profileId);
   const resumeState = buildResumeStateFromSnapshot(script, snapshot, fromNode || null);
   await executeAutoscriptRuntime({
     commandName: 'autoscript.resume',

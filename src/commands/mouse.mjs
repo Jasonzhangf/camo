@@ -2,6 +2,12 @@ import { getDefaultProfile } from '../utils/config.mjs';
 import { callAPI, ensureBrowserService } from '../utils/browser-service.mjs';
 import { getPositionals } from '../utils/args.mjs';
 
+const INPUT_ACTION_TIMEOUT_MS = (() => {
+  const parsed = Number(process.env.CAMO_INPUT_ACTION_TIMEOUT_MS);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 30000;
+  return Math.max(1000, Math.floor(parsed));
+})();
+
 export async function handleMouseCommand(args) {
   await ensureBrowserService();
 
@@ -17,7 +23,7 @@ export async function handleMouseCommand(args) {
     const x = parseInt(args[xIdx + 1]);
     const y = parseInt(args[yIdx + 1]);
     const steps = stepsIdx >= 0 ? parseInt(args[stepsIdx + 1]) : undefined;
-    const result = await callAPI('mouse:move', { profileId, x, y, steps });
+    const result = await callAPI('mouse:move', { profileId, x, y, steps }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
     console.log(JSON.stringify(result, null, 2));
   } else if (sub === 'click') {
     // Use existing click command? We already have click command for element clicking.
@@ -33,7 +39,7 @@ export async function handleMouseCommand(args) {
     const button = buttonIdx >= 0 ? args[buttonIdx + 1] : 'left';
     const clicks = clicksIdx >= 0 ? parseInt(args[clicksIdx + 1]) : 1;
     const delay = delayIdx >= 0 ? parseInt(args[delayIdx + 1]) : undefined;
-    const result = await callAPI('mouse:click', { profileId, x, y, button, clicks, delay });
+    const result = await callAPI('mouse:click', { profileId, x, y, button, clicks, delay }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
     console.log(JSON.stringify(result, null, 2));
   } else if (sub === 'wheel') {
     const deltaXIdx = args.indexOf('--deltax');
@@ -41,7 +47,7 @@ export async function handleMouseCommand(args) {
     if (deltaXIdx === -1 && deltaYIdx === -1) throw new Error('Usage: camo mouse wheel [profileId] [--deltax <px>] [--deltay <px>]');
     const deltaX = deltaXIdx >= 0 ? parseInt(args[deltaXIdx + 1]) : 0;
     const deltaY = deltaYIdx >= 0 ? parseInt(args[deltaYIdx + 1]) : 0;
-    const result = await callAPI('mouse:wheel', { profileId, deltaX, deltaY });
+    const result = await callAPI('mouse:wheel', { profileId, deltaX, deltaY }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
     console.log(JSON.stringify(result, null, 2));
   } else {
     throw new Error('Usage: camo mouse <move|click|wheel> [profileId] [options]');

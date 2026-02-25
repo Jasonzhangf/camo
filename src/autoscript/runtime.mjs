@@ -970,6 +970,7 @@ export class AutoscriptRunner {
         profileId: this.profileId,
         subscriptions: this.script.subscriptions,
         throttle: this.script.throttle,
+        filterMode: this.script?.defaults?.filterMode || 'strict',
         onEvent: async (event) => {
           this.log('autoscript:event', {
             type: event.type,

@@ -175,6 +175,22 @@ describe('autoscript command', () => {
     assert.ok(logs.some((line) => line.includes('"event": "autoscript:run_summary"')));
   });
 
+  it('rejects run when profile does not exist locally', async () => {
+    const mod = await import('../../../src/commands/autoscript.mjs');
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-autoscript-run-profile-gate-'));
+    const scriptPath = path.join(tmpDir, 'script.json');
+    writeJsonFile(scriptPath, createMinimalAutoscript({ profileId: 'missing-local-profile' }));
+
+    await assert.rejects(
+      () => mod.handleAutoscriptCommand([
+        'autoscript',
+        'run',
+        scriptPath,
+      ]),
+      /profile not found/i,
+    );
+  });
+
   it('validates resume from-node before runtime start', async () => {
     const mod = await import('../../../src/commands/autoscript.mjs');
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-autoscript-resume-'));

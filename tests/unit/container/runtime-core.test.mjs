@@ -20,6 +20,8 @@ describe('runtime core primitives', () => {
   let viewportSize;
   let windowSize;
   let wheelCalls;
+  let commandActions;
+  let onWheel;
 
   beforeEach(() => {
     currentUrl = 'https://www.xiaohongshu.com/explore?keyword=test';
@@ -38,12 +40,15 @@ describe('runtime core primitives', () => {
     viewportSize = { width: 1280, height: 720 };
     windowSize = { width: 1400, height: 820 };
     wheelCalls = [];
+    commandActions = [];
+    onWheel = null;
 
     global.fetch = async (url, options) => {
       if (String(url).includes('/command')) {
         const body = JSON.parse(options?.body || '{}');
         const action = body.action;
         const args = body.args || {};
+        commandActions.push(action);
         if (action === 'getStatus') {
           return { ok: true, json: async () => ({ sessions: [{ profileId: 'p1', sessionId: 's1' }] }) };
         }
@@ -126,7 +131,12 @@ describe('runtime core primitives', () => {
           return { ok: true, json: async () => ({ ok: true, window: windowSize }) };
         }
         if (action === 'mouse:wheel') {
-          wheelCalls.push({ deltaX: Number(args?.deltaX || 0), deltaY: Number(args?.deltaY || 0) });
+          const deltaX = Number(args?.deltaX || 0);
+          const deltaY = Number(args?.deltaY || 0);
+          wheelCalls.push({ deltaX, deltaY });
+          if (typeof onWheel === 'function') {
+            onWheel({ deltaX, deltaY });
+          }
           return { ok: true, json: async () => ({ ok: true }) };
         }
         return { ok: true, json: async () => ({ ok: true, result: { ok: true } }) };
@@ -348,6 +358,182 @@ describe('runtime core primitives', () => {
       context: { runtime: {} },
     });
     assert.strictEqual(pressed.ok, true);
+  });
+
+  it('auto-scrolls click target until fully visible', async () => {
+    snapshot = {
+      tag: 'body',
+      selector: 'body',
+      visible: true,
+      children: [
+        {
+          tag: 'button',
+          selector: '.edge-target',
+          classes: ['edge-target'],
+          visible: true,
+          rect: { left: 240, top: -120, width: 220, height: 120 },
+        },
+      ],
+    };
+    onWheel = ({ deltaY }) => {
+      if (deltaY < 0) {
+        snapshot.children[0].rect.top = 80;
+      }
+    };
+    commandActions.length = 0;
+    const result = await executeOperation({
+      profileId: 'p1',
+      operation: { action: 'click', params: { selector: '.edge-target' } },
+      context: { runtime: {} },
+    });
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.data.targetFullyVisible, true);
+    assert.ok(wheelCalls.some((item) => item.deltaY < 0));
+    assert.ok(commandActions.includes('mouse:click'));
+  });
+
+  it('fails click when target is still not fully visible after auto-scroll retries', async () => {
+    snapshot = {
+      tag: 'body',
+      selector: 'body',
+      visible: true,
+      children: [
+        {
+          tag: 'button',
+          selector: '.always-partial',
+          classes: ['always-partial'],
+          visible: true,
+          rect: { left: 260, top: -140, width: 220, height: 120 },
+        },
+      ],
+    };
+    const result = await executeOperation({
+      profileId: 'p1',
+      operation: { action: 'click', params: { selector: '.always-partial', maxScrollSteps: 3, scrollSettleMs: 0 } },
+      context: { runtime: {} },
+    });
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.code, 'TARGET_NOT_FULLY_VISIBLE');
+    assert.strictEqual(commandActions.includes('mouse:click'), false);
+    assert.strictEqual(wheelCalls.length, 3);
+  });
+
+  it('locks scroll anchor to modal in strict filter mode', async () => {
+    snapshot = {
+      tag: 'body',
+      selector: 'body',
+      visible: true,
+      children: [
+        {
+          tag: 'div',
+          selector: '.note-detail-mask',
+          classes: ['note-detail-mask'],
+          visible: true,
+          rect: { left: 60, top: 40, width: 900, height: 600 },
+          children: [
+            {
+              tag: 'button',
+              selector: '.inside-action',
+              classes: ['inside-action'],
+              visible: true,
+              rect: { left: 120, top: 120, width: 120, height: 40 },
+            },
+          ],
+        },
+        {
+          tag: 'div',
+          selector: '.feed-list',
+          classes: ['feed-list'],
+          visible: true,
+          rect: { left: 980, top: 140, width: 260, height: 420 },
+        },
+      ],
+    };
+    const result = await executeOperation({
+      profileId: 'p1',
+      operation: {
+        action: 'scroll',
+        params: { direction: 'down', amount: 240, selector: '.feed-list', filterMode: 'strict' },
+      },
+      context: { runtime: {} },
+    });
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.data.anchorSource, 'modal');
+    assert.strictEqual(result.data.modalLocked, true);
+  });
+
+  it('rejects selector operations outside modal in strict filter mode', async () => {
+    snapshot = {
+      tag: 'body',
+      selector: 'body',
+      visible: true,
+      children: [
+        {
+          tag: 'div',
+          selector: '.note-detail-mask',
+          classes: ['note-detail-mask'],
+          visible: true,
+          rect: { left: 60, top: 40, width: 900, height: 600 },
+          children: [
+            {
+              tag: 'button',
+              selector: '.inside-action',
+              classes: ['inside-action'],
+              visible: true,
+              rect: { left: 120, top: 120, width: 120, height: 40 },
+            },
+          ],
+        },
+        {
+          tag: 'button',
+          selector: '.outside-target',
+          classes: ['outside-target'],
+          visible: true,
+          rect: { left: 1000, top: 300, width: 120, height: 48 },
+        },
+      ],
+    };
+    const result = await executeOperation({
+      profileId: 'p1',
+      operation: {
+        action: 'click',
+        params: { selector: '.outside-target', filterMode: 'strict' },
+      },
+      context: { runtime: {} },
+    });
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.code, 'OPERATION_FAILED');
+    assert.ok(String(result.message).includes('Modal focus locked'));
+  });
+
+  it('types through device chain with pointer focus click', async () => {
+    snapshot = {
+      tag: 'body',
+      selector: 'body',
+      visible: true,
+      children: [
+        {
+          tag: 'input',
+          selector: '#search-input',
+          id: 'search-input',
+          visible: true,
+          rect: { left: 260, top: 180, width: 320, height: 42 },
+        },
+      ],
+    };
+    commandActions.length = 0;
+    const result = await executeOperation({
+      profileId: 'p1',
+      operation: { action: 'type', params: { selector: '#search-input', text: 'deepseek' } },
+      context: { runtime: {} },
+    });
+    assert.strictEqual(result.ok, true);
+    const moveIdx = commandActions.indexOf('mouse:move');
+    const clickIdx = commandActions.indexOf('mouse:click');
+    const typeIdx = commandActions.indexOf('keyboard:type');
+    assert.ok(moveIdx >= 0);
+    assert.ok(clickIdx > moveIdx);
+    assert.ok(typeIdx > clickIdx);
   });
 
   it('verifies subscription selectors across pages', async () => {

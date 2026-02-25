@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import { listProfiles, getDefaultProfile, loadConfig, hasStartScript, setRepoRoot } from './utils/config.mjs';
 import { printHelp, printProfilesAndHint } from './utils/help.mjs';
 import { handleProfileCommand } from './commands/profile.mjs';
@@ -34,6 +35,19 @@ import { ensureProgressEventDaemon } from './events/daemon.mjs';
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const START_SCRIPT_REL = path.join('runtime', 'infra', 'utils', 'scripts', 'service', 'start-browser-service.mjs');
+const PACKAGE_JSON_PATH = path.resolve(CURRENT_DIR, '..', 'package.json');
+
+function readCliVersion() {
+  try {
+    const raw = JSON.parse(readFileSync(PACKAGE_JSON_PATH, 'utf8'));
+    const version = String(raw?.version || '').trim();
+    return version || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
+const CLI_VERSION = readCliVersion();
 
 function readFlagValue(args, names) {
   for (let i = 0; i < args.length; i += 1) {
@@ -160,7 +174,11 @@ async function handleConfigCommand(args) {
 }
 
 async function main() {
-  const args = process.argv.slice(2);
+  const rawArgs = process.argv.slice(2);
+  const jsEnabled = rawArgs.includes('--js');
+  if (jsEnabled) process.env.CAMO_ALLOW_JS = '1';
+  else delete process.env.CAMO_ALLOW_JS;
+  const args = rawArgs.filter((arg) => arg !== '--js');
   const cmd = args[0];
 
   if (!cmd) {
@@ -170,6 +188,11 @@ async function main() {
 
   if (cmd === 'help' || cmd === '--help' || cmd === '-h') {
     printHelp();
+    return;
+  }
+
+  if (cmd === 'version' || cmd === '--version' || cmd === '-v') {
+    console.log(CLI_VERSION);
     return;
   }
 

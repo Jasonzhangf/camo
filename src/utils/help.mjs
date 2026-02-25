@@ -96,6 +96,7 @@ SYSTEM:
 
 SYSTEM:
   shutdown                                  Shutdown browser-service (stops all sessions)
+  version | --version | -v                 Print camo CLI version
   help
 
 EXAMPLES:

@@ -10,6 +10,22 @@ describe('autoscript runtime', () => {
   let snapshots;
   let snapshotIndex;
 
+  const normalizeSnapshot = (node) => {
+    if (!node || typeof node !== 'object') return node;
+    const next = { ...node };
+    const hasRect = next.rect && typeof next.rect === 'object';
+    if (!hasRect) {
+      next.rect = { left: 20, top: 20, width: 120, height: 40 };
+    }
+    if (typeof next.visible !== 'boolean') {
+      next.visible = true;
+    }
+    if (Array.isArray(next.children)) {
+      next.children = next.children.map((child) => normalizeSnapshot(child));
+    }
+    return next;
+  };
+
   beforeEach(() => {
     currentUrl = 'https://www.xiaohongshu.com/explore';
     snapshots = [
@@ -31,8 +47,22 @@ describe('autoscript runtime', () => {
           if (String(args.script || '').includes('window.location.href')) {
             return { ok: true, json: async () => ({ result: currentUrl }) };
           }
+          if (String(args.script || '').includes('selector_not_found')) {
+            return {
+              ok: true,
+              json: async () => ({
+                result: {
+                  ok: true,
+                  center: { x: 320, y: 240 },
+                  rawCenter: { x: 320, y: 240 },
+                  viewport: { width: 1280, height: 720 },
+                  rect: { left: 200, top: 180, width: 240, height: 48 },
+                },
+              }),
+            };
+          }
           if (String(args.script || '').includes('dom_tree')) {
-            const snap = snapshots[Math.min(snapshotIndex, snapshots.length - 1)];
+            const snap = normalizeSnapshot(snapshots[Math.min(snapshotIndex, snapshots.length - 1)]);
             snapshotIndex += 1;
             return { ok: true, json: async () => ({ result: { dom_tree: snap, viewport: { width: 1280, height: 720 } } }) };
           }
