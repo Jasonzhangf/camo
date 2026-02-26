@@ -22,7 +22,7 @@ No direct HTTP/API calls are required when using this skill.
 
 - protocol actions: `camo click`, `camo type`, `camo scroll`
 - debug assist: `camo highlight`, `camo clear-highlight`
-- system fallback: `camo mouse move/click/wheel`
+- system fallback: `camo mouse click/wheel`
 
 ## 4. Container Subscription Layer
 

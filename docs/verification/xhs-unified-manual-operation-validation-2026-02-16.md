@@ -402,7 +402,7 @@
 - 不刷新页面
 - 不重新发起搜索
 - 不新开详情
-- 仅在当前详情评论区连续手动滚动（`camo mouse move + camo mouse wheel`）
+- 仅在当前详情评论区连续手动滚动（`camo mouse wheel`）
 
 证据截图:
 - 初始现场: `docs/verification/evidence/xhs-unified-manual-2026-02-16/manual-stuck-note-before-scroll.png`

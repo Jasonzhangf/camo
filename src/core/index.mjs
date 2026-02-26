@@ -38,7 +38,6 @@ export {
   listPages,
   switchPage,
   closePage,
-  mouseMove,
   mouseClick,
   mouseWheel,
 } from './actions.mjs';

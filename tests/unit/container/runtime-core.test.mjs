@@ -418,6 +418,31 @@ describe('runtime core primitives', () => {
     assert.strictEqual(wheelCalls.length, 3);
   });
 
+  it('uses direct click without mouse move', async () => {
+    snapshot = {
+      tag: 'body',
+      selector: 'body',
+      visible: true,
+      children: [
+        {
+          tag: 'button',
+          selector: '.move-fallback',
+          classes: ['move-fallback'],
+          visible: true,
+          rect: { left: 260, top: 200, width: 220, height: 120 },
+        },
+      ],
+    };
+    commandActions.length = 0;
+    const result = await executeOperation({
+      profileId: 'p1',
+      operation: { action: 'click', params: { selector: '.move-fallback' } },
+      context: { runtime: {} },
+    });
+    assert.strictEqual(result.ok, true);
+    assert.deepStrictEqual(commandActions.filter((action) => action.startsWith('mouse:')), ['mouse:click']);
+  });
+
   it('locks scroll anchor to modal in strict filter mode', async () => {
     snapshot = {
       tag: 'body',
@@ -506,7 +531,7 @@ describe('runtime core primitives', () => {
     assert.ok(String(result.message).includes('Modal focus locked'));
   });
 
-  it('types through device chain with pointer focus click', async () => {
+  it('types through device chain with direct focus click by default', async () => {
     snapshot = {
       tag: 'body',
       selector: 'body',
@@ -528,11 +553,10 @@ describe('runtime core primitives', () => {
       context: { runtime: {} },
     });
     assert.strictEqual(result.ok, true);
-    const moveIdx = commandActions.indexOf('mouse:move');
     const clickIdx = commandActions.indexOf('mouse:click');
     const typeIdx = commandActions.indexOf('keyboard:type');
-    assert.ok(moveIdx >= 0);
-    assert.ok(clickIdx > moveIdx);
+    assert.deepStrictEqual(commandActions.filter((action) => action.startsWith('mouse:')), ['mouse:click']);
+    assert.ok(clickIdx >= 0);
     assert.ok(typeIdx > clickIdx);
   });
 

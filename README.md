@@ -276,7 +276,6 @@ camo window resize [profileId] --width <w> --height <h>
 ### Mouse Control
 
 ```bash
-camo mouse move [profileId] --x <x> --y <y> [--steps <n>]
 camo mouse click [profileId] --x <x> --y <y> [--button left|right|middle] [--clicks <n>] [--delay <ms>]
 camo mouse wheel [profileId] [--deltax <px>] [--deltay <px>]
 ```

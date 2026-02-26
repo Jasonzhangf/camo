@@ -32,7 +32,6 @@ const DEFAULT_MODAL_SELECTORS = [
   '.note-detail-page',
   '.note-detail-dialog',
 ];
-
 function resolveFilterMode(input) {
   const text = String(input || process.env.CAMO_FILTER_MODE || 'strict').trim().toLowerCase();
   if (!text) return 'strict';
@@ -282,9 +281,6 @@ async function scrollTargetIntoViewport(profileId, selector, initialTarget, para
     if (isTargetFullyInViewport(target, visibilityMargin)) break;
     const delta = resolveViewportScrollDelta(target, visibilityMargin);
     if (Math.abs(delta.deltaX) < 1 && Math.abs(delta.deltaY) < 1) break;
-    const anchorX = clamp(Math.round(Number(target?.center?.x || 0) || 1), 1, Math.max(1, Number(target?.viewport?.width || 1) - 1));
-    const anchorY = clamp(Math.round(Number(target?.center?.y || 0) || 1), 1, Math.max(1, Number(target?.viewport?.height || 1) - 1));
-    await callAPI('mouse:move', { profileId, x: anchorX, y: anchorY, steps: 1 });
     await callAPI('mouse:wheel', { profileId, deltaX: delta.deltaX, deltaY: delta.deltaY });
     if (settleMs > 0) await sleep(settleMs);
     target = await resolveSelectorTarget(profileId, selector, options);
@@ -376,8 +372,6 @@ async function executeSelectorOperation({ profileId, action, operation, params, 
     });
   }
 
-  await callAPI('mouse:move', { profileId, x: target.center.x, y: target.center.y, steps: 2 });
-
   if (action === 'scroll_into_view') {
     return {
       ok: true,
@@ -399,7 +393,12 @@ async function executeSelectorOperation({ profileId, action, operation, params, 
       clicks,
       ...(Number.isFinite(delay) && delay >= 0 ? { delay } : {}),
     });
-    return { ok: true, code: 'OPERATION_DONE', message: 'click done', data: { selector, target, result, targetFullyVisible, visibilityMargin } };
+    return {
+      ok: true,
+      code: 'OPERATION_DONE',
+      message: 'click done',
+      data: { selector, target, result, targetFullyVisible, visibilityMargin },
+    };
   }
 
   const text = String(params.text ?? params.value ?? '');
@@ -627,14 +626,6 @@ export async function executeOperation({ profileId, operation, context = {} }) {
         selector: anchorSelector,
         filterMode,
       });
-      if (anchor?.center?.x && anchor?.center?.y) {
-        await callAPI('mouse:move', {
-          profileId: resolvedProfile,
-          x: Math.max(1, Math.round(Number(anchor.center.x) || 1)),
-          y: Math.max(1, Math.round(Number(anchor.center.y) || 1)),
-          steps: 2,
-        });
-      }
       const result = await callAPI('mouse:wheel', { profileId: resolvedProfile, deltaX, deltaY });
       return {
         ok: true,

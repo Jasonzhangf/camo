@@ -15,17 +15,7 @@ export async function handleMouseCommand(args) {
   const profileId = getPositionals(args, 2)[0] || getDefaultProfile();
   if (!profileId) throw new Error('No profile specified and no default profile set');
 
-  if (sub === 'move') {
-    const xIdx = args.indexOf('--x');
-    const yIdx = args.indexOf('--y');
-    const stepsIdx = args.indexOf('--steps');
-    if (xIdx === -1 || yIdx === -1) throw new Error('Usage: camo mouse move [profileId] --x <x> --y <y> [--steps <n>]');
-    const x = parseInt(args[xIdx + 1]);
-    const y = parseInt(args[yIdx + 1]);
-    const steps = stepsIdx >= 0 ? parseInt(args[stepsIdx + 1]) : undefined;
-    const result = await callAPI('mouse:move', { profileId, x, y, steps }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
-    console.log(JSON.stringify(result, null, 2));
-  } else if (sub === 'click') {
+  if (sub === 'click') {
     // Use existing click command? We already have click command for element clicking.
     // This is for raw mouse click at coordinates.
     const xIdx = args.indexOf('--x');
@@ -50,6 +40,6 @@ export async function handleMouseCommand(args) {
     const result = await callAPI('mouse:wheel', { profileId, deltaX, deltaY }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
     console.log(JSON.stringify(result, null, 2));
   } else {
-    throw new Error('Usage: camo mouse <move|click|wheel> [profileId] [options]');
+    throw new Error('Usage: camo mouse <click|wheel> [profileId] [options]');
   }
 }

@@ -378,7 +378,7 @@ describe('browser command', () => {
             }),
           };
         }
-        if (body.action === 'mouse:move' || body.action === 'mouse:click') {
+        if (body.action === 'mouse:click') {
           return { ok: true, status: 200, json: async () => ({ ok: true }) };
         }
       }
@@ -386,7 +386,7 @@ describe('browser command', () => {
     };
 
     await handleClickCommand(['click', profileId, '#btn', '--highlight']);
-    assert.deepStrictEqual(actions.map((item) => item.action), ['evaluate', 'evaluate', 'mouse:move', 'mouse:click']);
+    assert.deepStrictEqual(actions.map((item) => item.action), ['evaluate', 'evaluate', 'mouse:click']);
   });
 
   it('click auto-scrolls to fully visible target before clicking', async () => {
@@ -421,7 +421,7 @@ describe('browser command', () => {
           offscreen = false;
           return { ok: true, status: 200, json: async () => ({ ok: true }) };
         }
-        if (body.action === 'mouse:move' || body.action === 'mouse:click') {
+        if (body.action === 'mouse:click') {
           return { ok: true, status: 200, json: async () => ({ ok: true }) };
         }
       }
@@ -432,6 +432,41 @@ describe('browser command', () => {
     const ordered = actions.map((item) => item.action);
     assert.ok(ordered.includes('mouse:wheel'));
     assert.strictEqual(ordered[ordered.length - 1], 'mouse:click');
+  });
+
+  it('click uses direct click by default without pre-move', async () => {
+    const profileId = `${TEST_PROFILE}-click-direct`;
+    const actions = [];
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) return { ok: true, status: 200 };
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        actions.push(body);
+        if (body.action === 'evaluate') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              ok: true,
+              result: {
+                ok: true,
+                center: { x: 360, y: 240 },
+                rawCenter: { x: 360, y: 240 },
+                viewport: { width: 1280, height: 720 },
+                rect: { left: 260, top: 180, width: 200, height: 120 },
+              },
+            }),
+          };
+        }
+        if (body.action === 'mouse:click') {
+          return { ok: true, status: 200, json: async () => ({ ok: true }) };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    await handleClickCommand(['click', profileId, '#btn', '--no-highlight']);
+    assert.deepStrictEqual(actions.map((item) => item.action), ['evaluate', 'mouse:click']);
   });
 
   it('click fails after 3 auto-scroll attempts when target stays partially visible', async () => {
@@ -458,7 +493,7 @@ describe('browser command', () => {
             }),
           };
         }
-        if (body.action === 'mouse:move' || body.action === 'mouse:wheel') {
+        if (body.action === 'mouse:wheel') {
           return { ok: true, status: 200, json: async () => ({ ok: true }) };
         }
       }
@@ -500,7 +535,7 @@ describe('browser command', () => {
             }),
           };
         }
-        if (body.action === 'mouse:move' || body.action === 'mouse:click' || body.action === 'keyboard:press' || body.action === 'keyboard:type') {
+        if (body.action === 'mouse:click' || body.action === 'keyboard:press' || body.action === 'keyboard:type') {
           return { ok: true, status: 200, json: async () => ({ ok: true }) };
         }
       }
@@ -510,11 +545,11 @@ describe('browser command', () => {
     await handleTypeCommand(['type', profileId, '#input', 'hello', '--no-highlight']);
     assert.deepStrictEqual(
       actions.map((item) => item.action),
-      ['evaluate', 'mouse:move', 'mouse:click', 'keyboard:press', 'keyboard:press', 'keyboard:type'],
+      ['evaluate', 'mouse:click', 'keyboard:press', 'keyboard:press', 'keyboard:type'],
     );
   });
 
-  it('scroll highlights visible target and moves pointer before wheel', async () => {
+  it('scroll highlights visible target and wheels without pointer pre-move by default', async () => {
     const profileId = `${TEST_PROFILE}-scroll-highlight`;
     const actions = [];
     global.fetch = async (url, options = {}) => {
@@ -529,7 +564,7 @@ describe('browser command', () => {
             json: async () => ({ ok: true, result: { center: { x: 320, y: 480 }, source: 'selector' } }),
           };
         }
-        if (body.action === 'mouse:move' || body.action === 'mouse:wheel') {
+        if (body.action === 'mouse:wheel') {
           return { ok: true, status: 200, json: async () => ({ ok: true }) };
         }
       }
@@ -547,9 +582,9 @@ describe('browser command', () => {
       '--highlight',
     ]);
     const orderedActions = actions.map((item) => item.action);
-    assert.deepStrictEqual(orderedActions.slice(0, 3), ['evaluate', 'mouse:move', 'mouse:wheel']);
+    assert.deepStrictEqual(orderedActions.slice(0, 2), ['evaluate', 'mouse:wheel']);
     assert.ok(String(actions[0]?.args?.script || '').includes('.feed-list'));
-    assert.strictEqual(actions[2]?.args?.deltaY, 120);
+    assert.strictEqual(actions[1]?.args?.deltaY, 120);
   });
 });
 

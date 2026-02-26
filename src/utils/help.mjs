@@ -87,7 +87,6 @@ WINDOW:
   window resize [profileId] --width <w> --height <h> Resize browser window
 
 MOUSE:
-  mouse move [profileId] --x <x> --y <y> [--steps <n>]  Move mouse to coordinates
   mouse click [profileId] --x <x> --y <y> [--button left|right|middle] [--clicks <n>] [--delay <ms>]  Click at coordinates
   mouse wheel [profileId] [--deltax <px>] [--deltay <px>]  Scroll wheel
 
@@ -134,7 +133,6 @@ EXAMPLES:
   camo cookies auto start --interval 5000
   camo window move --x 100 --y 100
   camo window resize --width 1920 --height 1080
-  camo mouse move --x 500 --y 300
   camo mouse click --x 500 --y 300 --button left
   camo mouse wheel --deltay -300
   camo system display

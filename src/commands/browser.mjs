@@ -222,10 +222,6 @@ async function ensureClickTargetInViewport(profileId, selector, initialTarget, o
     if (Math.abs(deltaY) < 100) {
       deltaY = deltaY >= 0 ? 120 : -120;
     }
-    const anchorX = clamp(Math.round(vw / 2), 1, Math.max(1, vw - 1));
-    const anchorY = clamp(Math.round(vh / 2), 1, Math.max(1, vh - 1));
-
-    await callAPI('mouse:move', { profileId, x: anchorX, y: anchorY, steps: 1 }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
     await callAPI('mouse:wheel', { profileId, deltaX: 0, deltaY }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
     autoScrolled += 1;
     if (settleMs > 0) {
@@ -980,11 +976,6 @@ export async function handleScrollCommand(args) {
     profileId,
     script: buildScrollTargetScript({ selector, highlight }),
   }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
-  const centerX = Number(target?.result?.center?.x);
-  const centerY = Number(target?.result?.center?.y);
-  if (Number.isFinite(centerX) && Number.isFinite(centerY)) {
-    await callAPI('mouse:move', { profileId, x: centerX, y: centerY, steps: 2 }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
-  }
   const deltaX = direction === 'left' ? -amount : direction === 'right' ? amount : 0;
   const deltaY = direction === 'up' ? -amount : direction === 'down' ? amount : 0;
   const result = await callAPI('mouse:wheel', { profileId, deltaX, deltaY }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
@@ -1024,7 +1015,6 @@ export async function handleClickCommand(args) {
   if (highlight) {
     target = await resolveVisibleTargetPoint(profileId, selector, { highlight: true });
   }
-  await callAPI('mouse:move', { profileId, x: target.center.x, y: target.center.y, steps: 2 }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
   const result = await callAPI('mouse:click', {
     profileId,
     x: target.center.x,
@@ -1064,7 +1054,6 @@ export async function handleTypeCommand(args) {
   if (!selector || text === undefined) throw new Error('Usage: camo type [profileId] <selector> <text> [--highlight|--no-highlight]');
 
   const target = await resolveVisibleTargetPoint(profileId, selector, { highlight });
-  await callAPI('mouse:move', { profileId, x: target.center.x, y: target.center.y, steps: 2 }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
   await callAPI('mouse:click', {
     profileId,
     x: target.center.x,

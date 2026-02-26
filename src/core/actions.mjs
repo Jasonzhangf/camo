@@ -117,7 +117,6 @@ export async function clickElement(profileId, selector, options = {}) {
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
 
-  await page.mouse.move(x, y);
   await page.mouse.click(x, y, { button: options.button || 'left', clickCount: options.clickCount || 1 });
 
   return {
@@ -535,17 +534,6 @@ export async function closePage(profileId, pageIndex) {
 /**
  * Mouse operations
  */
-export async function mouseMove(profileId, x, y, options = {}) {
-  if (!isBrowserRunning(profileId)) {
-    throw new Error(`No browser running for profile: ${profileId}`);
-  }
-
-  const page = await getCurrentPage(profileId);
-  await page.mouse.move(x, y, { steps: options.steps || 1 });
-
-  return { ok: true, profileId, x, y };
-}
-
 export async function mouseClick(profileId, x, y, options = {}) {
   if (!isBrowserRunning(profileId)) {
     throw new Error(`No browser running for profile: ${profileId}`);

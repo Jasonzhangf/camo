@@ -120,7 +120,7 @@ describe('browser-service utilities', () => {
       });
       const { callAPI } = await import('../../../src/utils/browser-service.mjs');
       await assert.rejects(
-        async () => callAPI('mouse:move', { profileId: 'profile-a', x: 1, y: 2 }, { timeoutMs: 10 }),
+        async () => callAPI('probe:timeout', { profileId: 'profile-a', x: 1, y: 2 }, { timeoutMs: 10 }),
         /timeout/i,
       );
     });
