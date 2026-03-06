@@ -82,6 +82,21 @@ Session isolation notes:
 - `stop --id` and `stop --alias` are allowed only for `stop`; `cleanup` and `force-stop` reject indirect targeting.
 - `status`, `sessions`, and `instances` read one shared resolved session view.
 
+Examples:
+
+```bash
+camo sessions
+camo status finger
+camo stop finger
+camo status xhs-qa-1
+camo cleanup finger
+camo force-stop finger
+
+# invalid examples
+camo cleanup --alias shard1
+camo force-stop --id inst_xxxxxxxx
+```
+
 ### Navigation/actions
 
 ```bash

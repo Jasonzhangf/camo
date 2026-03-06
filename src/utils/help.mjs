@@ -195,6 +195,16 @@ SESSION ISOLATION:
       orphaned: registry exists but service session is gone
       needsRecovery: registry says active but service no longer has that profile
   - list-pages requires live=true for that profile; otherwise camo will fail fast instead of probing other profiles.
+
+ISOLATION EXAMPLES:
+  camo sessions
+  camo status finger
+  camo stop finger
+  camo status xhs-qa-1
+  camo cleanup finger
+  camo force-stop finger
+  invalid: camo cleanup --alias shard1
+  invalid: camo force-stop --id inst_xxxxxxxx
 `);
 }
 

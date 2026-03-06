@@ -211,6 +211,28 @@ Session isolation rules:
   - `orphaned`: registry exists but the service session is gone
   - `needsRecovery`: registry still says active but browser-service no longer has that profile
 
+Isolation examples:
+
+```bash
+# Observe both profiles independently
+camo sessions
+camo status finger
+camo status xhs-qa-1
+
+# Stop only finger; xhs-qa-1 must remain live
+camo stop finger
+camo status finger
+camo status xhs-qa-1
+
+# cleanup / force-stop require direct profile targeting
+camo cleanup finger
+camo force-stop finger
+
+# Invalid on purpose: indirect targeting is rejected
+camo cleanup --alias shard1
+camo force-stop --id inst_xxxxxxxx
+```
+
 ### Navigation
 
 ```bash

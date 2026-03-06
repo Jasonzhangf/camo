@@ -37,3 +37,9 @@ A misleading `status finger = null` result happened once because `status finger`
 - Updated `README.md` and `skills/camoufox/references/camo-cli-usage.md` to document session isolation semantics and `list-pages` live-only behavior.
 - Updated `skills/camoufox/SKILL.md` so future agents keep `profileId` as the only lifecycle primary key.
 - Added tests covering lifecycle indirect-target rejection and help output session-isolation text.
+
+
+## Packaging prep
+- Added explicit isolation examples to `camo --help` so valid and invalid lifecycle patterns are visible directly in CLI help.
+- Verified targeted tests for lifecycle/help, rebuilt package, and ran `npm pack` successfully.
+- Prepared npm tarball: `web-auto-camo-0.1.22.tgz`.

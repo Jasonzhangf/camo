@@ -28,6 +28,8 @@ describe('help utilities', () => {
       assert.ok(logs.some(l => l.includes('highlight-mode')));
       assert.ok(logs.some(l => l.includes('SESSION ISOLATION')));
       assert.ok(logs.some(l => l.includes('live: browser-service currently has this profile session')));
+      assert.ok(logs.some(l => l.includes('ISOLATION EXAMPLES')));
+      assert.ok(logs.some(l => l.includes('invalid: camo cleanup --alias shard1')));
     });
   });
 
