@@ -1,7 +1,7 @@
 {
   "version": 1,
   "name": "xhs-unified-harvest-autoscript",
-  "source": "/Users/fanzhang/Documents/github/webauto/scripts/xiaohongshu/phase-unified-harvest.mjs",
+  "source": "/Users/fanzhang/Documents/github/legacy-app/scripts/xiaohongshu/phase-unified-harvest.mjs",
   "profileId": "xiaohongshu-batch-1",
   "throttle": 500,
   "defaults": {
@@ -28,7 +28,7 @@
   "metadata": {
     "keyword": "工作服定制",
     "env": "debug_min_full_20260216_v2",
-    "outputRoot": "/Users/fanzhang/.webauto/download",
+    "outputRoot": "/Users/fanzhang/.camo/download",
     "tabCount": 1,
     "noteIntervalMs": 900,
     "maxNotes": 1,
@@ -405,7 +405,7 @@
       "params": {
         "env": "debug_min_full_20260216_v2",
         "keyword": "工作服定制",
-        "outputRoot": "/Users/fanzhang/.webauto/download",
+        "outputRoot": "/Users/fanzhang/.camo/download",
         "persistComments": true,
         "maxRounds": 48,
         "scrollStep": 360,
@@ -516,7 +516,7 @@
       "params": {
         "env": "debug_min_full_20260216_v2",
         "keyword": "工作服定制",
-        "outputRoot": "/Users/fanzhang/.webauto/download",
+        "outputRoot": "/Users/fanzhang/.camo/download",
         "persistLikeState": true,
         "saveEvidence": true,
         "keywords": [

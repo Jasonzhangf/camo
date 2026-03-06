@@ -19,50 +19,58 @@ function normalizePathForPlatform(input, platform = process.platform) {
   return isWinPath ? pathApi.normalize(raw) : path.resolve(raw);
 }
 
-function normalizeLegacyWebautoRoot(input, platform = process.platform) {
+function normalizeLegacyCamoRoot(input, platform = process.platform) {
   const pathApi = platform === 'win32' ? path.win32 : path;
   const resolved = normalizePathForPlatform(input, platform);
   const base = pathApi.basename(resolved).toLowerCase();
-  if (base === '.webauto' || base === 'webauto') return resolved;
-  return pathApi.join(resolved, '.webauto');
+  if (base === '.camo' || base === 'camo') return resolved;
+  return pathApi.join(resolved, '.camo');
 }
 
-export function resolveWebautoRoot(options = {}) {
+export function resolveCamoRoot(options = {}) {
   const env = options.env || process.env;
   const platform = String(options.platform || process.platform);
   const pathApi = platform === 'win32' ? path.win32 : path;
   const homeDir = String(options.homeDir || os.homedir());
-  const explicitDataRoot = String(env.WEBAUTO_DATA_ROOT || env.WEBAUTO_HOME || '').trim();
+  const explicitDataRoot = String(env.CAMO_DATA_ROOT || env.CAMO_HOME || '').trim();
   if (explicitDataRoot) return normalizePathForPlatform(explicitDataRoot, platform);
 
-  const legacyRoot = String(env.WEBAUTO_ROOT || env.WEBAUTO_PORTABLE_ROOT || '').trim();
-  if (legacyRoot) return normalizeLegacyWebautoRoot(legacyRoot, platform);
+  const legacyRoot = String(env.CAMO_ROOT || env.CAMO_PORTABLE_ROOT || '').trim();
+  if (legacyRoot) return normalizeLegacyCamoRoot(legacyRoot, platform);
 
   const dDriveExists = typeof options.hasDDrive === 'boolean'
     ? options.hasDDrive
     : hasDrive('D');
   if (platform === 'win32') {
-    return dDriveExists ? 'D:\\webauto' : pathApi.join(homeDir, '.webauto');
+    return dDriveExists ? 'D:\\camo' : pathApi.join(homeDir, '.camo');
   }
-  return pathApi.join(homeDir, '.webauto');
+  return pathApi.join(homeDir, '.camo');
+}
+
+// Backward-compatible export name; camo no longer uses legacy paths.
+export function resolveLegacyRoot(options = {}) {
+  return resolveCamoRoot(options);
 }
 
 export function resolveProfilesDir(options = {}) {
   const env = options.env || process.env;
   const platform = String(options.platform || process.platform);
-  const explicitProfileRoot = String(env.WEBAUTO_PROFILE_ROOT || '').trim();
+  const explicitProfileRoot = String(env.CAMO_PROFILE_ROOT || env.CAMO_PATHS_PROFILES || '').trim();
   if (explicitProfileRoot) {
     return normalizePathForPlatform(explicitProfileRoot, platform);
   }
   const pathApi = platform === 'win32' ? path.win32 : path;
-  return pathApi.join(resolveWebautoRoot(options), 'profiles');
+  return pathApi.join(resolveCamoRoot(options), 'profiles');
 }
 
-export const CONFIG_DIR = resolveWebautoRoot();
+export const CONFIG_DIR = resolveCamoRoot();
 export const PROFILES_DIR = resolveProfilesDir();
 export const CONFIG_FILE = path.join(CONFIG_DIR, 'camo-cli.json');
 export const PROFILE_META_FILE = 'camo-profile.json';
-export const BROWSER_SERVICE_URL = process.env.WEBAUTO_BROWSER_URL || 'http://127.0.0.1:7704';
+export const BROWSER_SERVICE_URL = process.env.CAMO_BROWSER_URL
+  || process.env.CAMO_BROWSER_HTTP_URL
+  || (process.env.CAMO_BROWSER_HOST ? `http://${process.env.CAMO_BROWSER_HOST}` : '')
+  || 'http://127.0.0.1:7704';
 
 export function ensureDir(p) {
   if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
@@ -202,12 +210,5 @@ export function setProfileWindowSize(profileId, width, height) {
       height: Math.floor(parsedHeight),
       updatedAt: now,
     },
-  });
-}
-
-const START_SCRIPT_REL = path.join('runtime', 'infra', 'utils', 'scripts', 'service', 'start-browser-service.mjs');
-
-export function hasStartScript(root) {
-  if (!root) return false;
-  return fs.existsSync(path.join(root, START_SCRIPT_REL));
+ });
 }

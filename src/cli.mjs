@@ -2,7 +2,7 @@
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
-import { listProfiles, getDefaultProfile, loadConfig, hasStartScript, setRepoRoot } from './utils/config.mjs';
+import { listProfiles, getDefaultProfile, loadConfig, setRepoRoot } from './utils/config.mjs';
 import { printHelp, printProfilesAndHint } from './utils/help.mjs';
 import { handleProfileCommand } from './commands/profile.mjs';
 import { handleInitCommand } from './commands/init.mjs';
@@ -17,6 +17,7 @@ import { handleEventsCommand } from './commands/events.mjs';
 import { handleDevtoolsCommand } from './commands/devtools.mjs';
 import { handleRecordCommand } from './commands/record.mjs';
 import { handleHighlightModeCommand } from './commands/highlight-mode.mjs';
+import { handleAttachCommand } from './commands/attach.mjs';
 import {
   handleStartCommand, handleStopCommand, handleStatusCommand,
   handleGotoCommand, handleBackCommand, handleScreenshotCommand,
@@ -34,7 +35,6 @@ import { safeAppendProgressEvent } from './events/progress-log.mjs';
 import { ensureProgressEventDaemon } from './events/daemon.mjs';
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
-const START_SCRIPT_REL = path.join('runtime', 'infra', 'utils', 'scripts', 'service', 'start-browser-service.mjs');
 const PACKAGE_JSON_PATH = path.resolve(CURRENT_DIR, '..', 'package.json');
 
 function readCliVersion() {
@@ -165,10 +165,8 @@ async function handleConfigCommand(args) {
     console.log(JSON.stringify({ ok: true, repoRoot: loadConfig().repoRoot }, null, 2));
     return;
   }
+  // Accept any path; camo does not require camo-specific structure
   const resolved = path.resolve(repoRoot);
-  if (!hasStartScript(resolved)) {
-    throw new Error(`Invalid repo root: ${resolved} (missing ${START_SCRIPT_REL})`);
-  }
   setRepoRoot(resolved);
   console.log(JSON.stringify({ ok: true, repoRoot: resolved }, null, 2));
 }
@@ -239,6 +237,11 @@ async function main() {
 
   if (cmd === 'events') {
     await runTrackedCommand(cmd, args, () => handleEventsCommand(args));
+    return;
+  }
+
+  if (cmd === 'attach') {
+    await runTrackedCommand(cmd, args, () => handleAttachCommand(args));
     return;
   }
 

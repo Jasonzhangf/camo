@@ -168,7 +168,7 @@ Runtime emits JSON logs with stable fields:
 - `latencyMs`
 - `code`
 
-## 10. Migration Mapping (webauto/scripts/xiaohongshu)
+## 10. Migration Mapping (camo/scripts/xiaohongshu)
 
 - `runtime-ready` + `checkpoints` => base checkpoint primitives.
 - `Phase34OpenDetail` validation => operation `validate.post`.

@@ -159,11 +159,13 @@ export function buildSelectorTypeScript({ selector, highlight, text }) {
   })()`;
 }
 
-export function buildScrollTargetScript({ selector, highlight }) {
+export function buildScrollTargetScript({ selector, highlight, requireVisibleContainer = false }) {
   const selectorLiteral = JSON.stringify(String(selector || '').trim() || null);
   const highlightLiteral = asBoolLiteral(highlight);
+  const requireVisibleContainerLiteral = asBoolLiteral(requireVisibleContainer);
   return `(() => {
     const selector = ${selectorLiteral};
+    const requireVisibleContainer = ${requireVisibleContainerLiteral};
     const isVisible = (node) => {
       if (!(node instanceof Element)) return false;
       const rect = node.getBoundingClientRect?.();
@@ -183,11 +185,13 @@ export function buildScrollTargetScript({ selector, highlight }) {
       const style = window.getComputedStyle(node);
       const overflowY = String(style.overflowY || '');
       const overflowX = String(style.overflowX || '');
+      const scrollableSelectors = ['.comments-container', '.comment-list', '.comments-el', '.note-scroller'];
+      const selectorScrollable = scrollableSelectors.some((sel) => typeof node.matches === 'function' && node.matches(sel));
       const yScrollable = (overflowY.includes('auto') || overflowY.includes('scroll') || overflowY.includes('overlay'))
         && (node.scrollHeight - node.clientHeight > 2);
       const xScrollable = (overflowX.includes('auto') || overflowX.includes('scroll') || overflowX.includes('overlay'))
         && (node.scrollWidth - node.clientWidth > 2);
-      return yScrollable || xScrollable;
+      return yScrollable || xScrollable || selectorScrollable;
     };
     const findScrollableAncestor = (node) => {
       let cursor = node instanceof Element ? node : null;
@@ -203,9 +207,12 @@ export function buildScrollTargetScript({ selector, highlight }) {
     if (selector) {
       const list = Array.from(document.querySelectorAll(selector));
       target = list.find((node) => isVisible(node) && isScrollable(node))
-        || list.find((node) => isVisible(node))
+        || list.map((node) => findScrollableAncestor(node)).find((node) => isVisible(node))
         || null;
       if (target) source = 'selector';
+      if (!target && requireVisibleContainer) {
+        return { ok: false, error: 'visible_scroll_container_not_found', selector };
+      }
     }
     if (!target) {
       const active = document.activeElement instanceof Element ? document.activeElement : null;
@@ -250,9 +257,20 @@ export function buildScrollTargetScript({ selector, highlight }) {
       source,
       highlight: ${highlightLiteral},
       center: { x: centerX, y: centerY },
+      rect: {
+        left: Number(rect.left || 0),
+        top: Number(rect.top || 0),
+        width: Number(rect.width || 0),
+        height: Number(rect.height || 0)
+      },
       target: {
         tag: String(target.tagName || '').toLowerCase(),
-        id: target.id || null
+        id: target.id || null,
+        className: typeof target.className === 'string' ? target.className : null,
+        scrollHeight: Number(target.scrollHeight || 0),
+        clientHeight: Number(target.clientHeight || 0),
+        scrollWidth: Number(target.scrollWidth || 0),
+        clientWidth: Number(target.clientWidth || 0)
       }
     };
   })()`;

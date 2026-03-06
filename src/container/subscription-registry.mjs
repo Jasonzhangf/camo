@@ -1,9 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { findRepoRootCandidate } from '../utils/browser-service.mjs';
-import { CONFIG_DIR } from '../utils/config.mjs';
+import { CONFIG_DIR, loadConfig } from '../utils/config.mjs';
 
-const CONTAINER_ROOT_ENV = process.env.WEBAUTO_CONTAINER_ROOT || process.env.ROUTECODEX_CONTAINER_ROOT;
+const CONTAINER_ROOT_ENV = process.env.CAMO_CONTAINER_ROOT;
 
 export const USER_CONTAINER_ROOT = CONTAINER_ROOT_ENV || path.join(CONFIG_DIR, 'container-lib');
 export const SUBSCRIPTION_ROOT = path.join(CONFIG_DIR, 'container-subscriptions');
@@ -223,9 +222,10 @@ function collectJsonFiles(dirPath) {
 
 function detectContainerLibraryRoot(explicitRoot) {
   if (explicitRoot) return explicitRoot;
-  const repoRoot = findRepoRootCandidate();
-  if (!repoRoot) return null;
-  const candidate = path.join(repoRoot, 'container-library');
+  const cfg = loadConfig();
+  const root = cfg.repoRoot || process.env.CAMO_CONTAINER_ROOT || process.cwd();
+  if (!root) return null;
+  const candidate = path.join(root, 'container-library');
   return fs.existsSync(candidate) ? candidate : null;
 }
 
@@ -251,7 +251,7 @@ export function initContainerSubscriptionDirectory(options = {}) {
   const containerLibraryRoot = detectContainerLibraryRoot(options.containerLibraryRoot);
   if (!containerLibraryRoot || !fs.existsSync(containerLibraryRoot)) {
     throw new Error(
-      'container-library not found. Set WEBAUTO_REPO_ROOT or run `camo config repo-root <webauto-path>` first.',
+      'container-library not found. Set CAMO_CONTAINER_ROOT or run `camo config repo-root <path>` first.',
     );
   }
 

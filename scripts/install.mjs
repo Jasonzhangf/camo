@@ -49,15 +49,15 @@ function install() {
 
   const thisDir = path.dirname(new URL(import.meta.url).pathname);
   const moduleDir = path.resolve(thisDir, '..');
-  const srcFile = path.join(moduleDir, 'bin', 'camoufox.mjs');
+  const srcFile = path.join(moduleDir, 'bin', 'camo.mjs');
 
   if (!fs.existsSync(srcFile)) {
     console.error(`Source not found: ${srcFile}`);
-    console.error('Run: cp src/cli.mjs bin/camoufox.mjs');
+    console.error('Run: cp src/cli.mjs bin/camo.mjs');
     process.exit(1);
   }
 
-  const targetFile = path.join(targetDir, 'camoufox.mjs');
+  const targetFile = path.join(targetDir, 'camo.mjs');
   fs.copyFileSync(srcFile, targetFile);
   fs.chmodSync(targetFile, 0o755);
 

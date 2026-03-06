@@ -48,9 +48,13 @@ export function acquireLock(profileId, sessionInfo = {}) {
 
 export function releaseLock(profileId) {
   const lockFile = getLockFile(profileId);
-  if (fs.existsSync(lockFile)) {
-    fs.unlinkSync(lockFile);
-    return true;
+  try {
+    if (fs.existsSync(lockFile)) {
+      fs.unlinkSync(lockFile);
+      return true;
+    }
+  } catch {
+    // Ignore missing lock file or racing cleanup.
   }
   return false;
 }

@@ -626,7 +626,24 @@ export async function executeOperation({ profileId, operation, context = {} }) {
         selector: anchorSelector,
         filterMode,
       });
-      const result = await callAPI('mouse:wheel', { profileId: resolvedProfile, deltaX, deltaY });
+      if (!anchor?.ok || !anchor?.center) {
+        return asErrorPayload('OPERATION_FAILED', 'visible scroll container not found');
+      }
+      await callAPI('mouse:click', {
+        profileId: resolvedProfile,
+        x: anchor.center.x,
+        y: anchor.center.y,
+        button: 'left',
+        clicks: 1,
+        delay: 30,
+      });
+      const result = await callAPI('mouse:wheel', {
+        profileId: resolvedProfile,
+        deltaX,
+        deltaY,
+        anchorX: anchor.center.x,
+        anchorY: anchor.center.y,
+      });
       return {
         ok: true,
         code: 'OPERATION_DONE',
@@ -638,6 +655,7 @@ export async function executeOperation({ profileId, operation, context = {} }) {
           deltaY,
           filterMode,
           anchorSource: String(anchor?.source || 'document'),
+          anchorCenter: anchor?.center || null,
           modalLocked: anchor?.modalLocked === true,
           result,
         },

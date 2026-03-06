@@ -1,13 +1,15 @@
-# XHS Unified Migration (camo <-> webauto)
+# XHS Unified Migration (legacy-app -> camo)
 
 ## Scope
 
-This document tracks migration of XHS app-level automation from:
+This document tracks migration of XHS app-level automation from `legacy-app`
+into local `camo` autoscript runtime and provider blocks.
 
-- `/Users/fanzhang/Documents/github/webauto/modules/xiaohongshu/app/src/blocks/*`
-- `/Users/fanzhang/Documents/github/webauto/scripts/xiaohongshu/phase-unified-harvest.mjs`
+Reference upstream source examples:
 
-into local camo autoscript runtime and provider blocks.
+- `/Users/fanzhang/Documents/github/legacy-app/modules/xiaohongshu/app/src/blocks/*`
+- `/Users/fanzhang/Documents/github/legacy-app/scripts/xiaohongshu/phase-unified-harvest.mjs`
+
 
 ## Current Status (2026-02-16)
 
@@ -21,7 +23,7 @@ Implemented in camo:
   - `src/autoscript/action-providers/xhs/persistence.mjs`
   - `src/autoscript/action-providers/xhs/like-rules.mjs`
   - `src/autoscript/action-providers/xhs.mjs` (router only)
-- Persistence aligned to webauto output semantics:
+- Persistence aligned to legacy-app output semantics:
   - `comments.jsonl` incremental merge
   - `.like-state.jsonl` signature dedupe
   - `like-evidence/<noteId>/` screenshots + `summary-*.json`
@@ -37,7 +39,7 @@ camo autoscript scaffold xhs-unified \
   --profile xiaohongshu-batch-1 \
   --keyword "手机膜" \
   --env debug \
-  --output-root ~/.webauto/download \
+  --output-root ~/.camo/download \
   --do-comments \
   --do-likes \
   --max-notes 30
@@ -59,13 +61,13 @@ camo autoscript run ./autoscripts/xiaohongshu/unified-harvest.autoscript.json --
 - `Phase34CloseDetailBlock` -> `xhs_close_detail` (`detail.mjs`)
 - `MatchCommentsBlock` -> `xhs_comment_match` (`comments.mjs`)
 
-## webauto Cleanup Targets (after migration acceptance)
+## legacy-app Cleanup Targets (after migration acceptance)
 
 Primary candidates to freeze/remove from active pipeline:
 
 - `scripts/xiaohongshu/phase3-interact.mjs`
 - `scripts/xiaohongshu/phase4-harvest.mjs`
-- `scripts/xiaohongshu/phase-unified-harvest.mjs` (replace by camo autoscript run)
+- `legacy-app/scripts/xiaohongshu/phase-unified-harvest.mjs` (replace by `camo autoscript run`)
 - Legacy scripts under `scripts/xiaohongshu/legacy/`
 - Duplicated test/debug entry scripts under `scripts/xiaohongshu/tests/` that only verify old phase orchestration
 
@@ -77,17 +79,17 @@ Keep temporarily (migration bridge):
 
 ## Migration Sequence
 
-1. Lock camo parity:
+1. Lock legacy-app parity:
    - comments harvest/persist and like evidence semantics
    - minimum E2E run for target keyword + note count
 2. Switch scheduler entry:
    - use `camo autoscript run` as primary runner
-   - keep webauto phase runner as fallback only
+   - keep `legacy-app` phase runner as fallback only
 3. Decommission old phase scripts:
    - remove active references from orchestration entrypoints
    - archive legacy and duplicate test scripts
 4. UI/structure redesign:
-   - webauto app layer keeps only session/profile/control UI
+   - camo app layer keeps only session/profile/control UI
    - page automation logic remains in camo blockized provider
 
 ## Risks

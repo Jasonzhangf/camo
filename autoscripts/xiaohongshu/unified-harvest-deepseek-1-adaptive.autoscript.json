@@ -1,7 +1,7 @@
 {
   "version": 1,
   "name": "xhs-unified-harvest-autoscript",
-  "source": "/Users/fanzhang/Documents/github/webauto/scripts/xiaohongshu/phase-unified-harvest.mjs",
+  "source": "/Users/fanzhang/Documents/github/legacy-app/scripts/xiaohongshu/phase-unified-harvest.mjs",
   "profileId": "xiaohongshu-batch-1",
   "throttle": 500,
   "defaults": {
