@@ -43,3 +43,9 @@ A misleading `status finger = null` result happened once because `status finger`
 - Added explicit isolation examples to `camo --help` so valid and invalid lifecycle patterns are visible directly in CLI help.
 - Verified targeted tests for lifecycle/help, rebuilt package, and ran `npm pack` successfully.
 - Prepared npm tarball: `web-auto-camo-0.1.22.tgz`.
+
+
+## Release follow-up
+- `npm publish` for `0.1.22` failed because that version already existed on npm.
+- Bumped package version to `0.1.23` with `npm version patch --no-git-tag-version`.
+- Rebuilt and re-packed the package to prepare a publishable tarball for the next release attempt.

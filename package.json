@@ -1,10 +1,11 @@
 {
   "name": "@web-auto/camo",
-  "version": "0.1.18",
+  "version": "0.1.23",
   "description": "Camoufox Browser CLI - Cross-platform browser automation",
   "type": "module",
   "bin": {
-    "camo": "./bin/camo.mjs"
+    "camo": "./bin/camo.mjs",
+    "browser-service": "./bin/browser-service.mjs"
   },
   "files": [
     "bin/",
@@ -40,5 +41,9 @@
   },
   "devDependencies": {
     "c8": "^10.1.3"
+  },
+  "dependencies": {
+    "playwright": "^1.58.2",
+    "ws": "^8.19.0"
   }
 }
