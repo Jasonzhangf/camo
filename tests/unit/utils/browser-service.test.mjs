@@ -35,6 +35,7 @@ describe('browser-service utilities', () => {
       const bs = await import('../../../src/utils/browser-service.mjs');
       assert.strictEqual(typeof bs.callAPI, 'function');
       assert.strictEqual(typeof bs.getSessionByProfile, 'function');
+      assert.strictEqual(typeof bs.getResolvedSessions, 'function');
       assert.strictEqual(typeof bs.checkBrowserService, 'function');
       assert.strictEqual(typeof bs.detectCamoufoxPath, 'function');
       assert.strictEqual(typeof bs.ensureCamoufox, 'function');
@@ -152,7 +153,7 @@ describe('browser-service utilities', () => {
       assert.strictEqual(session, null);
     });
 
-    it('should recover session from page:list when getStatus is empty', async () => {
+    it('should return null when profile is not live even if page:list could respond', async () => {
       global.fetch = async (_url, options) => {
         const body = JSON.parse(options.body);
         if (body.action === 'getStatus') {
@@ -177,9 +178,43 @@ describe('browser-service utilities', () => {
       };
       const { getSessionByProfile } = await import('../../../src/utils/browser-service.mjs');
       const session = await getSessionByProfile('profile-a');
-      assert.strictEqual(session.profileId, 'profile-a');
-      assert.strictEqual(session.current_url, 'https://www.xiaohongshu.com/explore');
-      assert.strictEqual(session.recoveredFromPages, true);
+      assert.strictEqual(session, null);
+    });
+  });
+
+  describe('getResolvedSessions', () => {
+    it('should merge live and registered session state into one resolved view', async () => {
+      const { registerSession, unregisterSession } = await import('../../../src/lifecycle/session-registry.mjs');
+      const profileLive = 'resolved-live-a';
+      const profileOrphan = 'resolved-orphan-b';
+      registerSession(profileLive, { sessionId: 'sid-live', alias: 'alias-live', status: 'active' });
+      registerSession(profileOrphan, { sessionId: 'sid-orphan', alias: 'alias-orphan', status: 'active' });
+      global.fetch = async (_url, options) => {
+        const body = JSON.parse(options.body);
+        if (body.action === 'getStatus') {
+          return {
+            ok: true,
+            json: async () => ({ sessions: [{ profileId: profileLive, session_id: 'sid-live', current_url: 'https://example.com', mode: 'dev' }] }),
+          };
+        }
+        return { ok: true, json: async () => ({ ok: true }) };
+      };
+      try {
+        const { getResolvedSessions } = await import('../../../src/utils/browser-service.mjs');
+        const sessions = await getResolvedSessions();
+        const live = sessions.find((item) => item.profileId === profileLive);
+        const orphan = sessions.find((item) => item.profileId === profileOrphan);
+        assert.strictEqual(live.live, true);
+        assert.strictEqual(live.registered, true);
+        assert.strictEqual(live.orphaned, false);
+        assert.strictEqual(orphan.live, false);
+        assert.strictEqual(orphan.registered, true);
+        assert.strictEqual(orphan.orphaned, true);
+        assert.strictEqual(orphan.needsRecovery, true);
+      } finally {
+        unregisterSession(profileLive);
+        unregisterSession(profileOrphan);
+      }
     });
   });
 

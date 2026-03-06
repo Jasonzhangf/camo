@@ -89,4 +89,50 @@ describe('lifecycle command', () => {
     assert.strictEqual(payload.sessions[0].ok, false);
     assert.match(payload.sessions[0].error, /stop failed for cleanup-all test/);
   });
+
+  it('sessions command returns resolved session view fields', async () => {
+    const { handleSessionsCommand } = await import('../../../src/commands/lifecycle.mjs');
+    const liveProfile = `${TEST_PROFILE}-sessions-live`;
+    const orphanProfile = `${TEST_PROFILE}-sessions-orphan`;
+    registerSession(liveProfile, { sessionId: 'sid-live', alias: 'alias-live', status: 'active' });
+    registerSession(orphanProfile, { sessionId: 'sid-orphan', alias: 'alias-orphan', status: 'active' });
+
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) {
+        return { ok: true, status: 200 };
+      }
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        if (body.action === 'getStatus') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ sessions: [{ profileId: liveProfile, session_id: 'sid-live', current_url: 'https://example.com', mode: 'dev' }] }),
+          };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    const logs = [];
+    const originalConsoleLog = console.log;
+    console.log = (value) => logs.push(value);
+    try {
+      await handleSessionsCommand(['sessions']);
+    } finally {
+      console.log = originalConsoleLog;
+      unregisterSession(liveProfile);
+      unregisterSession(orphanProfile);
+    }
+
+    const payload = JSON.parse(String(logs.at(-1) || '{}'));
+    const live = payload.sessions.find((item) => item.profileId === liveProfile);
+    const orphan = payload.sessions.find((item) => item.profileId === orphanProfile);
+    assert.strictEqual(payload.ok, true);
+    assert.strictEqual(live.live, true);
+    assert.strictEqual(live.registered, true);
+    assert.strictEqual(orphan.live, false);
+    assert.strictEqual(orphan.orphaned, true);
+    assert.strictEqual(orphan.needsRecovery, true);
+  });
 });

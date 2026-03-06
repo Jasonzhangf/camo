@@ -8,6 +8,8 @@ import {
   handleClickCommand,
   handleTypeCommand,
   handleScrollCommand,
+  handleStatusCommand,
+  handleListPagesCommand,
   computeStartWindowSize,
   syncWindowViewportAfterResize,
   requestDevtoolsOpen,
@@ -152,8 +154,70 @@ describe('browser command', () => {
       /No active session for profile/i,
     );
     assert.ok(actions.includes('getStatus'));
-    assert.ok(actions.includes('page:list'));
     assert.ok(!actions.includes('goto'));
+  });
+
+  it('status uses resolved session view for a single profile', async () => {
+    const profileId = `${TEST_PROFILE}-status-view`;
+    registerSession(profileId, { sessionId: 'sid-status', alias: 'alias-status', status: 'active' });
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) return { ok: true, status: 200 };
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        if (body.action === 'getStatus') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ sessions: [{ profileId, session_id: 'sid-status', current_url: 'https://example.com', mode: 'dev' }] }),
+          };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+    const logs = [];
+    const originalConsoleLog = console.log;
+    console.log = (value) => logs.push(value);
+    try {
+      await handleStatusCommand(['status', profileId]);
+    } finally {
+      console.log = originalConsoleLog;
+      unregisterSession(profileId);
+    }
+    const payload = JSON.parse(String(logs.at(-1) || '{}'));
+    assert.strictEqual(payload.ok, true);
+    assert.strictEqual(payload.session.profileId, profileId);
+    assert.strictEqual(payload.session.live, true);
+    assert.strictEqual(payload.session.registered, true);
+  });
+
+  it('list-pages fails fast when target profile is not live', async () => {
+    const profileId = `${TEST_PROFILE}-pages-offline`;
+    registerSession(profileId, { sessionId: 'sid-pages-offline', status: 'active' });
+    const actions = [];
+    global.fetch = async (url, options = {}) => {
+      if (String(url).includes('/health')) return { ok: true, status: 200 };
+      if (String(url).includes('/command')) {
+        const body = JSON.parse(options.body || '{}');
+        actions.push(body.action);
+        if (body.action === 'getStatus') {
+          return { ok: true, status: 200, json: async () => ({ sessions: [] }) };
+        }
+        if (body.action === 'page:list') {
+          return { ok: true, status: 200, json: async () => ({ pages: [{ index: 0, url: 'https://should-not-run.invalid' }] }) };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+    try {
+      await assert.rejects(
+        async () => handleListPagesCommand(['list-pages', profileId]),
+        /Profile session not live/i,
+      );
+      assert.ok(actions.includes('getStatus'));
+      assert.ok(!actions.includes('page:list'));
+    } finally {
+      unregisterSession(profileId);
+    }
   });
 
   it('supports close all', async () => {
@@ -561,8 +625,17 @@ describe('browser command', () => {
           return {
             ok: true,
             status: 200,
-            json: async () => ({ ok: true, result: { center: { x: 320, y: 480 }, source: 'selector' } }),
+            json: async () => ({ ok: true, result: {
+              ok: true,
+              center: { x: 320, y: 480 },
+              source: 'selector',
+              rect: { left: 220, top: 360, width: 200, height: 240 },
+              target: { tag: 'div', id: null, className: 'feed-list', scrollHeight: 1200, clientHeight: 300 },
+            } }),
           };
+        }
+        if (body.action === 'mouse:click') {
+          return { ok: true, status: 200, json: async () => ({ ok: true }) };
         }
         if (body.action === 'mouse:wheel') {
           return { ok: true, status: 200, json: async () => ({ ok: true }) };
@@ -582,9 +655,13 @@ describe('browser command', () => {
       '--highlight',
     ]);
     const orderedActions = actions.map((item) => item.action);
-    assert.deepStrictEqual(orderedActions.slice(0, 2), ['evaluate', 'mouse:wheel']);
+    assert.deepStrictEqual(orderedActions.slice(0, 3), ['evaluate', 'mouse:click', 'mouse:wheel']);
     assert.ok(String(actions[0]?.args?.script || '').includes('.feed-list'));
-    assert.strictEqual(actions[1]?.args?.deltaY, 120);
+    assert.strictEqual(actions[1]?.args?.x, 320);
+    assert.strictEqual(actions[1]?.args?.y, 480);
+    assert.strictEqual(actions[2]?.args?.deltaY, 120);
+    assert.strictEqual(actions[2]?.args?.anchorX, 320);
+    assert.strictEqual(actions[2]?.args?.anchorY, 480);
   });
 });
 

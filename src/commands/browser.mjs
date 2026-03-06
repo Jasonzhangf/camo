@@ -7,7 +7,7 @@ import {
   getProfileWindowSize,
   setProfileWindowSize,
 } from '../utils/config.mjs';
-import { callAPI, ensureCamoufox, ensureBrowserService, getSessionByProfile, checkBrowserService } from '../utils/browser-service.mjs';
+import { callAPI, ensureCamoufox, ensureBrowserService, getSessionByProfile, checkBrowserService, getResolvedSessions } from '../utils/browser-service.mjs';
 import { resolveProfileId, ensureUrlScheme, looksLikeUrlToken, getPositionals } from '../utils/args.mjs';
 import { ensureJsExecutionEnabled } from '../utils/js-policy.mjs';
 import { acquireLock, releaseLock, cleanupStaleLocks } from '../lifecycle/lock.mjs';
@@ -139,7 +139,7 @@ async function resolveVisibleTargetPoint(profileId, selector, options = {}) {
       };
       if (highlight) {
         try {
-          const id = 'webauto-action-highlight-overlay';
+          const id = 'camo-action-highlight-overlay';
           const old = document.getElementById(id);
           if (old) old.remove();
           const overlay = document.createElement('div');
@@ -296,6 +296,15 @@ async function stopAndCleanupProfile(profileId, options = {}) {
     result,
     error: error ? (error.message || String(error)) : null,
   };
+}
+
+async function loadResolvedSessions(serviceUp) {
+  if (!serviceUp) return [];
+  try {
+    return await getResolvedSessions();
+  } catch {
+    return [];
+  }
 }
 
 async function probeViewportSize(profileId) {
@@ -726,22 +735,16 @@ export async function handleStopCommand(args) {
   const stopIdle = target === 'idle' || args.includes('--idle');
   const stopAll = target === 'all';
   const serviceUp = await checkBrowserService();
+  const resolvedSessions = await loadResolvedSessions(serviceUp);
 
   if (stopAll) {
-    let liveSessions = [];
-    if (serviceUp) {
-      try {
-        const status = await callAPI('getStatus', {});
-        liveSessions = Array.isArray(status?.sessions) ? status.sessions : [];
-      } catch {
-        // Ignore and fallback to local registry.
+    const profileSet = new Set(resolvedSessions.map((item) => String(item?.profileId || '').trim()).filter(Boolean));
+    if (profileSet.size === 0) {
+      for (const session of listRegisteredSessions()) {
+        if (String(session?.status || '').trim() === 'closed') continue;
+        const profileId = String(session?.profileId || '').trim();
+        if (profileId) profileSet.add(profileId);
       }
-    }
-    const profileSet = new Set(liveSessions.map((item) => String(item?.profileId || '').trim()).filter(Boolean));
-    for (const session of listRegisteredSessions()) {
-      if (String(session?.status || '').trim() === 'closed') continue;
-      const profileId = String(session?.profileId || '').trim();
-      if (profileId) profileSet.add(profileId);
     }
 
     const results = [];
@@ -763,15 +766,6 @@ export async function handleStopCommand(args) {
   if (stopIdle) {
     const now = Date.now();
     const registeredSessions = listRegisteredSessions();
-    let liveSessions = [];
-    if (serviceUp) {
-      try {
-        const status = await callAPI('getStatus', {});
-        liveSessions = Array.isArray(status?.sessions) ? status.sessions : [];
-      } catch {
-        // Ignore and fallback to local registry.
-      }
-    }
     const regMap = new Map(
       registeredSessions
         .filter((item) => item && String(item?.status || '').trim() === 'active')
@@ -785,7 +779,7 @@ export async function handleStopCommand(args) {
       .map((item) => item.session.profileId),
     );
     let orphanLiveHeadlessCount = 0;
-    for (const live of liveSessions) {
+    for (const live of resolvedSessions.filter((item) => item.live)) {
       const liveProfileId = String(live?.profileId || '').trim();
       if (!liveProfileId) continue;
       if (regMap.has(liveProfileId) || idleTargets.has(liveProfileId)) continue;
@@ -863,14 +857,15 @@ export async function handleStopCommand(args) {
 
 export async function handleStatusCommand(args) {
   await ensureBrowserService();
-  const result = await callAPI('getStatus', {});
   const profileId = args[1];
   if (profileId && args[0] === 'status') {
-    const session = result?.sessions?.find((s) => s.profileId === profileId) || null;
+    const sessions = await getResolvedSessions();
+    const session = sessions.find((item) => item.profileId === profileId) || null;
     console.log(JSON.stringify({ ok: true, session }, null, 2));
     return;
   }
-  console.log(JSON.stringify(result, null, 2));
+  const sessions = await getResolvedSessions();
+  console.log(JSON.stringify({ ok: true, sessions, count: sessions.length }, null, 2));
 }
 
 export async function handleGotoCommand(args) {
@@ -974,14 +969,32 @@ export async function handleScrollCommand(args) {
 
   const target = await callAPI('evaluate', {
     profileId,
-    script: buildScrollTargetScript({ selector, highlight }),
+    script: buildScrollTargetScript({ selector, highlight, requireVisibleContainer: Boolean(selector) }),
   }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
+  const scrollTarget = target?.result || null;
+  if (!scrollTarget?.ok || !scrollTarget?.center) {
+    throw new Error(scrollTarget?.error || 'visible scroll container not found');
+  }
   const deltaX = direction === 'left' ? -amount : direction === 'right' ? amount : 0;
   const deltaY = direction === 'up' ? -amount : direction === 'down' ? amount : 0;
-  const result = await callAPI('mouse:wheel', { profileId, deltaX, deltaY }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
+  await callAPI('mouse:click', {
+    profileId,
+    x: scrollTarget.center.x,
+    y: scrollTarget.center.y,
+    button: 'left',
+    clicks: 1,
+    delay: 30,
+  }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
+  const result = await callAPI('mouse:wheel', {
+    profileId,
+    deltaX,
+    deltaY,
+    anchorX: scrollTarget.center.x,
+    anchorY: scrollTarget.center.y,
+  }, { timeoutMs: INPUT_ACTION_TIMEOUT_MS });
   console.log(JSON.stringify({
     ...result,
-    scrollTarget: target?.result || null,
+    scrollTarget,
     highlight,
   }, null, 2));
 }
@@ -1081,7 +1094,6 @@ export async function handleTypeCommand(args) {
 
 export async function handleHighlightCommand(args) {
   await ensureBrowserService();
-  ensureJsExecutionEnabled('highlight command');
   const positionals = getPositionals(args);
   let profileId;
   let selector;
@@ -1097,38 +1109,22 @@ export async function handleHighlightCommand(args) {
   if (!profileId) throw new Error('Usage: camo highlight [profileId] <selector>');
   if (!selector) throw new Error('Usage: camo highlight [profileId] <selector>');
 
-  const result = await callAPI('evaluate', {
+  const result = await callAPI('browser:highlight', {
+    profile: profileId,
     profileId,
-    script: `(() => {
-      const el = document.querySelector(${JSON.stringify(selector)});
-      if (!el) throw new Error('Element not found: ' + ${JSON.stringify(selector)});
-      const prev = el.style.outline;
-      el.style.outline = '3px solid #ff4444';
-      setTimeout(() => { el.style.outline = prev; }, 2000);
-      const rect = el.getBoundingClientRect();
-      return { highlighted: true, selector: ${JSON.stringify(selector)}, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height } };
-    })()`
+    selector,
   });
   console.log(JSON.stringify(result, null, 2));
 }
 
 export async function handleClearHighlightCommand(args) {
   await ensureBrowserService();
-  ensureJsExecutionEnabled('clear-highlight command');
   const profileId = resolveProfileId(args, 1, getDefaultProfile);
   if (!profileId) throw new Error('Usage: camo clear-highlight [profileId]');
 
-  const result = await callAPI('evaluate', {
+  const result = await callAPI('browser:clear-highlight', {
+    profile: profileId,
     profileId,
-    script: `(() => {
-      const overlay = document.getElementById('webauto-highlight-overlay');
-      if (overlay) overlay.remove();
-      document.querySelectorAll('[data-webauto-highlight]').forEach(el => {
-        el.style.outline = el.dataset.webautoHighlight || '';
-        delete el.dataset.webautoHighlight;
-      });
-      return { cleared: true };
-    })()`
   });
   console.log(JSON.stringify(result, null, 2));
 }
@@ -1200,6 +1196,11 @@ export async function handleListPagesCommand(args) {
   await ensureBrowserService();
   const profileId = resolveProfileId(args, 1, getDefaultProfile);
   if (!profileId) throw new Error('Usage: camo list-pages [profileId] (or set default profile first)');
+  const sessions = await getResolvedSessions();
+  const session = sessions.find((item) => item.profileId === profileId) || null;
+  if (!session?.live) {
+    throw new Error(`Profile session not live: ${profileId}. Start via "camo start ${profileId}" first.`);
+  }
   const result = await callAPI('page:list', { profileId });
   console.log(JSON.stringify(result, null, 2));
 }
@@ -1240,33 +1241,9 @@ export async function handleShutdownCommand() {
 
 export async function handleSessionsCommand(args) {
   const serviceUp = await checkBrowserService();
+  const merged = await loadResolvedSessions(serviceUp);
   const registeredSessions = listRegisteredSessions();
-  
-  let liveSessions = [];
-  if (serviceUp) {
-    try {
-      const status = await callAPI('getStatus', {});
-      liveSessions = Array.isArray(status?.sessions) ? status.sessions : [];
-    } catch {
-      // Service may have just become unavailable
-    }
-  }
-  
-  // Merge live and registered sessions
-  const liveProfileIds = new Set(liveSessions.map(s => s.profileId));
-  const merged = [...liveSessions];
-  
-  // Add registered sessions that are not in live sessions (need recovery)
-  for (const reg of registeredSessions) {
-    if (!liveProfileIds.has(reg.profileId) && reg.status === 'active') {
-      merged.push({
-        ...reg,
-        live: false,
-        needsRecovery: true,
-      });
-    }
-  }
-  
+
   console.log(JSON.stringify({
     ok: true,
     serviceUp,

@@ -25,6 +25,11 @@ function normalizeAlias(value) {
   return text.slice(0, 64);
 }
 
+function isAliasProtectedStatus(status) {
+  const normalized = String(status || '').trim().toLowerCase();
+  return normalized === 'active' || normalized === 'reconnecting';
+}
+
 function normalizeTimeoutMs(value) {
   const ms = Number(value);
   if (!Number.isFinite(ms) || ms < 0) return null;
@@ -159,10 +164,21 @@ export function resolveSessionTarget(target) {
   const sessions = listRegisteredSessions();
   const byProfile = sessions.find((item) => String(item?.profileId || '').trim() === value);
   if (byProfile) return { profileId: byProfile.profileId, reason: 'profile', session: byProfile };
-  const byInstanceId = sessions.find((item) => String(item?.instanceId || '').trim() === value);
-  if (byInstanceId) return { profileId: byInstanceId.profileId, reason: 'instanceId', session: byInstanceId };
-  const byAlias = sessions.find((item) => normalizeAlias(item?.alias) === normalizeAlias(value));
-  if (byAlias) return { profileId: byAlias.profileId, reason: 'alias', session: byAlias };
+  const byInstanceId = sessions.filter((item) => String(item?.instanceId || '').trim() === value);
+  if (byInstanceId.length > 1) {
+    throw new Error(`Ambiguous instance id target: ${value}`);
+  }
+  if (byInstanceId.length === 1) {
+    return { profileId: byInstanceId[0].profileId, reason: 'instanceId', session: byInstanceId[0] };
+  }
+  const normalizedAlias = normalizeAlias(value);
+  const byAlias = sessions.filter((item) => normalizeAlias(item?.alias) === normalizedAlias && isAliasProtectedStatus(item?.status));
+  if (byAlias.length > 1) {
+    throw new Error(`Ambiguous alias target: ${value}`);
+  }
+  if (byAlias.length === 1) {
+    return { profileId: byAlias[0].profileId, reason: 'alias', session: byAlias[0] };
+  }
   return null;
 }
 
@@ -173,7 +189,7 @@ export function isSessionAliasTaken(alias, exceptProfileId = '') {
   return listRegisteredSessions().some((item) => {
     if (!item) return false;
     if (except && String(item.profileId || '').trim() === except) return false;
-    if (String(item.status || '').trim() !== 'active') return false;
+    if (!isAliasProtectedStatus(item.status)) return false;
     return normalizeAlias(item.alias) === target;
   });
 }

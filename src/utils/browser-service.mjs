@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { BROWSER_SERVICE_URL, loadConfig, setRepoRoot } from './config.mjs';
 import { touchSessionActivity } from '../lifecycle/session-registry.mjs';
+import { buildResolvedSessionView, resolveSessionViewByProfile } from '../lifecycle/session-view.mjs';
 
 const require = createRequire(import.meta.url);
 const DEFAULT_API_TIMEOUT_MS = 90000;
@@ -21,6 +22,78 @@ function resolveApiTimeoutMs(options = {}) {
     return Math.max(1000, Math.floor(envValue));
   }
   return DEFAULT_API_TIMEOUT_MS;
+}
+
+function resolveWsUrl() {
+  const cfg = loadConfig();
+  const explicit = String(process.env.CAMO_WS_URL || '').trim();
+  if (explicit) return explicit;
+  const host = String(process.env.CAMO_WS_HOST || '127.0.0.1').trim() || '127.0.0.1';
+  const port = Number(process.env.CAMO_WS_PORT || 8765) || 8765;
+  return `ws://${host}:${port}`;
+}
+
+async function openWs() {
+  if (typeof WebSocket !== 'function') {
+    throw new Error('Global WebSocket is unavailable in this Node runtime');
+  }
+  const wsUrl = resolveWsUrl();
+  return new Promise((resolve, reject) => {
+    const socket = new WebSocket(wsUrl);
+    const timer = setTimeout(() => {
+      try { socket.close(); } catch {}
+      reject(new Error(`WebSocket connect timeout: ${wsUrl}`));
+    }, 8000);
+    socket.addEventListener('open', () => {
+      clearTimeout(timer);
+      resolve(socket);
+    });
+    socket.addEventListener('error', (err) => {
+      clearTimeout(timer);
+      reject(new Error(`WebSocket connect failed: ${err?.message || String(err)}`));
+    });
+  });
+}
+
+export async function callWS(action, payload = {}, options = {}) {
+  const timeoutMs = resolveApiTimeoutMs(options);
+  const socket = await openWs();
+  const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const sessionId = String(payload?.profileId || payload?.sessionId || payload?.profile || '').trim();
+  const message = {
+    type: 'command',
+    request_id: requestId,
+    session_id: sessionId,
+    data: { command_type: 'dev_command', action, parameters: payload },
+  };
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      try { socket.close(); } catch {}
+      reject(new Error(`browser-service ws timeout after ${timeoutMs}ms: ${action}`));
+    }, timeoutMs);
+
+    socket.addEventListener('message', (event) => {
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : JSON.parse(String(event.data));
+        if (data?.type === 'response' && data.request_id === requestId) {
+          clearTimeout(timer);
+          try { socket.close(); } catch {}
+          resolve(data?.data ?? data);
+        }
+      } catch (err) {
+        clearTimeout(timer);
+        try { socket.close(); } catch {}
+        reject(err);
+      }
+    });
+
+    socket.send(JSON.stringify(message));
+  });
+}
+
+export function findRepoRootCandidate() {
+  return null;
 }
 
 function isTimeoutError(error) {
@@ -79,16 +152,21 @@ export async function callAPI(action, payload = {}, options = {}) {
 
 export async function getSessionByProfile(profileId) {
   const status = await callAPI('getStatus', {});
-  const activeSession = status?.sessions?.find((s) => s.profileId === profileId) || null;
-  if (activeSession) {
-    return activeSession;
-  }
   if (!profileId) {
     return null;
   }
+  const liveSessions = Array.isArray(status?.sessions) ? status.sessions : [];
+  const resolved = resolveSessionViewByProfile(profileId, liveSessions);
+  if (resolved?.live) {
+    const activeSession = liveSessions.find((session) => String(session?.profileId || '').trim() === resolved.profileId) || null;
+    if (activeSession) return activeSession;
+  }
+  if (!resolved?.live) {
+    return null;
+  }
 
-  // Some browser-service builds do not populate getStatus.sessions reliably.
-  // Fallback to page:list so runtime can still attach to an active profile tab set.
+  // Some browser-service builds do not populate current_url reliably.
+  // Fallback to page:list only to enrich an already-live profile.
   try {
     const pagePayload = await callAPI('page:list', { profileId });
     const pages = Array.isArray(pagePayload?.pages)
@@ -111,6 +189,12 @@ export async function getSessionByProfile(profileId) {
   } catch {
     return null;
   }
+}
+
+export async function getResolvedSessions() {
+  const status = await callAPI('getStatus', {});
+  const liveSessions = Array.isArray(status?.sessions) ? status.sessions : [];
+  return buildResolvedSessionView(liveSessions);
 }
 
 function buildDomSnapshotScript(maxDepth, maxChildren) {
@@ -342,64 +426,17 @@ export function ensureCamoufox() {
   console.log('Camoufox installed.');
 }
 
-const START_SCRIPT_REL = path.join('runtime', 'infra', 'utils', 'scripts', 'service', 'start-browser-service.mjs');
-const CONTROLLER_SERVER_REL = path.join('services', 'controller', 'src', 'server.mjs');
+const CONTROLLER_SERVER_REL = path.join('src', 'services', 'browser-service', 'index.js');
 
-function hasStartScript(root) {
-  if (!root) return false;
-  return fs.existsSync(path.join(root, START_SCRIPT_REL));
-}
 
 function hasControllerServer(root) {
   if (!root) return false;
   return fs.existsSync(path.join(root, CONTROLLER_SERVER_REL));
 }
 
-function walkUpForRepoRoot(startDir) {
-  if (!startDir) return null;
-  let cursor = path.resolve(startDir);
-  for (;;) {
-    if (hasStartScript(cursor)) return cursor;
-    const parent = path.dirname(cursor);
-    if (parent === cursor) return null;
-    cursor = parent;
-  }
-}
 
-function scanCommonRepoRoots() {
-  const home = os.homedir();
-  const roots = [
-    path.join(home, 'Documents', 'github'),
-    path.join(home, 'github'),
-    path.join(home, 'code'),
-    path.join(home, 'projects'),
-    path.join('/Volumes', 'extension', 'code'),
-    path.join('C:', 'code'),
-    path.join('D:', 'code'),
-    path.join('C:', 'projects'),
-    path.join('D:', 'projects'),
-    path.join('C:', 'Users', os.userInfo().username, 'code'),
-    path.join('C:', 'Users', os.userInfo().username, 'projects'),
-    path.join('C:', 'Users', os.userInfo().username, 'Documents', 'github'),
-  ].filter(Boolean);
 
-  for (const root of roots) {
-    if (!fs.existsSync(root)) continue;
-    try {
-      const entries = fs.readdirSync(root, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        if (!entry.name.toLowerCase().includes('webauto')) continue;
-        const candidate = path.join(root, entry.name);
-        if (hasStartScript(candidate)) return candidate;
-      }
-    } catch {
-      // ignore scanning errors and continue
-    }
-  }
 
-  return null;
-}
 
 function scanCommonInstallRoots() {
   const home = os.homedir();
@@ -416,75 +453,32 @@ function scanCommonInstallRoots() {
   ].filter(Boolean);
 
   for (const root of nodeModuleRoots) {
-    const candidate = path.join(root, '@web-auto', 'webauto');
+    const candidate = path.join(root, '@web-auto', 'camo');
     if (hasControllerServer(candidate)) return candidate;
   }
   return null;
 }
 
-export function findRepoRootCandidate() {
-  const cfg = loadConfig();
-  const candidates = [
-    process.env.WEBAUTO_REPO_ROOT,
-    cfg.repoRoot,
-    process.cwd(),
-    path.join('/Volumes', 'extension', 'code', 'webauto'),
-    path.join('/Volumes', 'extension', 'code', 'WebAuto'),
-    path.join(os.homedir(), 'Documents', 'github', 'webauto'),
-    path.join(os.homedir(), 'Documents', 'github', 'WebAuto'),
-    path.join(os.homedir(), 'github', 'webauto'),
-    path.join(os.homedir(), 'github', 'WebAuto'),
-    path.join('C:', 'code', 'webauto'),
-    path.join('C:', 'code', 'WebAuto'),
-    path.join('C:', 'Users', os.userInfo().username, 'code', 'webauto'),
-    path.join('C:', 'Users', os.userInfo().username, 'code', 'WebAuto'),
-  ].filter(Boolean);
 
-  for (const root of candidates) {
-    if (hasStartScript(root)) {
-      if (cfg.repoRoot !== root) {
-        setRepoRoot(root);
-      }
-      return root;
-    }
-  }
 
-  for (const startDir of [process.cwd()]) {
-    const found = walkUpForRepoRoot(startDir);
-    if (found) {
-      if (cfg.repoRoot !== found) {
-        setRepoRoot(found);
-      }
-      return found;
-    }
-  }
 
-  const scanned = scanCommonRepoRoots();
-  if (scanned) {
-    if (cfg.repoRoot !== scanned) {
-      setRepoRoot(scanned);
-    }
-    return scanned;
-  }
 
-  return null;
-}
 
 export function findInstallRootCandidate() {
   const cfg = loadConfig();
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
-  const siblingInScopedNodeModules = path.resolve(currentDir, '..', '..', '..', 'webauto');
+  const siblingInScopedNodeModules = path.resolve(currentDir, '..', '..', '..', 'camo');
   const candidates = [
-    process.env.WEBAUTO_INSTALL_DIR,
-    process.env.WEBAUTO_PACKAGE_ROOT,
-    process.env.WEBAUTO_REPO_ROOT,
+    process.env.CAMO_INSTALL_DIR,
+    process.env.CAMO_PACKAGE_ROOT,
+    process.env.CAMO_REPO_ROOT,
     cfg.repoRoot,
     siblingInScopedNodeModules,
     process.cwd(),
   ].filter(Boolean);
 
   try {
-    const pkgPath = require.resolve('@web-auto/webauto/package.json');
+    const pkgPath = require.resolve('@web-auto/camo/package.json');
     candidates.push(path.dirname(pkgPath));
   } catch {
     // ignore resolution failures in npx-only environments
@@ -504,34 +498,27 @@ export function findInstallRootCandidate() {
 export async function ensureBrowserService() {
   if (await checkBrowserService()) return;
 
-  const repoRoot = findRepoRootCandidate();
-  if (repoRoot) {
-    const scriptPath = path.join(repoRoot, START_SCRIPT_REL);
-    console.log('Starting browser-service daemon...');
-    execSync(`node "${scriptPath}"`, { stdio: 'inherit', cwd: repoRoot });
-  } else {
-    const installRoot = findInstallRootCandidate();
-    if (!installRoot) {
-      throw new Error(
-        `Cannot locate browser-service launcher (${START_SCRIPT_REL} or ${CONTROLLER_SERVER_REL}). ` +
-        'Set WEBAUTO_INSTALL_DIR=<@web-auto/webauto install dir> or WEBAUTO_REPO_ROOT=<repo root>.',
-      );
-    }
-    const scriptPath = path.join(installRoot, CONTROLLER_SERVER_REL);
-    const env = {
-      ...process.env,
-      WEBAUTO_REPO_ROOT: String(process.env.WEBAUTO_REPO_ROOT || '').trim() || installRoot,
-    };
-    const child = spawn(process.execPath, [scriptPath], {
-      cwd: installRoot,
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
-      env,
-    });
-    child.unref();
-    console.log(`Starting browser-service daemon (packaged webauto, pid=${child.pid || 'unknown'})...`);
+  const installRoot = findInstallRootCandidate();
+  if (!installRoot) {
+    throw new Error(
+      `Cannot locate browser-service launcher (${CONTROLLER_SERVER_REL}). ` +
+      'Ensure @web-auto/camo is installed or set CAMO_INSTALL_DIR.',
+    );
   }
+  const scriptPath = path.join(installRoot, CONTROLLER_SERVER_REL);
+  const env = {
+    ...process.env,
+    CAMO_REPO_ROOT: String(process.env.CAMO_REPO_ROOT || '').trim() || installRoot,
+  };
+  const child = spawn(process.execPath, [scriptPath], {
+    cwd: installRoot,
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true,
+    env,
+  });
+  child.unref();
+  console.log(`Starting browser-service daemon (pid=${child.pid || 'unknown'})...`);
 
   for (let i = 0; i < 20; i += 1) {
     await new Promise((r) => setTimeout(r, 400));

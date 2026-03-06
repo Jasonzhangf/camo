@@ -102,6 +102,23 @@ describe('session registry', () => {
     unregisterSession(id);
   });
 
+  it('should keep alias reserved while session is reconnecting', () => {
+    const id = TEST_PREFIX + '-6d';
+    registerSession(id, { alias: 'alias-6d', status: 'reconnecting' });
+    assert.strictEqual(isSessionAliasTaken('alias-6d'), true);
+    unregisterSession(id);
+  });
+
+  it('should reject ambiguous alias resolution', () => {
+    const a = TEST_PREFIX + '-6e-a';
+    const b = TEST_PREFIX + '-6e-b';
+    registerSession(a, { alias: 'shared-alias', status: 'active' });
+    registerSession(b, { alias: 'shared-alias', status: 'reconnecting' });
+    assert.throws(() => resolveSessionTarget('shared-alias'), /Ambiguous alias target/);
+    unregisterSession(a);
+    unregisterSession(b);
+  });
+
   it('should mark reconnecting and active', () => {
     const id = TEST_PREFIX + '-7';
     registerSession(id);

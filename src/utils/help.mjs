@@ -20,8 +20,9 @@ INITIALIZATION:
   create profile <profileId>                Create a new profile
 
 CONFIG:
-  config repo-root [path]                   Get or set persisted webauto repo root
+  config repo-root [path]                   Get or set persisted camo repo root
   highlight-mode [status|on|off]            Global highlight mode for click/type/scroll (default: on)
+  attach <profileId|sessionId>             Attach to session via WS; read JSON commands from stdin
 
 BROWSER CONTROL:
   init                                      Ensure camoufox + ensure browser-service daemon
@@ -31,16 +32,16 @@ BROWSER CONTROL:
   stop --alias <alias>                      Stop by alias
   stop idle                                 Stop all idle sessions
   stop all                                  Stop all sessions
-  status [profileId]
+  status [profileId]                        Show resolved per-profile session view
   list                                      Alias of status
 
 LIFECYCLE & CLEANUP:
-  instances                                 List global camoufox instances (live + registered + idle state)
-  sessions                                  List active browser sessions
-  cleanup [profileId]                       Cleanup session (release lock + stop)
+  instances                                 List resolved session view (live + registered + idle state)
+  sessions                                  List resolved session view for all profiles
+  cleanup [profileId]                       Cleanup only one profile (remote stop + local registry/lock/watchdog)
   cleanup all                               Cleanup all active sessions
   cleanup locks                             Cleanup stale lock files
-  force-stop [profileId]                    Force stop session (for stuck sessions)
+  force-stop [profileId]                    Force stop only one profile session (no alias/id targeting)
   lock list                                 List active session locks
   lock [profileId]                          Show lock info for profile
   unlock [profileId]                        Release lock for profile
@@ -62,7 +63,7 @@ PAGES:
   new-page [profileId] [--url <url>]
   close-page [profileId] [index]
   switch-page [profileId] <index>
-  list-pages [profileId]
+  list-pages [profileId]                    List pages only when that profile is live
 
 DEVTOOLS:
   devtools logs [profileId] [--limit 120] [--since <unix_ms>] [--levels error,warn] [--clear]
@@ -143,6 +144,7 @@ EXAMPLES:
   camo lock list
   camo unlock myprofile
   camo stop
+  echo '{"action":"stop","args":{"profileId":"myprofile"}}' | camo attach myprofile
 
 CONTAINER FILTER & SUBSCRIPTION:
   container init [--source <dir>] [--force]         Initialize subscription dir + migrate container sets
@@ -170,14 +172,29 @@ PROGRESS EVENTS:
   (non-events commands auto-start daemon by default)
 
 ENV:
-  WEBAUTO_BROWSER_URL                       Default: http://127.0.0.1:7704
-  WEBAUTO_INSTALL_DIR                       Optional @web-auto/webauto install dir
-  WEBAUTO_REPO_ROOT                         Optional webauto repo root (dev mode)
-  WEBAUTO_DATA_ROOT / WEBAUTO_HOME         Optional data root (Windows default D:\\webauto)
-  WEBAUTO_PROFILE_ROOT                      Optional profile dir override
-  WEBAUTO_ROOT                              Legacy data root (auto-appends .webauto if needed)
+  CAMO_BROWSER_URL                           Default: http://127.0.0.1:7704
+  CAMO_INSTALL_DIR                           Optional @web-auto/camo install dir
+  CAMO_REPO_ROOT                             Optional camo repo root (dev mode)
+  CAMO_DATA_ROOT / CAMO_HOME                Optional data root (Windows default D:\\camo)
+  CAMO_PROFILE_ROOT                          Optional profile dir override
+  CAMO_ROOT                                  Legacy data root (auto-appends .camo if needed)
+  CAMO_WS_URL                                Optional ws://host:port override
+  CAMO_WS_HOST / CAMO_WS_PORT                WS host/port for browser-service
+  CAMO_BRING_TO_FRONT_MODE                   Bring-to-front policy: auto (default) | never
+  CAMO_SKIP_BRING_TO_FRONT                   Legacy alias for CAMO_BRING_TO_FRONT_MODE=never
   CAMO_PROGRESS_EVENTS_FILE                 Optional path override for progress jsonl
   CAMO_PROGRESS_WS_HOST / CAMO_PROGRESS_WS_PORT   Progress daemon host/port (defaults: 127.0.0.1:7788)
+
+SESSION ISOLATION:
+  - profile is the lifecycle primary key. browser-service, lock, watchdog, registry all bind to the same profileId.
+  - camo start/stop/cleanup/force-stop <profileId> only targets that exact profile and must not affect other profiles.
+  - stop --id / stop --alias are convenience selectors for stop only; cleanup/force-stop never accept alias or instance id.
+  - status/sessions/instances all read the same resolved session view with these fields:
+      live: browser-service currently has this profile session
+      registered: local registry has metadata for this profile
+      orphaned: registry exists but service session is gone
+      needsRecovery: registry says active but service no longer has that profile
+  - list-pages requires live=true for that profile; otherwise camo will fail fast instead of probing other profiles.
 `);
 }
 
