@@ -135,4 +135,28 @@ describe('lifecycle command', () => {
     assert.strictEqual(orphan.orphaned, true);
     assert.strictEqual(orphan.needsRecovery, true);
   });
+
+  it('cleanup rejects --id and --alias to avoid indirect profile targeting', async () => {
+    const { handleCleanupCommand } = await import('../../../src/commands/lifecycle.mjs');
+    await assert.rejects(
+      async () => handleCleanupCommand(['cleanup', '--id', 'inst_123']),
+      /direct profile only; --id is only supported by "camo stop"/i,
+    );
+    await assert.rejects(
+      async () => handleCleanupCommand(['cleanup', '--alias', 'worker-a']),
+      /direct profile only; --alias is only supported by "camo stop"/i,
+    );
+  });
+
+  it('force-stop rejects --id and --alias to avoid indirect profile targeting', async () => {
+    const { handleForceStopCommand } = await import('../../../src/commands/lifecycle.mjs');
+    await assert.rejects(
+      async () => handleForceStopCommand(['force-stop', '--id', 'inst_123']),
+      /direct profile only; --id is only supported by "camo stop"/i,
+    );
+    await assert.rejects(
+      async () => handleForceStopCommand(['force-stop', '--alias', 'worker-a']),
+      /direct profile only; --alias is only supported by "camo stop"/i,
+    );
+  });
 });

@@ -41,9 +41,14 @@ Then report capability gap instead of switching control surface.
 - Subscription sets: `container init/register/targets/watch`  
 - Scripted flow: `autoscript validate/explain/run/resume/mock-run`
 
-4) Progress / Recovery  
-- Real-time and replay events: `events serve/tail/recent/emit`  
+4) Progress / Recovery
+- Real-time and replay events: `events serve/tail/recent/emit`
 - Lifecycle and cleanup: `sessions/status/cleanup/force-stop/shutdown`
+
+Session isolation hard rule:
+- Treat `profileId` as the only lifecycle primary key.
+- `cleanup` and `force-stop` must always use direct `profileId`; never translate from alias / instance id.
+- `stop --id` / `stop --alias` are stop-only shortcuts and should not be generalized to other lifecycle commands.
 
 ## Trigger Conditions
 
@@ -85,8 +90,8 @@ Then report capability gap instead of switching control surface.
 
 ## Environment Variables
 
-- `WEBAUTO_BROWSER_URL` (default `http://127.0.0.1:7704`)
-- `WEBAUTO_REPO_ROOT` (optional explicit repo root)
+- `CAMO_BROWSER_URL` (default `http://127.0.0.1:7704`)
+- `CAMO_REPO_ROOT` (optional explicit repo root)
 - `CAMO_PROGRESS_EVENTS_FILE` (optional progress JSONL path)
 - `CAMO_PROGRESS_WS_HOST` / `CAMO_PROGRESS_WS_PORT` (progress ws daemon host/port)
 

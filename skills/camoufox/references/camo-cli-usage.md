@@ -76,6 +76,12 @@ camo lock [profileId]
 camo unlock [profileId]
 ```
 
+Session isolation notes:
+- `profileId` is the lifecycle primary key.
+- `stop/cleanup/force-stop <profileId>` must only affect that exact profile.
+- `stop --id` and `stop --alias` are allowed only for `stop`; `cleanup` and `force-stop` reject indirect targeting.
+- `status`, `sessions`, and `instances` read one shared resolved session view.
+
 ### Navigation/actions
 
 ```bash
@@ -98,6 +104,8 @@ camo close-page [profileId] [index]
 camo switch-page [profileId] <index>
 camo list-pages [profileId]
 ```
+
+`list-pages` requires the target profile to be `live=true`; it should fail fast instead of probing other profiles.
 
 ### Cookies/window/mouse/system
 
@@ -205,7 +213,7 @@ camo shutdown
 
 - Browser service connection failure:
   - run `camo init`
-  - verify `WEBAUTO_BROWSER_URL`
+  - verify `CAMO_BROWSER_URL`
 - Session lock conflict:
   - `camo lock list`
   - `camo cleanup locks` or `camo unlock <profileId>`

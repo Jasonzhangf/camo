@@ -163,7 +163,7 @@ camo create fingerprint --os <os> --region <region>
 ### Config
 
 ```bash
-camo config repo-root [path]           # Get/set persisted webauto repo root
+camo config repo-root [path]           # Get/set persisted camo repo root
 camo highlight-mode [status|on|off]    # Global highlight mode for click/type/scroll
 ```
 
@@ -176,7 +176,7 @@ camo stop --id <instanceId>
 camo stop --alias <alias>
 camo stop idle
 camo stop all
-camo status [profileId]
+camo status [profileId]                  # Show resolved per-profile session view
 camo shutdown                          # Shutdown browser-service (all sessions)
 ```
 
@@ -186,18 +186,30 @@ Use `--width/--height` to override and update the saved profile size.
 For headless sessions, default idle timeout is `30m` (auto-stop on inactivity). Use `--idle-timeout` (e.g. `45m`, `1800s`, `0`) to customize.
 Use `--devtools` to open browser developer tools in headed mode (cannot be combined with `--headless`).
 Use `--record` to auto-enable JSONL recording at startup; `--record-name`, `--record-output`, and `--record-overlay` customize file naming/output and floating toggle UI.
+Set `CAMO_BRING_TO_FRONT_MODE=never` to keep protocol-level input and page lifecycle operations from forcing the browser window to front during headed runs.
+`CAMO_SKIP_BRING_TO_FRONT=1` remains supported as a legacy alias.
 
 ### Lifecycle & Cleanup
 
 ```bash
-camo instances                         # List global camoufox instances (live + orphaned + idle state)
-camo sessions                          # List active browser sessions
-camo cleanup [profileId]               # Cleanup session (release lock + stop)
+camo instances                         # List resolved session view (live + registered + idle state)
+camo sessions                          # List resolved session view for all profiles
+camo cleanup [profileId]               # Cleanup only one profile (remote stop + local registry/lock/watchdog)
 camo cleanup all                       # Cleanup all active sessions
 camo cleanup locks                     # Cleanup stale lock files
-camo force-stop [profileId]            # Force stop session (for stuck sessions)
+camo force-stop [profileId]            # Force stop only one profile (no alias/id targeting)
 camo lock list                         # List active session locks
 ```
+
+Session isolation rules:
+- `profileId` is the lifecycle primary key across browser-service session, local registry, watchdog, and lock.
+- `camo start/stop/cleanup/force-stop <profileId>` only target that exact profile and must not affect other profiles.
+- `camo stop --id` and `camo stop --alias` are stop-only convenience selectors; `cleanup` and `force-stop` intentionally reject indirect targeting.
+- `camo status`, `camo sessions`, and `camo instances` share the same resolved session view fields:
+  - `live`: browser-service currently has this profile session
+  - `registered`: local registry has metadata for this profile
+  - `orphaned`: registry exists but the service session is gone
+  - `needsRecovery`: registry still says active but browser-service no longer has that profile
 
 ### Navigation
 
@@ -252,7 +264,7 @@ Recorder JSONL events include:
 camo new-page [profileId] [--url <url>]
 camo close-page [profileId] [index]
 camo switch-page [profileId] <index>
-camo list-pages [profileId]
+camo list-pages [profileId]             # Requires live=true for that profile
 ```
 
 ### Cookies
@@ -348,20 +360,20 @@ By default, non-`events` commands auto-start the progress daemon (`/events`) in 
 
 ## Configuration
 
-- Config file: `~/.webauto/camo-cli.json`
-- Profiles directory: `~/.webauto/profiles/`
-- Fingerprints directory: `~/.webauto/fingerprints/`
-- Session registry: `~/.webauto/sessions/`
-- Lock files: `~/.webauto/locks/`
-- GeoIP database: `~/.webauto/geoip/GeoLite2-City.mmdb`
-- User container root: `~/.webauto/container-lib/`
-- Subscription root: `~/.webauto/container-subscriptions/`
+- Config file: `~/.camo/camo-cli.json`
+- Profiles directory: `~/.camo/profiles/`
+- Fingerprints directory: `~/.camo/fingerprints/`
+- Session registry: `~/.camo/sessions/`
+- Lock files: `~/.camo/locks/`
+- GeoIP database: `~/.camo/geoip/GeoLite2-City.mmdb`
+- User container root: `~/.camo/container-lib/`
+- Subscription root: `~/.camo/container-subscriptions/`
 
 ### Subscription-driven Watch
 
 ```bash
 # 1) Migrate container-library into subscription sets
-camo container init --source /Users/fanzhang/Documents/github/webauto/container-library
+camo container init --source /Users/fanzhang/Documents/github/camo/container-library
 
 # 2) Register sets to a profile
 camo container register xiaohongshu-batch-1 xiaohongshu_home xiaohongshu_home.search_input
@@ -439,13 +451,13 @@ Condition types:
 
 ### Environment Variables
 
-- `WEBAUTO_BROWSER_URL` - Browser service URL (default: `http://127.0.0.1:7704`)
-- `WEBAUTO_INSTALL_DIR` - `@web-auto/webauto` 安装目录（可选，首次安装兜底）
-- `WEBAUTO_REPO_ROOT` - WebAuto repository root (optional, dev mode)
-- `WEBAUTO_DATA_ROOT` / `WEBAUTO_HOME` - 用户数据目录（Windows 默认 `D:/webauto`，无 D 盘回退 `~/.webauto`）
-- `WEBAUTO_PROFILE_ROOT` - Profile 目录覆盖（默认 `<data-root>/profiles`）
-- `WEBAUTO_ROOT` - 兼容旧变量（当值不是 `webauto/.webauto` 目录时会自动补 `.webauto`）
-- `WEBAUTO_CONTAINER_ROOT` - User container root override (default: `~/.webauto/container-lib`)
+- `CAMO_BROWSER_URL` - Browser service URL (default: `http://127.0.0.1:7704`)
+- `CAMO_INSTALL_DIR` - `@web-auto/camo` 安装目录（可选，首次安装兜底）
+- `CAMO_REPO_ROOT` - Camo repository root (optional, dev mode)
+- `CAMO_DATA_ROOT` / `CAMO_HOME` - 用户数据目录（Windows 默认 `D:/camo`，无 D 盘回退 `~/.camo`）
+- `CAMO_PROFILE_ROOT` - Profile 目录覆盖（默认 `<data-root>/profiles`）
+- `CAMO_ROOT` - 兼容旧变量（当值不是 `camo/.camo` 目录时会自动补 `.camo`）
+- `CAMO_CONTAINER_ROOT` - User container root override (default: `~/.camo/container-lib`)
 - `CAMO_PROGRESS_EVENTS_FILE` - Optional progress event JSONL path override
 - `CAMO_PROGRESS_WS_HOST` / `CAMO_PROGRESS_WS_PORT` - Progress websocket daemon bind address (default: `127.0.0.1:7788`)
 - `CAMO_DEFAULT_WINDOW_VERTICAL_RESERVE` - Reserved vertical pixels for default headful auto-size
@@ -454,7 +466,7 @@ Condition types:
 
 Camo CLI persists session information locally:
 
-- Sessions are registered in `~/.webauto/sessions/`
+- Sessions are registered in `~/.camo/sessions/`
 - On restart, `camo sessions` / `camo instances` shows live + orphaned sessions
 - Stale sessions (>7 days) are automatically cleaned up
 

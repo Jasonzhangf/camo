@@ -30,3 +30,10 @@ Fix camo profile/session lifecycle so each profile is isolated and stop/cleanup/
 
 ## Note
 A misleading `status finger = null` result happened once because `status finger` and `stop finger` were accidentally launched in parallel during manual verification, not because of the isolation logic itself. Sequential verification confirmed the profile isolation behavior is correct.
+
+
+## Follow-up hardening
+- Added explicit guardrails so `camo cleanup` and `camo force-stop` reject `--id` / `--alias` and require direct `profileId` targeting.
+- Updated `README.md` and `skills/camoufox/references/camo-cli-usage.md` to document session isolation semantics and `list-pages` live-only behavior.
+- Updated `skills/camoufox/SKILL.md` so future agents keep `profileId` as the only lifecycle primary key.
+- Added tests covering lifecycle indirect-target rejection and help output session-isolation text.

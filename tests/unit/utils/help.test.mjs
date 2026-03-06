@@ -26,6 +26,8 @@ describe('help utilities', () => {
       assert.ok(logs.some(l => l.includes('devtools logs')));
       assert.ok(logs.some(l => l.includes('record start')));
       assert.ok(logs.some(l => l.includes('highlight-mode')));
+      assert.ok(logs.some(l => l.includes('SESSION ISOLATION')));
+      assert.ok(logs.some(l => l.includes('live: browser-service currently has this profile session')));
     });
   });
 

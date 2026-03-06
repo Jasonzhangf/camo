@@ -12,7 +12,17 @@ import {
 } from '../lifecycle/session-registry.mjs';
 import { stopAllSessionWatchdogs, stopSessionWatchdog } from '../lifecycle/session-watchdog.mjs';
 
+function rejectIndirectSessionTargeting(commandName, args) {
+  if (args.includes('--id')) {
+    throw new Error(`Usage: camo ${commandName} [profileId] (direct profile only; --id is only supported by "camo stop")`);
+  }
+  if (args.includes('--alias')) {
+    throw new Error(`Usage: camo ${commandName} [profileId] (direct profile only; --alias is only supported by "camo stop")`);
+  }
+}
+
 export async function handleCleanupCommand(args) {
+  rejectIndirectSessionTargeting('cleanup', args);
   const sub = args[1];
   
   if (sub === 'locks') {
@@ -90,6 +100,7 @@ export async function handleCleanupCommand(args) {
 }
 
 export async function handleForceStopCommand(args) {
+  rejectIndirectSessionTargeting('force-stop', args);
   await ensureBrowserService();
   const profileId = resolveProfileId(args, 1, getDefaultProfile);
   if (!profileId) throw new Error('Usage: camo force-stop [profileId]');
