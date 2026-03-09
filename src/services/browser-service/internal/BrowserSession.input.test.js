@@ -277,6 +277,39 @@ test('mouseWheel retries with refreshed active page after timeout', async () => 
         restoreTimeout();
     }
 });
+test('mouseWheel prefers interactive viewport metrics for anchor clamping', async () => {
+    const restoreTimeout = setEnv('CAMO_INPUT_ACTION_TIMEOUT_MS', '80');
+    const restoreAttempts = setEnv('CAMO_INPUT_ACTION_MAX_ATTEMPTS', '1');
+    const restoreDelay = setEnv('CAMO_INPUT_RECOVERY_DELAY_MS', '0');
+    const restoreBringToFrontTimeout = setEnv('CAMO_INPUT_RECOVERY_BRING_TO_FRONT_TIMEOUT_MS', '50');
+    const restoreReadySettle = setEnv('CAMO_INPUT_READY_SETTLE_MS', '0');
+    try {
+        const moves = [];
+        const page = {
+            isClosed: () => false,
+            viewportSize: () => ({ width: 1280, height: 720 }),
+            evaluate: async () => ({ innerWidth: 2560, innerHeight: 1440, visualWidth: 2560, visualHeight: 1440 }),
+            bringToFront: async () => { },
+            waitForTimeout: async () => { },
+            mouse: {
+                move: async (x, y) => {
+                    moves.push([x, y]);
+                },
+                wheel: async () => { },
+            },
+        };
+        const session = createSessionWithPage(page);
+        await session.mouseWheel({ deltaY: 360, anchorX: 2564, anchorY: 228 });
+        assert.deepEqual(moves, [[2559, 228]]);
+    }
+    finally {
+        restoreReadySettle();
+        restoreBringToFrontTimeout();
+        restoreDelay();
+        restoreAttempts();
+        restoreTimeout();
+    }
+});
 test('mouseWheel falls back to keyboard paging when wheel keeps timing out', async () => {
     const restoreTimeout = setEnv('CAMO_INPUT_ACTION_TIMEOUT_MS', '80');
     const restoreAttempts = setEnv('CAMO_INPUT_ACTION_MAX_ATTEMPTS', '1');

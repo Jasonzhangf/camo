@@ -6,6 +6,36 @@ export class BrowserSessionPageManagement {
     constructor(deps) {
         this.deps = deps;
     }
+    async openPageViaContext(ctx, beforeCount) {
+        try {
+            const page = await ctx.newPage();
+            await page.waitForLoadState('domcontentloaded', { timeout: 1500 }).catch(() => null);
+            const after = ctx.pages().filter((p) => !p.isClosed()).length;
+            if (after > beforeCount) {
+                return page;
+            }
+        }
+        catch {
+            // Fall through to shortcut-based creation below.
+        }
+        return null;
+    }
+    async openPageViaShortcut(ctx, opener, shortcut, beforeCount) {
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+            const waitPage = ctx.waitForEvent('page', { timeout: 1200 }).catch(() => null);
+            await opener.keyboard.press(shortcut).catch(() => null);
+            const page = await waitPage;
+            const pagesNow = ctx.pages().filter((p) => !p.isClosed());
+            const after = pagesNow.length;
+            if (page && after > beforeCount)
+                return page;
+            if (!page && after > beforeCount) {
+                return pagesNow[pagesNow.length - 1] || null;
+            }
+            await new Promise((r) => setTimeout(r, 250));
+        }
+        return null;
+    }
     tryOsNewTabShortcut() {
         if (this.deps.isHeadless())
             return false;
@@ -58,7 +88,14 @@ export class BrowserSessionPageManagement {
     }
     listPages() {
         const ctx = this.deps.ensureContext();
-        const pages = ctx.pages().filter((p) => !p.isClosed());
+        // Filter out closed pages AND pages that are effectively blank (about:newtab/about:blank)
+        const pages = ctx.pages().filter((p) => {
+            if (p.isClosed()) return false;
+            const url = p.url();
+            // Filter out blank placeholder pages
+            if (url === 'about:newtab' || url === 'about:blank') return false;
+            return true;
+        });
         const active = this.deps.getActivePage();
         return pages.map((p, index) => ({
             index,
@@ -78,23 +115,15 @@ export class BrowserSessionPageManagement {
             await opener.bringToFront().catch(() => null);
         }
         const before = ctx.pages().filter((p) => !p.isClosed()).length;
-        for (let attempt = 1; attempt <= 3; attempt += 1) {
-            const waitPage = ctx.waitForEvent('page', { timeout: 8000 }).catch(() => null);
-            await opener.keyboard.press(shortcut).catch(() => null);
-            page = await waitPage;
-            const pagesNow = ctx.pages().filter((p) => !p.isClosed());
-            const after = pagesNow.length;
-            if (page && after > before)
-                break;
-            if (!page && after > before) {
-                page = pagesNow[pagesNow.length - 1] || null;
-                break;
-            }
-            await new Promise((r) => setTimeout(r, 250));
+        if (!options?.strictShortcut) {
+            page = await this.openPageViaContext(ctx, before);
+        }
+        if (!page) {
+            page = await this.openPageViaShortcut(ctx, opener, shortcut, before);
         }
         let after = ctx.pages().filter((p) => !p.isClosed()).length;
         if (!page || after <= before) {
-            const waitPage = ctx.waitForEvent('page', { timeout: 8000 }).catch(() => null);
+            const waitPage = ctx.waitForEvent('page', { timeout: 1200 }).catch(() => null);
             const osShortcutOk = this.tryOsNewTabShortcut();
             if (osShortcutOk) {
                 page = await waitPage;
@@ -107,13 +136,7 @@ export class BrowserSessionPageManagement {
         }
         if (!page || after <= before) {
             if (!options?.strictShortcut) {
-                try {
-                    page = await ctx.newPage();
-                    await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => null);
-                }
-                catch {
-                    // ignore fallback errors
-                }
+                page = await this.openPageViaContext(ctx, before);
                 after = ctx.pages().filter((p) => !p.isClosed()).length;
                 if (!page && after > before) {
                     const pagesNow = ctx.pages().filter((p) => !p.isClosed());
@@ -194,8 +217,39 @@ export class BrowserSessionPageManagement {
             throw new Error(`invalid_page_index: ${index}`);
         }
         const page = pages[closedIndex];
-        await page.close().catch(() => { });
-        const remaining = ctx.pages().filter((p) => !p.isClosed());
+        const beforeUrl = page.url();
+        
+        // Try to close the page
+        try {
+            await page.close({ runBeforeUnload: false });
+        } catch (e) {
+            // Ignore close errors
+        }
+        
+        // Wait for close to take effect
+        await new Promise(r => setTimeout(r, 100));
+        
+        // Check if actually closed
+        let remaining = ctx.pages().filter((p) => !p.isClosed());
+        
+        // If still same count, the page might not have closed properly
+        // Try navigating to about:blank first then close
+        if (remaining.length === pages.length) {
+            try {
+                await page.goto('about:blank', { timeout: 500 }).catch(() => {});
+                await page.close({ runBeforeUnload: false }).catch(() => {});
+                await new Promise(r => setTimeout(r, 100));
+                remaining = ctx.pages().filter((p) => !p.isClosed());
+            } catch (e) {
+                // Ignore
+            }
+        }
+        
+        // Final check - filter out pages that look like closed tabs (about:newtab)
+        remaining = remaining.filter(p => {
+            const url = p.url();
+            return url !== 'about:newtab' && url !== 'about:blank';
+        });
         const nextIndex = remaining.length === 0 ? -1 : Math.min(Math.max(0, closedIndex - 1), remaining.length - 1);
         if (nextIndex >= 0) {
             const nextPage = remaining[nextIndex];

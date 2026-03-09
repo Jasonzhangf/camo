@@ -1,4 +1,30 @@
 import { isTimeoutLikeError } from './utils.js';
+
+async function readInteractiveViewport(page) {
+    const fallback = page.viewportSize?.() || null;
+    try {
+        const metrics = await page.evaluate(() => ({
+            innerWidth: Number(window.innerWidth || 0),
+            innerHeight: Number(window.innerHeight || 0),
+            visualWidth: Number(window.visualViewport?.width || 0),
+            visualHeight: Number(window.visualViewport?.height || 0),
+        }));
+        const width = Math.max(Number(metrics?.innerWidth || 0), Number(metrics?.visualWidth || 0), Number(fallback?.width || 0));
+        const height = Math.max(Number(metrics?.innerHeight || 0), Number(metrics?.visualHeight || 0), Number(fallback?.height || 0));
+        if (Number.isFinite(width) && width > 1 && Number.isFinite(height) && height > 1) {
+            return {
+                width: Math.round(width),
+                height: Math.round(height),
+            };
+        }
+    }
+    catch { }
+    return {
+        width: Math.max(1, Number(fallback?.width || 1280)),
+        height: Math.max(1, Number(fallback?.height || 720)),
+    };
+}
+
 export class BrowserSessionInputOps {
     ensurePrimaryPage;
     ensureInputReady;
@@ -89,7 +115,7 @@ export class BrowserSessionInputOps {
             }
             try {
                 await this.runInputAction(page, 'mouse:wheel', async (activePage) => {
-                    const viewport = activePage.viewportSize();
+                    const viewport = await readInteractiveViewport(activePage);
                     const moveX = Number.isFinite(normalizedAnchorX)
                         ? Math.max(1, Math.min(Math.max(1, Number(viewport?.width || 1280) - 1), Math.round(normalizedAnchorX)))
                         : Math.max(1, Math.floor(((viewport?.width || 1280) * 0.5)));
