@@ -48,6 +48,10 @@ export async function withTimeout(promise, ms, message = 'Timeout') {
 export function ensureUrlScheme(url) {
   if (!url) return url;
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  // Skip special browser URLs that don't need scheme
+  if (url.startsWith('about:') || url.startsWith('chrome:') || url.startsWith('file:')) {
+    return url;
+  }
   if (url.startsWith('localhost') || url.match(/^\\d+\\.\\d+/)) {
     return `http://${url}`;
   }

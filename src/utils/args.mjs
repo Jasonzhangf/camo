@@ -10,6 +10,7 @@ export function ensureUrlScheme(rawUrl) {
   if (typeof rawUrl !== 'string') return rawUrl;
   const trimmed = rawUrl.trim();
   if (!trimmed) return trimmed;
+  if (/^(about|chrome|file|data|blob|javascript):/i.test(trimmed)) return trimmed;
   if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)) return trimmed;
   return `https://${trimmed}`;
 }
