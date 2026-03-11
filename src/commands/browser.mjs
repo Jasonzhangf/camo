@@ -506,7 +506,7 @@ export async function handleStartCommand(args) {
       ? true
       : null;
   if (hasExplicitWidth !== hasExplicitHeight) {
-    throw new Error('Usage: camo start [profileId] [--url <url>] [--headless] [--devtools] [--record] [--record-name <name>] [--record-output <path>] [--record-overlay|--no-record-overlay] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]');
+    throw new Error('Usage: camo start [profileId] [--url <url>] [--no-headless|--visible] [--devtools] [--record] [--record-name <name>] [--record-output <path>] [--record-overlay|--no-record-overlay] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]');
   }
   if ((hasExplicitWidth && explicitWidth < START_WINDOW_MIN_WIDTH) || (hasExplicitHeight && explicitHeight < START_WINDOW_MIN_HEIGHT)) {
     throw new Error(`Window size too small. Minimum is ${START_WINDOW_MIN_WIDTH}x${START_WINDOW_MIN_HEIGHT}`);
@@ -528,7 +528,7 @@ export async function handleStartCommand(args) {
     if (arg === '--url') { i++; continue; }
     if (arg === '--width' || arg === '--height') { i++; continue; }
     if (arg === '--alias' || arg === '--idle-timeout' || arg === '--record-name' || arg === '--record-output') { i++; continue; }
-    if (arg === '--headless') continue;
+    if (arg === '--headless' || arg === '--no-headless' || arg === '--visible') continue;
     if (arg === '--record' || arg === '--record-overlay' || arg === '--no-record-overlay') continue;
     if (arg.startsWith('--')) continue;
 
@@ -615,9 +615,9 @@ export async function handleStartCommand(args) {
     releaseLock(profileId);
   }
 
-  const headless = args.includes('--headless');
+  const headless = !args.includes('--no-headless') && !args.includes('--visible');
   if (wantsDevtools && headless) {
-    throw new Error('--devtools is not supported with --headless');
+    throw new Error('--devtools requires --no-headless or --visible mode');
   }
   const idleTimeoutMs = headless ? parsedIdleTimeoutMs : 0;
   const targetUrl = explicitUrl || implicitUrl;
@@ -655,8 +655,8 @@ export async function handleStartCommand(args) {
       all: 'camo close all',
     };
     result.message = headless
-      ? `Started headless session. Idle timeout: ${formatDurationMs(idleTimeoutMs)}`
-      : 'Started session. Remember to stop it when finished.';
+      ? `Started session. Idle timeout: ${formatDurationMs(idleTimeoutMs)}`
+      : 'Started visible session. Remember to stop it when finished.';
 
     if (!headless) {
       let windowTarget = null;

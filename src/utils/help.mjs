@@ -26,7 +26,7 @@ CONFIG:
 
 BROWSER CONTROL:
   init                                      Ensure camoufox + ensure browser-service daemon
-  start [profileId] [--url <url>] [--headless] [--devtools] [--record] [--record-name <name>] [--record-output <path>] [--record-overlay|--no-record-overlay] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]
+  start [profileId] [--url <url>] [--no-headless|--visible] [--devtools] [--record] [--record-name <name>] [--record-output <path>] [--record-overlay|--no-record-overlay] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]
   stop [profileId]
   stop --id <instanceId>                    Stop by instance id
   stop --alias <alias>                      Stop by alias
@@ -108,8 +108,8 @@ EXAMPLES:
   camo profile create myprofile
   camo profile default myprofile
   camo start --url https://example.com --alias main
-  camo start worker-1 --headless --alias shard1 --idle-timeout 45m
-  camo start worker-1 --devtools
+  camo start worker-1 --alias shard1 --idle-timeout 45m
+  camo start worker-1 --visible --devtools
   camo start worker-1 --record --record-name xhs-debug --record-output ./logs/xhs-debug.jsonl --record-overlay
   camo start myprofile --width 1920 --height 1020
   camo highlight-mode on

@@ -224,7 +224,7 @@ export class UiController {
     }
     const args = ['create', '--profile', payload.profile];
     if (payload.url) args.push('--url', payload.url);
-    if (payload.headless !== undefined) args.push('--headless', String(payload.headless));
+    if (payload.headless === false) args.push('--no-headless');
     if (payload.keepOpen !== undefined) args.push('--keep-open', String(payload.keepOpen));
     return this.runCliCommand('session-manager', args);
   }
