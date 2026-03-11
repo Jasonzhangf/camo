@@ -26,30 +26,43 @@ function parseCssSelector(css) {
   const raw = typeof css === 'string' ? css.trim() : '';
   if (!raw) return [];
   const attrRegex = /\[\s*([^\s~|^$*=\]]+)\s*(\*=|\^=|\$=|=)?\s*(?:"([^"]*)"|'([^']*)'|([^\]\s]+))?\s*\]/g;
+  const parseSegment = (item) => {
+    const tagMatch = item.match(/^[a-zA-Z][\w-]*/);
+    const idMatch = item.match(/#([\w-]+)/);
+    const classMatches = item.match(/\.([\w-]+)/g) || [];
+    const attrs = [];
+    let attrMatch = attrRegex.exec(item);
+    while (attrMatch) {
+      attrs.push({
+        name: String(attrMatch[1] || '').toLowerCase(),
+        op: attrMatch[2] || 'exists',
+        value: attrMatch[3] ?? attrMatch[4] ?? attrMatch[5] ?? '',
+      });
+      attrMatch = attrRegex.exec(item);
+    }
+    attrRegex.lastIndex = 0;
+    return {
+      raw: item,
+      tag: tagMatch ? tagMatch[0].toLowerCase() : null,
+      id: idMatch ? idMatch[1] : null,
+      classes: classMatches.map((token) => token.slice(1)),
+      attrs,
+    };
+  };
   return raw
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean)
     .map((item) => {
-      const tagMatch = item.match(/^[a-zA-Z][\w-]*/);
-      const idMatch = item.match(/#([\w-]+)/);
-      const classMatches = item.match(/\.([\w-]+)/g) || [];
-      const attrs = [];
-      let attrMatch = attrRegex.exec(item);
-      while (attrMatch) {
-        attrs.push({
-          name: String(attrMatch[1] || '').toLowerCase(),
-          op: attrMatch[2] || 'exists',
-          value: attrMatch[3] ?? attrMatch[4] ?? attrMatch[5] ?? '',
-        });
-        attrMatch = attrRegex.exec(item);
-      }
-      attrRegex.lastIndex = 0;
+      const segments = item
+        .split(/\s+/)
+        .map((segment) => segment.trim())
+        .filter(Boolean)
+        .map((segment) => parseSegment(segment));
       return {
-        tag: tagMatch ? tagMatch[0].toLowerCase() : null,
-        id: idMatch ? idMatch[1] : null,
-        classes: classMatches.map((token) => token.slice(1)),
-        attrs,
+        raw: item,
+        segments,
+        ...parseSegment(item),
       };
     });
 }
@@ -80,6 +93,50 @@ function matchAttribute(node, attrSpec, nodeId, nodeClasses) {
   if (attrSpec.op === '^=') return value.startsWith(expected);
   if (attrSpec.op === '$=') return value.endsWith(expected);
   return false;
+}
+
+function nodeMatchesCssSegment(node, cssSegment) {
+  const nodeTag = typeof node?.tag === 'string' ? node.tag.toLowerCase() : null;
+  const nodeId = typeof node?.id === 'string' ? node.id : null;
+  const nodeClasses = new Set(Array.isArray(node?.classes) ? node.classes : []);
+
+  const hasConstraints = Boolean(
+    cssSegment?.tag
+      || cssSegment?.id
+      || (cssSegment?.classes && cssSegment.classes.length > 0)
+      || (cssSegment?.attrs && cssSegment.attrs.length > 0),
+  );
+  if (!hasConstraints) return false;
+
+  let matched = true;
+  if (cssSegment.tag && nodeTag !== cssSegment.tag) matched = false;
+  if (cssSegment.id && nodeId !== cssSegment.id) matched = false;
+  if (matched && cssSegment.classes.length > 0) {
+    matched = cssSegment.classes.every((className) => nodeClasses.has(className));
+  }
+  if (matched && cssSegment.attrs.length > 0) {
+    matched = cssSegment.attrs.every((attrSpec) => matchAttribute(node, attrSpec, nodeId, nodeClasses));
+  }
+  return matched;
+}
+
+function matchesAncestorChain(ancestors, segments) {
+  if (!Array.isArray(segments) || segments.length === 0) return true;
+  if (!Array.isArray(ancestors) || ancestors.length === 0) return false;
+  let ancestorIndex = ancestors.length - 1;
+  for (let segmentIndex = segments.length - 1; segmentIndex >= 0; segmentIndex -= 1) {
+    let found = false;
+    while (ancestorIndex >= 0) {
+      if (nodeMatchesCssSegment(ancestors[ancestorIndex], segments[segmentIndex])) {
+        found = true;
+        ancestorIndex -= 1;
+        break;
+      }
+      ancestorIndex -= 1;
+    }
+    if (!found) return false;
+  }
+  return true;
 }
 
 export class ChangeNotifier {
@@ -214,17 +271,22 @@ export class ChangeNotifier {
     const normalized = normalizeSelector(selector);
     const runtimeContext = context || {
       viewport: node?.__viewport || null,
+      ancestors: [],
     };
 
     // Check if current node matches
-    if (this.nodeMatchesSelector(node, normalized) && this.nodePassesVisibility(node, normalized, runtimeContext.viewport)) {
+    if (this.nodeMatchesSelector(node, normalized, runtimeContext.ancestors) && this.nodePassesVisibility(node, normalized, runtimeContext.viewport)) {
       results.push({ ...node, path });
     }
 
     // Recurse into children
     if (node.children) {
+      const childContext = {
+        ...runtimeContext,
+        ancestors: [...runtimeContext.ancestors, node],
+      };
       for (let i = 0; i < node.children.length; i++) {
-        const childResults = this.findElements(node.children[i], normalized, `${path}/${i}`, runtimeContext);
+        const childResults = this.findElements(node.children[i], normalized, `${path}/${i}`, childContext);
         results.push(...childResults);
       }
     }
@@ -233,7 +295,7 @@ export class ChangeNotifier {
   }
 
   // Check if node matches selector
-  nodeMatchesSelector(node, selector) {
+  nodeMatchesSelector(node, selector, ancestors = []) {
     if (!node) return false;
     const normalized = normalizeSelector(selector);
     if (!normalized || typeof normalized !== 'object') return false;
@@ -248,24 +310,13 @@ export class ChangeNotifier {
     const cssVariants = parseCssSelector(normalized.css);
     if (cssVariants.length > 0) {
       for (const cssVariant of cssVariants) {
-        const hasConstraints = Boolean(
-          cssVariant.tag
-            || cssVariant.id
-            || (cssVariant.classes && cssVariant.classes.length > 0)
-            || (cssVariant.attrs && cssVariant.attrs.length > 0),
-        );
-        if (!hasConstraints) continue;
-
-        let matched = true;
-        if (cssVariant.tag && nodeTag !== cssVariant.tag) matched = false;
-        if (cssVariant.id && nodeId !== cssVariant.id) matched = false;
-        if (matched && cssVariant.classes.length > 0) {
-          matched = cssVariant.classes.every((className) => nodeClasses.has(className));
-        }
-        if (matched && cssVariant.attrs.length > 0) {
-          matched = cssVariant.attrs.every((attrSpec) => matchAttribute(node, attrSpec, nodeId, nodeClasses));
-        }
-        if (matched) return true;
+        const segments = Array.isArray(cssVariant.segments) && cssVariant.segments.length > 0
+          ? cssVariant.segments
+          : [cssVariant];
+        const targetSegment = segments[segments.length - 1];
+        if (!nodeMatchesCssSegment(node, targetSegment)) continue;
+        if (segments.length === 1) return true;
+        if (matchesAncestorChain(ancestors, segments.slice(0, -1))) return true;
       }
     }
 

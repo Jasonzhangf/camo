@@ -179,47 +179,129 @@ async function seedNewestTabIfNeeded({
   if (Number(activeIndex) !== targetIndex) {
     await callApiWithTimeout('page:switch', { profileId, index: targetIndex }, apiTimeoutMs);
   }
-  if (shouldNavigateToSeed(newest.url, seedUrl)) {
-    await callApiWithTimeout('goto', { profileId, url: seedUrl }, navigationTimeoutMs);
-    if (openDelayMs > 0) await sleep(Math.min(openDelayMs, 1200));
+  try {
+    if (shouldNavigateToSeed(newest.url, seedUrl)) {
+      await callApiWithTimeout('goto', { profileId, url: seedUrl }, navigationTimeoutMs);
+      if (openDelayMs > 0) await sleep(Math.min(openDelayMs, 1200));
+    }
+    const syncResult = await syncTabViewportIfNeeded({ profileId, syncConfig });
+    if (!syncResult?.ok) {
+      throw new Error(syncResult?.message || 'sync_window_viewport failed');
+    }
+  } catch {
+    // Best-effort seeding; failing to navigate/sync shouldn't block tab pool init.
+  }
+}
+
+async function waitForTabCountIncrease({
+  profileId,
+  beforeCount,
+  apiTimeoutMs,
+  maxWaitMs,
+  pollMs = 250,
+}) {
+  const startedAt = Date.now();
+  const effectivePollMs = Math.max(80, Number(pollMs) || 250);
+  const waitMs = Math.max(400, Number(maxWaitMs) || 4000);
+  const listTimeoutMs = Math.max(1000, Math.min(resolveTimeoutMs(apiTimeoutMs, DEFAULT_API_TIMEOUT_MS), 8000));
+  let lastError = null;
+
+  while (Date.now() - startedAt <= waitMs) {
+    try {
+      const listed = await callApiWithTimeout('page:list', { profileId }, listTimeoutMs);
+      const { pages } = extractPageList(listed);
+      if (pages.length > beforeCount) {
+        return {
+          ok: true,
+          elapsedMs: Date.now() - startedAt,
+          afterCount: pages.length,
+        };
+      }
+    } catch (err) {
+      lastError = err;
+    }
+    await sleep(effectivePollMs);
+  }
+
+  return {
+    ok: false,
+    elapsedMs: Date.now() - startedAt,
+    error: lastError,
+  };
+}
+
+async function hydrateBlankNewestTab({
+  profileId,
+  beforeCount,
+  seedUrl,
+  openDelayMs,
+  apiTimeoutMs,
+  navigationTimeoutMs,
+  tabAppearTimeoutMs,
+  syncConfig,
+}) {
+  if (!seedUrl) {
+    return { ok: false, reason: 'missing_seed_url' };
+  }
+  const listed = await callApiWithTimeout('page:list', { profileId }, apiTimeoutMs);
+  const { pages } = extractPageList(listed);
+  const candidates = [...pages]
+    .filter((page) => Number.isFinite(Number(page?.index)))
+    .sort((a, b) => Number(b.index) - Number(a.index));
+  const newest = candidates[0] || null;
+  if (!newest) {
+    return { ok: false, reason: 'no_pages' };
+  }
+  const currentCount = pages.length;
+  if (currentCount <= beforeCount) {
+    return { ok: false, reason: 'count_not_increased' };
+  }
+  const currentUrl = String(newest.url || '').trim().toLowerCase();
+  const isBlank = !currentUrl || currentUrl === 'about:blank';
+  if (!isBlank) {
+    return { ok: true, reason: 'newest_already_navigated', afterCount: currentCount };
+  }
+  await callApiWithTimeout('page:switch', { profileId, index: Number(newest.index) }, apiTimeoutMs);
+  await callApiWithTimeout('goto', { profileId, url: seedUrl }, navigationTimeoutMs);
+  if (openDelayMs > 0) {
+    await sleep(Math.min(openDelayMs, 1200));
   }
   const syncResult = await syncTabViewportIfNeeded({ profileId, syncConfig });
   if (!syncResult?.ok) {
     throw new Error(syncResult?.message || 'sync_window_viewport failed');
   }
-}
-
-async function tryOpenTabWithShortcut(profileId, timeoutMs) {
-  const candidates = process.platform === 'darwin'
-    ? ['Meta+t', 'Control+t']
-    : ['Control+t', 'Meta+t'];
-  let lastError = null;
-  for (const key of candidates) {
-    try {
-      await callApiWithTimeout('keyboard:press', { profileId, key }, timeoutMs);
-      return { ok: true, key };
-    } catch (err) {
-      lastError = err;
-    }
-  }
-  return { ok: false, error: lastError };
+  const after = await waitForTabCountIncrease({
+    profileId,
+    beforeCount,
+    apiTimeoutMs,
+    maxWaitMs: Math.max(1500, Math.min(tabAppearTimeoutMs, 6000)),
+  });
+  return {
+    ok: true,
+    reason: 'blank_tab_hydrated',
+    afterCount: after?.afterCount || currentCount,
+  };
 }
 
 async function openTabBestEffort({
   profileId,
   seedUrl,
+  seedOnOpen = true,
+  shortcutOnly = false,
   openDelayMs,
   beforeCount,
   apiTimeoutMs,
   navigationTimeoutMs,
   shortcutTimeoutMs,
+  tabAppearTimeoutMs,
   syncConfig,
 }) {
-  const hasNewTab = async () => {
-    const listed = await callApiWithTimeout('page:list', { profileId }, apiTimeoutMs);
-    const { pages } = extractPageList(listed);
-    return pages.length > beforeCount;
-  };
+  const waitForTab = async () => waitForTabCountIncrease({
+    profileId,
+    beforeCount,
+    apiTimeoutMs,
+    maxWaitMs: tabAppearTimeoutMs,
+  });
   const settle = async () => {
     if (openDelayMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, openDelayMs));
@@ -227,57 +309,20 @@ async function openTabBestEffort({
   };
 
   let openError = null;
-  const shortcutResult = await tryOpenTabWithShortcut(profileId, shortcutTimeoutMs);
-  if (shortcutResult.ok) {
-    await settle();
-    if (await hasNewTab()) {
-      await seedNewestTabIfNeeded({
-        profileId,
-        seedUrl,
-        openDelayMs,
-        apiTimeoutMs,
-        navigationTimeoutMs,
-        syncConfig,
-      });
-      return { ok: true, mode: `shortcut:${shortcutResult.key}`, error: null };
-    }
-  } else {
-    openError = shortcutResult.error;
-  }
-
-  const payload = seedUrl
+  const openCommandTimeoutMs = Math.max(
+    60000,
+    resolveTimeoutMs(apiTimeoutMs, DEFAULT_API_TIMEOUT_MS),
+    resolveTimeoutMs(tabAppearTimeoutMs, 0) + Math.max(30000, Math.min(openDelayMs || 0, 20000)),
+  );
+  const payload = seedOnOpen && seedUrl
     ? { profileId, url: seedUrl }
     : { profileId };
   try {
-    await callApiWithTimeout('newPage', payload, apiTimeoutMs);
+    await callApiWithTimeout('newPage', payload, openCommandTimeoutMs);
     await settle();
-    if (await hasNewTab()) {
-      await seedNewestTabIfNeeded({
-        profileId,
-        seedUrl,
-        openDelayMs,
-        apiTimeoutMs,
-        navigationTimeoutMs,
-        syncConfig,
-      });
-      return { ok: true, mode: 'newPage', error: null };
-    }
-  } catch (err) {
-    openError = err;
-  }
-
-  try {
-    const popupResult = await callApiWithTimeout('evaluate', {
-      profileId,
-      script: `(() => {
-        const popup = window.open(${JSON.stringify(seedUrl || 'about:blank')}, '_blank');
-        return { opened: !!popup };
-      })()`,
-    }, apiTimeoutMs);
-    const popupData = popupResult?.result || popupResult || {};
-    if (Boolean(popupData?.opened || popupData?.ok)) {
-      await settle();
-      if (await hasNewTab()) {
+    const newPageOpened = await waitForTab();
+    if (newPageOpened.ok) {
+      if (seedOnOpen && seedUrl) {
         await seedNewestTabIfNeeded({
           profileId,
           seedUrl,
@@ -286,8 +331,24 @@ async function openTabBestEffort({
           navigationTimeoutMs,
           syncConfig,
         });
-        return { ok: true, mode: 'window.open', error: null };
       }
+      return { ok: true, mode: 'newPage', error: null };
+    }
+    const hydrated = await hydrateBlankNewestTab({
+      profileId,
+      beforeCount,
+      seedUrl,
+      openDelayMs,
+      apiTimeoutMs,
+      navigationTimeoutMs,
+      tabAppearTimeoutMs,
+      syncConfig,
+    }).catch((error) => ({ ok: false, error }));
+    if (hydrated?.ok) {
+      return { ok: true, mode: 'newPage_hydrated_blank', error: null };
+    }
+    if (hydrated?.error) {
+      openError = hydrated.error;
     }
   } catch (err) {
     openError = err;
@@ -301,11 +362,22 @@ export async function executeTabPoolOperation({ profileId, action, params = {}, 
 
   if (action === 'ensure_tab_pool') {
     const tabCount = Math.max(1, Number(params.tabCount ?? params.count ?? 1) || 1);
-    const openDelayMs = Math.max(0, Number(params.openDelayMs ?? 350) || 350);
+    const minOpenDelayMs = Math.max(0, Number(params.minDelayMs ?? params.minOpenDelayMs ?? 0) || 0);
+    const openDelayMs = Math.max(
+      minOpenDelayMs,
+      Math.max(0, Number(params.openDelayMs ?? 350) || 350),
+    );
     const normalizeTabs = params.normalizeTabs === true;
+    const seedOnOpen = params.seedOnOpen !== false;
+    const shortcutOnly = params.shortcutOnly === true;
+    const reuseOnly = params.reuseOnly === true;
     const apiTimeoutMs = resolveTimeoutMs(params.apiTimeoutMs, DEFAULT_API_TIMEOUT_MS);
     const navigationTimeoutMs = resolveTimeoutMs(params.navigationTimeoutMs ?? params.gotoTimeoutMs, DEFAULT_NAV_TIMEOUT_MS);
     const shortcutTimeoutMs = resolveTimeoutMs(params.shortcutTimeoutMs, SHORTCUT_OPEN_TIMEOUT_MS);
+    const tabAppearTimeoutMs = resolveTimeoutMs(
+      params.tabAppearTimeoutMs,
+      Math.max(20000, openDelayMs + 15000),
+    );
     const syncConfig = resolveViewportSyncConfig({ params });
     const configuredSeedUrl = normalizeSeedUrl(String(params.url || '').trim());
 
@@ -323,31 +395,55 @@ export async function executeTabPoolOperation({ profileId, action, params = {}, 
       if (recoveredListUrl) fallbackSeedUrl = recoveredListUrl;
     }
     fallbackSeedUrl = normalizeSeedUrl(fallbackSeedUrl);
+    let openFailures = 0;
+    const maxOpenFailures = Math.max(3, tabCount);
 
     while (pages.length < tabCount) {
+      if (reuseOnly) {
+        break;
+      }
       const beforeCount = pages.length;
       const openResult = await openTabBestEffort({
         profileId,
         seedUrl: fallbackSeedUrl,
+        seedOnOpen,
+        shortcutOnly,
         openDelayMs,
         beforeCount,
         apiTimeoutMs,
         navigationTimeoutMs,
         shortcutTimeoutMs,
+        tabAppearTimeoutMs,
         syncConfig,
       });
       listed = await callApiWithTimeout('page:list', { profileId }, apiTimeoutMs);
       ({ pages, activeIndex } = extractPageList(listed));
       if (!openResult.ok || pages.length <= beforeCount) {
-        return asErrorPayload('OPERATION_FAILED', 'new_tab_failed', {
-          tabCount,
-          beforeCount,
-          afterCount: pages.length,
-          seedUrl: fallbackSeedUrl || null,
-          mode: openResult.mode || null,
-          reason: openResult.error?.message || 'cannot open new tab',
-        });
+        openFailures += 1;
+        if (openFailures >= maxOpenFailures) {
+          return asErrorPayload('OPERATION_FAILED', 'new_tab_failed', {
+            tabCount,
+            beforeCount,
+            afterCount: pages.length,
+            seedUrl: fallbackSeedUrl || null,
+            mode: openResult.mode || null,
+            reason: openResult.error?.message || 'cannot open new tab',
+            attempts: openFailures,
+          });
+        }
+        if (openDelayMs > 0) {
+          await sleep(Math.min(openDelayMs, 1200));
+        } else {
+          await sleep(300);
+        }
+        continue;
       }
+    }
+
+    if (reuseOnly && pages.length === 0) {
+      return asErrorPayload('TAB_POOL_EMPTY', 'reuse_only_tab_pool_requires_existing_tabs', {
+        tabCount,
+      });
     }
 
     const sortedPages = [...pages].sort((a, b) => Number(a.index) - Number(b.index));
@@ -357,24 +453,55 @@ export async function executeTabPoolOperation({ profileId, action, params = {}, 
       ...sortedPages.filter((item) => Number(item.index) !== Number(activeIndex)),
     ].slice(0, tabCount);
 
-    const forceNormalizeFromDetail = Boolean(!configuredSeedUrl && isXhsDetailUrl(defaultSeedUrl));
-    const shouldNormalizeSlots = Boolean(fallbackSeedUrl) && (normalizeTabs || forceNormalizeFromDetail);
+    const forceNormalizeFromDetail = Boolean(seedOnOpen && !configuredSeedUrl && isXhsDetailUrl(defaultSeedUrl));
+    const shouldNormalizeSlots = seedOnOpen && Boolean(fallbackSeedUrl) && (normalizeTabs || forceNormalizeFromDetail);
 
     if (shouldNormalizeSlots) {
       for (const page of selected) {
         const pageIndex = Number(page.index);
         if (!Number.isFinite(pageIndex)) continue;
-        await callApiWithTimeout('page:switch', { profileId, index: pageIndex }, apiTimeoutMs);
-        if (shouldNavigateToSeed(page.url, fallbackSeedUrl)) {
-          await callApiWithTimeout('goto', { profileId, url: fallbackSeedUrl }, navigationTimeoutMs);
-          if (openDelayMs > 0) await sleep(Math.min(openDelayMs, 1200));
-        }
-        const syncResult = await syncTabViewportIfNeeded({ profileId, syncConfig });
-        if (!syncResult?.ok) {
-          return asErrorPayload('OPERATION_FAILED', 'tab viewport sync failed', {
-            pageIndex,
-            syncResult,
-          });
+        try {
+          await callApiWithTimeout('page:switch', { profileId, index: pageIndex }, apiTimeoutMs);
+          if (shouldNavigateToSeed(page.url, fallbackSeedUrl)) {
+            await callApiWithTimeout('goto', { profileId, url: fallbackSeedUrl }, navigationTimeoutMs);
+            if (openDelayMs > 0) await sleep(Math.min(openDelayMs, 1200));
+          }
+          const syncResult = await syncTabViewportIfNeeded({ profileId, syncConfig });
+          if (!syncResult?.ok) {
+            throw new Error(syncResult?.message || 'tab viewport sync failed');
+          }
+        } catch (err) {
+          const activePage = selected.find((item) => Number(item.index) === Number(activeIndex)) || selected[0] || null;
+          const slots = activePage
+            ? [{
+              slotIndex: 1,
+              tabRealIndex: Number(activePage.index),
+              url: String(activePage.url || ''),
+            }]
+            : [];
+          if (runtimeState) {
+            runtimeState.tabPool = {
+              slots,
+              cursor: 0,
+              count: slots.length,
+              syncConfig,
+              apiTimeoutMs,
+              initializedAt: new Date().toISOString(),
+            };
+          }
+          return {
+            ok: true,
+            code: 'OPERATION_DEGRADED',
+            message: 'ensure_tab_pool degraded to active tab',
+            data: {
+              tabCount: slots.length,
+              normalized: false,
+              degraded: true,
+              reason: err?.message || 'page switch failed',
+              slots,
+              pages: activePage ? [activePage] : [],
+            },
+          };
         }
       }
       listed = await callApiWithTimeout('page:list', { profileId }, apiTimeoutMs);
@@ -391,13 +518,39 @@ export async function executeTabPoolOperation({ profileId, action, params = {}, 
     }));
 
     if (slots.length > 0) {
-      await callApiWithTimeout('page:switch', {
-        profileId,
-        index: Number(slots[0].tabRealIndex),
-      }, apiTimeoutMs);
-      const syncResult = await syncTabViewportIfNeeded({ profileId, syncConfig });
-      if (!syncResult?.ok) {
-        return asErrorPayload('OPERATION_FAILED', 'tab viewport sync failed', { slotIndex: 1, syncResult });
+      try {
+        await callApiWithTimeout('page:switch', {
+          profileId,
+          index: Number(slots[0].tabRealIndex),
+        }, apiTimeoutMs);
+        const syncResult = await syncTabViewportIfNeeded({ profileId, syncConfig });
+        if (!syncResult?.ok) {
+          throw new Error(syncResult?.message || 'tab viewport sync failed');
+        }
+      } catch (err) {
+        if (runtimeState) {
+          runtimeState.tabPool = {
+            slots,
+            cursor: 0,
+            count: slots.length,
+            syncConfig,
+            apiTimeoutMs,
+            initializedAt: new Date().toISOString(),
+          };
+        }
+        return {
+          ok: true,
+          code: 'OPERATION_DEGRADED',
+          message: 'ensure_tab_pool degraded on final switch',
+          data: {
+            tabCount: slots.length,
+            normalized: false,
+            degraded: true,
+            reason: err?.message || 'page switch failed',
+            slots,
+            pages: slots,
+          },
+        };
       }
     }
 
@@ -410,6 +563,13 @@ export async function executeTabPoolOperation({ profileId, action, params = {}, 
         apiTimeoutMs,
         initializedAt: new Date().toISOString(),
       };
+      runtimeState.currentTab = slots[0]
+        ? {
+            slotIndex: Number(slots[0].slotIndex),
+            tabRealIndex: Number(slots[0].tabRealIndex),
+            url: String(slots[0].url || ''),
+          }
+        : null;
     }
 
     return {
@@ -470,9 +630,10 @@ export async function executeTabPoolOperation({ profileId, action, params = {}, 
       });
     }
     runtimeState.currentTab = {
-      slotIndex: selected.slotIndex,
+      slotIndex: Number(selected.slotIndex),
       tabRealIndex: targetIndex,
       activeIndex,
+      url: String(selected.url || ''),
     };
 
     return {
@@ -528,9 +689,10 @@ export async function executeTabPoolOperation({ profileId, action, params = {}, 
       });
     }
     runtimeState.currentTab = {
-      slotIndex: slot.slotIndex,
+      slotIndex: Number(slot.slotIndex),
       tabRealIndex: targetIndex,
       activeIndex,
+      url: String(slot.url || ''),
     };
     return {
       ok: true,

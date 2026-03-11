@@ -55,6 +55,7 @@ describe('runtime-core subscription watch', () => {
             tag: 'div',
             selector: '#target',
             id: 'target',
+            path: 'root/0',
             visible: true,
             rect: { left: 40, top: 40, width: 120, height: 40 },
           },
@@ -67,6 +68,7 @@ describe('runtime-core subscription watch', () => {
             tag: 'div',
             selector: '#target',
             id: 'target',
+            path: 'root/0',
             visible: true,
             rect: { left: 40, top: 40, width: 120, height: 40 },
           },
@@ -148,5 +150,95 @@ describe('runtime-core subscription watch', () => {
     const appear = legacyEvents.find((item) => item.type === 'appear');
     assert.ok(appear);
     assert.strictEqual(appear.filterMode, 'legacy');
+  });
+
+  it('emits stable element-cycle metadata for repeated exist/change events', async () => {
+    let snapshotIndex = 0;
+    global.fetch = async (url, options = {}) => {
+      if (!String(url).includes('/command')) {
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      }
+      const body = JSON.parse(options.body || '{}');
+      const action = body.action;
+      const args = body.args || {};
+      if (action === 'getStatus') {
+        return { ok: true, status: 200, json: async () => ({ sessions: [{ profileId: 'p1', sessionId: 's1' }] }) };
+      }
+      if (action === 'evaluate') {
+        if (String(args.script || '').includes('dom_tree')) {
+          const snaps = [
+            { __url: currentUrl, tag: 'body', children: [{ tag: 'div', id: 'target', path: 'root/0', visible: true }] },
+            { __url: currentUrl, tag: 'body', children: [{ tag: 'div', id: 'target', path: 'root/0', visible: true }, { tag: 'div', id: 'target-2', path: 'root/1', visible: true }] },
+            { __url: currentUrl, tag: 'body', children: [] },
+          ];
+          const snap = snaps[Math.min(snapshotIndex, snaps.length - 1)];
+          snapshotIndex += 1;
+          return { ok: true, status: 200, json: async () => ({ result: { dom_tree: snap, viewport: { width: 1280, height: 720 } } }) };
+        }
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    const events = [];
+    const handle = await watchSubscriptions({
+      profileId: 'p1',
+      throttle: 80,
+      subscriptions: [{ id: 'target', selector: '#target, #target-2', events: ['appear', 'exist', 'change', 'disappear'] }],
+      onEvent: async (event) => events.push(event),
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 280));
+    handle.stop();
+    global.fetch = originalFetch;
+
+    const appear = events.find((item) => item.type === 'appear');
+    const changed = events.find(
+      (item) => item.type === 'change'
+        && Array.isArray(item.appearedElementKeys)
+        && item.appearedElementKeys.includes('root/1'),
+    );
+    const disappear = events.find((item) => item.type === 'disappear');
+
+    assert.ok(appear);
+    assert.deepStrictEqual(appear.elementKeys, ['root/0']);
+    assert.strictEqual(appear.presenceVersion, 1);
+
+    assert.ok(changed);
+    assert.deepStrictEqual(changed.appearedElementKeys, ['root/1']);
+
+    assert.ok(disappear);
+    assert.deepStrictEqual(disappear.departedElementKeys, ['root/0', 'root/1']);
+  });
+
+  it('suppresses transient navigation/context errors', async () => {
+    let onErrorCount = 0;
+    snapshots = [];
+    snapshotIndex = 0;
+
+    global.fetch = async (url, options = {}) => {
+      if (!String(url).includes('/command')) {
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      }
+      const body = JSON.parse(options.body || '{}');
+      const action = body.action;
+      if (action === 'getStatus') {
+        return { ok: true, status: 200, json: async () => ({ sessions: [{ profileId: 'p1', sessionId: 's1' }] }) };
+      }
+      if (action === 'evaluate') {
+        throw new Error('page.evaluate: Execution context was destroyed, most likely because of a navigation');
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+
+    const handle = await watchSubscriptions({
+      profileId: 'p1',
+      throttle: 100,
+      subscriptions: [{ id: 'target', selector: '#target', events: ['appear'] }],
+      onError: () => { onErrorCount += 1; },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 160));
+    handle.stop();
+    assert.strictEqual(onErrorCount, 0);
   });
 });

@@ -164,5 +164,40 @@ describe('ChangeNotifier', () => {
       assert.strictEqual(appearCount, 0);
       assert.strictEqual(disappearCount, 1);
     });
+
+    it('matches descendant selectors against ancestor chain', () => {
+      const tree = {
+        selector: '.root',
+        children: [
+          {
+            classes: ['note-detail-mask'],
+            children: [
+              { classes: ['show-more'] },
+              { classes: ['reply-expand'] },
+            ],
+          },
+          {
+            classes: ['show-more'],
+          },
+        ],
+      };
+
+      const results = notifier.findElements(tree, { css: '.note-detail-mask .show-more' });
+      assert.strictEqual(results.length, 1);
+      assert.deepStrictEqual(results[0].classes, ['show-more']);
+    });
+
+    it('requires descendant selectors to match ancestors instead of the same node', () => {
+      const node = { classes: ['show-more'] };
+      const ancestors = [{ classes: ['note-detail-mask'] }];
+      assert.strictEqual(
+        notifier.nodeMatchesSelector(node, { css: '.note-detail-mask .show-more' }, ancestors),
+        true,
+      );
+      assert.strictEqual(
+        notifier.nodeMatchesSelector(node, { css: '.note-detail-mask .show-more' }, []),
+        false,
+      );
+    });
   });
 });

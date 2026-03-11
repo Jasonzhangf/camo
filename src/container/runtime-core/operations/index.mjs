@@ -94,6 +94,17 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function pageScroll(profileId, deltaY, delayMs = 80) {
+  const raw = Number(deltaY) || 0;
+  if (!Number.isFinite(raw) || raw === 0) return;
+  const key = raw >= 0 ? 'PageDown' : 'PageUp';
+  const steps = Math.max(1, Math.min(8, Math.round(Math.abs(raw) / 420) || 1));
+  for (let step = 0; step < steps; step += 1) {
+    await callAPI('keyboard:press', { profileId, key });
+    if (delayMs > 0) await sleep(delayMs);
+  }
+}
+
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
@@ -281,7 +292,8 @@ async function scrollTargetIntoViewport(profileId, selector, initialTarget, para
     if (isTargetFullyInViewport(target, visibilityMargin)) break;
     const delta = resolveViewportScrollDelta(target, visibilityMargin);
     if (Math.abs(delta.deltaX) < 1 && Math.abs(delta.deltaY) < 1) break;
-    await callAPI('mouse:wheel', { profileId, deltaX: delta.deltaX, deltaY: delta.deltaY });
+    const deltaY = delta.deltaY !== 0 ? delta.deltaY : (delta.deltaX !== 0 ? delta.deltaX : 0);
+    await pageScroll(profileId, deltaY);
     if (settleMs > 0) await sleep(settleMs);
     target = await resolveSelectorTarget(profileId, selector, options);
   }
@@ -468,6 +480,56 @@ async function executeVerifySubscriptions({ profileId, params }) {
 
   const acrossPages = params.acrossPages === true;
   const settleMs = Math.max(0, Number(params.settleMs ?? 280) || 280);
+  const pageUrlIncludes = normalizeArray(params.pageUrlIncludes)
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+  const pageUrlExcludes = normalizeArray(params.pageUrlExcludes)
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+  const pageUrlRegex = String(params.pageUrlRegex || '').trim();
+  const pageUrlNotRegex = String(params.pageUrlNotRegex || '').trim();
+  const requireMatchedPages = params.requireMatchedPages !== false;
+
+  let includeRegex = null;
+  if (pageUrlRegex) {
+    try {
+      includeRegex = new RegExp(pageUrlRegex);
+    } catch {
+      return asErrorPayload('OPERATION_FAILED', `invalid pageUrlRegex: ${pageUrlRegex}`);
+    }
+  }
+  let excludeRegex = null;
+  if (pageUrlNotRegex) {
+    try {
+      excludeRegex = new RegExp(pageUrlNotRegex);
+    } catch {
+      return asErrorPayload('OPERATION_FAILED', `invalid pageUrlNotRegex: ${pageUrlNotRegex}`);
+    }
+  }
+
+  const hasPageFilter = (
+    pageUrlIncludes.length > 0
+    || pageUrlExcludes.length > 0
+    || Boolean(includeRegex)
+    || Boolean(excludeRegex)
+  );
+
+  const shouldVerifyPage = (rawUrl) => {
+    const url = String(rawUrl || '').trim();
+    if (pageUrlIncludes.length > 0 && !pageUrlIncludes.some((part) => url.includes(part))) {
+      return false;
+    }
+    if (pageUrlExcludes.length > 0 && pageUrlExcludes.some((part) => url.includes(part))) {
+      return false;
+    }
+    if (includeRegex && !includeRegex.test(url)) {
+      return false;
+    }
+    if (excludeRegex && excludeRegex.test(url)) {
+      return false;
+    }
+    return true;
+  };
 
   const collectForCurrentPage = async () => {
     const snapshot = await getDomSnapshotByProfile(profileId);
@@ -487,6 +549,8 @@ async function executeVerifySubscriptions({ profileId, params }) {
 
   let pagesResult = [];
   let overallOk = true;
+  let matchedPageCount = 0;
+  let activePageIndex = null;
   if (!acrossPages) {
     const current = await collectForCurrentPage();
     overallOk = current.matches.every((item) => item.count >= item.minCount);
@@ -494,8 +558,19 @@ async function executeVerifySubscriptions({ profileId, params }) {
   } else {
     const listed = await callAPI('page:list', { profileId });
     const { pages, activeIndex } = extractPageList(listed);
+    activePageIndex = Number.isFinite(activeIndex) ? activeIndex : null;
     for (const page of pages) {
       const pageIndex = Number(page.index);
+      const listedUrl = String(page.url || '');
+      if (!shouldVerifyPage(listedUrl)) {
+        pagesResult.push({
+          index: pageIndex,
+          url: listedUrl,
+          skipped: true,
+          ok: true,
+        });
+        continue;
+      }
       if (Number.isFinite(activeIndex) && activeIndex !== pageIndex) {
         await callAPI('page:switch', { profileId, index: pageIndex });
         if (settleMs > 0) await new Promise((resolve) => setTimeout(resolve, settleMs));
@@ -504,15 +579,43 @@ async function executeVerifySubscriptions({ profileId, params }) {
       const pageOk = current.matches.every((item) => item.count >= item.minCount);
       overallOk = overallOk && pageOk;
       pagesResult.push({ index: pageIndex, ...current, ok: pageOk });
+      matchedPageCount += 1;
     }
     if (Number.isFinite(activeIndex)) {
       await callAPI('page:switch', { profileId, index: activeIndex });
     }
   }
 
+  if (acrossPages && hasPageFilter && requireMatchedPages && matchedPageCount === 0) {
+    const fallback = await collectForCurrentPage();
+    const fallbackOk = fallback.matches.every((item) => item.count >= item.minCount);
+    if (fallbackOk) {
+      matchedPageCount = 1;
+      overallOk = true;
+      pagesResult.push({
+        index: Number.isFinite(activePageIndex) ? activePageIndex : null,
+        urlMatched: false,
+        fallback: 'dom_match',
+        ok: true,
+        ...fallback,
+      });
+    } else {
+      return asErrorPayload('SUBSCRIPTION_MISMATCH', 'no page matched verify_subscriptions pageUrl filter', {
+        acrossPages,
+        pageUrlIncludes,
+        pageUrlExcludes,
+        pageUrlRegex: pageUrlRegex || null,
+        pageUrlNotRegex: pageUrlNotRegex || null,
+        pages: pagesResult,
+        fallback,
+      });
+    }
+  }
+
   if (!overallOk) {
     return asErrorPayload('SUBSCRIPTION_MISMATCH', 'subscription selectors missing on one or more pages', {
       acrossPages,
+      matchedPageCount,
       pages: pagesResult,
     });
   }
@@ -521,7 +624,7 @@ async function executeVerifySubscriptions({ profileId, params }) {
     ok: true,
     code: 'OPERATION_DONE',
     message: 'verify_subscriptions done',
-    data: { acrossPages, pages: pagesResult },
+    data: { acrossPages, matchedPageCount, pages: pagesResult },
   };
 }
 
@@ -617,48 +720,12 @@ export async function executeOperation({ profileId, operation, context = {} }) {
         deltaX = amount;
         deltaY = 0;
       }
-      const anchorSelector = maybeSelector({
-        profileId: resolvedProfile,
-        containerId: params.containerId || operation?.containerId || null,
-        selector: params.selector || operation?.selector || null,
-      });
-      const anchor = await resolveScrollAnchor(resolvedProfile, {
-        selector: anchorSelector,
-        filterMode,
-      });
-      if (!anchor?.ok || !anchor?.center) {
-        return asErrorPayload('OPERATION_FAILED', 'visible scroll container not found');
-      }
-      await callAPI('mouse:click', {
-        profileId: resolvedProfile,
-        x: anchor.center.x,
-        y: anchor.center.y,
-        button: 'left',
-        clicks: 1,
-        delay: 30,
-      });
-      const result = await callAPI('mouse:wheel', {
-        profileId: resolvedProfile,
-        deltaX,
-        deltaY,
-        anchorX: anchor.center.x,
-        anchorY: anchor.center.y,
-      });
+      const result = await pageScroll(resolvedProfile, deltaY);
       return {
         ok: true,
         code: 'OPERATION_DONE',
         message: 'scroll done',
-        data: {
-          direction,
-          amount,
-          deltaX,
-          deltaY,
-          filterMode,
-          anchorSource: String(anchor?.source || 'document'),
-          anchorCenter: anchor?.center || null,
-          modalLocked: anchor?.modalLocked === true,
-          result,
-        },
+        data: { direction, amount, deltaX, deltaY, result },
       };
     }
 
@@ -679,13 +746,7 @@ export async function executeOperation({ profileId, operation, context = {} }) {
     }
 
     if (action === 'evaluate') {
-      if (!isJsExecutionEnabled()) {
-        return asErrorPayload('JS_DISABLED', 'evaluate is disabled by default. Re-run camo command with --js.');
-      }
-      const script = String(params.script || '').trim();
-      if (!script) return asErrorPayload('OPERATION_FAILED', 'evaluate requires params.script');
-      const result = await callAPI('evaluate', { profileId: resolvedProfile, script });
-      return { ok: true, code: 'OPERATION_DONE', message: 'evaluate done', data: result };
+      return asErrorPayload('JS_DISABLED', 'evaluate is disabled in camo runtime');
     }
 
     if (action === 'click' || action === 'type' || action === 'scroll_into_view') {
@@ -694,7 +755,6 @@ export async function executeOperation({ profileId, operation, context = {} }) {
         action,
         operation,
         params,
-        filterMode,
       });
     }
 

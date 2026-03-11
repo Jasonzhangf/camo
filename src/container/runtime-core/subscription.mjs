@@ -2,6 +2,30 @@ import { getDomSnapshotByProfile } from '../../utils/browser-service.mjs';
 import { ChangeNotifier } from '../change-notifier.mjs';
 import { ensureActiveSession, getCurrentUrl, normalizeArray } from './utils.mjs';
 
+function normalizeElementKeys(elements) {
+  return (Array.isArray(elements) ? elements : [])
+    .map((node) => String(node?.path || '').trim())
+    .filter(Boolean)
+    .sort();
+}
+
+function joinElementKeys(keys) {
+  return Array.isArray(keys) && keys.length > 0 ? keys.join('|') : 'none';
+}
+
+function buildEventKey(subscriptionId, type, presenceVersion, keys) {
+  return `${subscriptionId}:${type}:p${Math.max(0, Number(presenceVersion) || 0)}:k${joinElementKeys(keys)}`;
+}
+
+export function isTransientSubscriptionError(error) {
+  const message = String(error?.message || error || '').trim().toLowerCase();
+  if (!message) return false;
+  return message.includes('execution context was destroyed')
+    || message.includes('most likely because of a navigation')
+    || message.includes('cannot find context with specified id')
+    || message.includes('target closed');
+}
+
 function resolveFilterMode(input) {
   const text = String(input || process.env.CAMO_FILTER_MODE || 'strict').trim().toLowerCase();
   if (!text) return 'strict';
@@ -11,9 +35,9 @@ function resolveFilterMode(input) {
 
 function urlMatchesFilter(url, item) {
   const href = String(url || '').trim();
-  const includes = normalizeArray(item?.pageUrlIncludes).map((token) => String(token || '').trim()).filter(Boolean);
-  const excludes = normalizeArray(item?.pageUrlExcludes).map((token) => String(token || '').trim()).filter(Boolean);
-  if (includes.length > 0 && !includes.every((token) => href.includes(token))) return false;
+  const includes = normalizeArray(item?.pageUrlIncludes || item?.urlIncludes).map((token) => String(token || '').trim()).filter(Boolean);
+  const excludes = normalizeArray(item?.pageUrlExcludes || item?.urlExcludes).map((token) => String(token || '').trim()).filter(Boolean);
+  if (includes.length > 0 && !includes.some((token) => href.includes(token))) return false;
   if (excludes.length > 0 && excludes.some((token) => href.includes(token))) return false;
   return true;
 }
@@ -51,7 +75,13 @@ export async function watchSubscriptions({
     })
     .filter(Boolean);
 
-  const state = new Map(items.map((item) => [item.id, { exists: false, stateSig: '', appearCount: 0 }]));
+  const state = new Map(items.map((item) => [item.id, {
+    exists: false,
+    stateSig: '',
+    appearCount: 0,
+    presenceVersion: 0,
+    elementKeys: [],
+  }]));
   const intervalMs = Math.max(100, Number(throttle) || 500);
   let stopped = false;
 
@@ -67,21 +97,36 @@ export async function watchSubscriptions({
     if (stopped) return;
     try {
       const snapshot = await getDomSnapshotByProfile(resolvedProfile);
-      const currentUrl = await getCurrentUrl(resolvedProfile).catch(() => '');
+      const currentUrl = String(snapshot?.__url || '') || await getCurrentUrl(resolvedProfile).catch(() => '');
       const ts = new Date().toISOString();
       for (const item of items) {
-        const prev = state.get(item.id) || { exists: false, stateSig: '', appearCount: 0 };
+        const prev = state.get(item.id) || {
+          exists: false,
+          stateSig: '',
+          appearCount: 0,
+          presenceVersion: 0,
+          elementKeys: [],
+        };
         const urlMatched = urlMatchesFilter(currentUrl, item);
         const elements = urlMatched
           ? notifier.findElements(snapshot, { css: item.selector, visible: item.visible })
           : [];
         const exists = elements.length > 0;
-        const stateSig = elements.map((node) => node.path).sort().join(',');
+        const elementKeys = normalizeElementKeys(elements);
+        const prevElementKeys = Array.isArray(prev.elementKeys) ? prev.elementKeys : [];
+        const prevElementKeySet = new Set(prevElementKeys);
+        const elementKeySet = new Set(elementKeys);
+        const appearedKeys = elementKeys.filter((key) => !prevElementKeySet.has(key));
+        const disappearedKeys = prevElementKeys.filter((key) => !elementKeySet.has(key));
+        const stateSig = elementKeys.join(',');
         const changed = stateSig !== prev.stateSig;
+        const presenceVersion = prev.presenceVersion + (exists && !prev.exists ? 1 : 0);
         const next = {
           exists,
           stateSig,
           appearCount: prev.appearCount + (exists && !prev.exists ? 1 : 0),
+          presenceVersion,
+          elementKeys,
         };
         state.set(item.id, next);
 
@@ -96,6 +141,10 @@ export async function watchSubscriptions({
             elements,
             pageUrl: currentUrl,
             filterMode: effectiveFilterMode,
+            elementKeys,
+            presenceVersion,
+            stateKey: stateSig,
+            eventKey: buildEventKey(item.id, 'appear', presenceVersion, appearedKeys.length > 0 ? appearedKeys : elementKeys),
             timestamp: ts,
           });
         }
@@ -109,6 +158,11 @@ export async function watchSubscriptions({
             elements: [],
             pageUrl: currentUrl,
             filterMode: effectiveFilterMode,
+            elementKeys: [],
+            departedElementKeys: disappearedKeys,
+            presenceVersion: prev.presenceVersion,
+            stateKey: '',
+            eventKey: buildEventKey(item.id, 'disappear', prev.presenceVersion, disappearedKeys),
             timestamp: ts,
           });
         }
@@ -122,6 +176,10 @@ export async function watchSubscriptions({
             elements,
             pageUrl: currentUrl,
             filterMode: effectiveFilterMode,
+            elementKeys,
+            presenceVersion,
+            stateKey: stateSig,
+            eventKey: buildEventKey(item.id, 'exist', presenceVersion, elementKeys),
             timestamp: ts,
           });
         }
@@ -135,12 +193,19 @@ export async function watchSubscriptions({
             elements,
             pageUrl: currentUrl,
             filterMode: effectiveFilterMode,
+            elementKeys,
+            appearedElementKeys: appearedKeys,
+            departedElementKeys: disappearedKeys,
+            presenceVersion,
+            stateKey: stateSig,
+            eventKey: buildEventKey(item.id, 'change', presenceVersion, elementKeys),
             timestamp: ts,
           });
         }
       }
       await emit({ type: 'tick', profileId: resolvedProfile, timestamp: ts });
     } catch (err) {
+      if (isTransientSubscriptionError(err)) return;
       onError(err);
     }
   };

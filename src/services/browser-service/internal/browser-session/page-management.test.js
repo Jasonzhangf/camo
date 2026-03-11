@@ -103,3 +103,46 @@ test('newPage falls back to shortcut path in strictShortcut mode', async () => {
     assert.equal(result.index, 1);
     assert.equal(getActivePage(), created);
 });
+
+test('listPages keeps track of newly created pages even when context.pages stays stale', async () => {
+    const opener = createPage('opener');
+    const created = createPage('created');
+    const pages = [opener];
+    const { management, getActivePage } = createManagement({
+        pages,
+        activePage: opener,
+        ctxNewPage: async () => created,
+        waitForEvent: async () => null,
+    });
+    const result = await management.newPage();
+    assert.equal(result.index, 1);
+    assert.equal(result.url, 'https://example.com/created');
+    assert.equal(getActivePage(), created);
+    const listed = management.listPages();
+    assert.deepEqual(listed, [
+        { index: 0, url: 'https://example.com/opener', active: false },
+        { index: 1, url: 'https://example.com/created', active: true },
+    ]);
+});
+
+test('listPages keeps a just-created page visible briefly even if page reports closed immediately', async () => {
+    const opener = createPage('opener');
+    const created = createPage('created');
+    const pages = [opener];
+    const { management } = createManagement({
+        pages,
+        activePage: opener,
+        ctxNewPage: async () => {
+            created.closed = true;
+            return created;
+        },
+        waitForEvent: async () => null,
+    });
+    const result = await management.newPage();
+    assert.equal(result.index, 1);
+    const listed = management.listPages();
+    assert.deepEqual(listed, [
+        { index: 0, url: 'https://example.com/opener', active: false },
+        { index: 1, url: 'https://example.com/created', active: true },
+    ]);
+});

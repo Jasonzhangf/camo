@@ -41,6 +41,7 @@ export async function executeViewportOperation({ profileId, action, params = {} 
     const width = hasTargetViewport ? Math.max(320, rawWidth) : null;
     const height = hasTargetViewport ? Math.max(240, rawHeight) : null;
     const followWindow = params.followWindow !== false;
+    const fitDisplayWindow = params.fitDisplayWindow !== false;
     const settleMs = Math.max(0, Number(params.settleMs ?? 180) || 180);
     const attempts = Math.max(1, Number(params.attempts ?? 3) || 3);
     const tolerance = Math.max(0, Number(params.tolerancePx ?? 3) || 3);
@@ -56,6 +57,49 @@ export async function executeViewportOperation({ profileId, action, params = {} 
 
     let measured = await probeWindow();
     if (followWindow && !hasTargetViewport) {
+      let resizedWindow = false;
+      let windowTarget = null;
+      if (fitDisplayWindow) {
+        try {
+          const displayPayload = await callWithTimeout('system:display', {}, apiTimeoutMs);
+          const display = displayPayload?.metrics || displayPayload || {};
+          const reserveFromEnv = Number(process.env.CAMO_DEFAULT_WINDOW_VERTICAL_RESERVE ?? 0);
+          const reservePx = Number.isFinite(reserveFromEnv) ? Math.max(0, Math.min(240, Math.floor(reserveFromEnv))) : 0;
+          const workWidth = Number(display.workWidth || 0);
+          const workHeight = Number(display.workHeight || 0);
+          const displayWidth = Number(display.width || 0);
+          const displayHeight = Number(display.height || 0);
+          const baseW = Math.floor(workWidth > 0 ? workWidth : displayWidth);
+          const baseH = Math.floor(workHeight > 0 ? workHeight : displayHeight);
+          if (baseW > 0 && baseH > 0) {
+            windowTarget = {
+              width: Math.max(960, baseW),
+              height: Math.max(700, baseH - reservePx),
+            };
+            const currentOuterWidth = Number(measured.outerWidth || 0);
+            const currentOuterHeight = Number(measured.outerHeight || 0);
+            const shouldResize = (
+              !Number.isFinite(currentOuterWidth)
+              || !Number.isFinite(currentOuterHeight)
+              || currentOuterWidth < Math.floor(windowTarget.width * 0.92)
+              || currentOuterHeight < Math.floor(windowTarget.height * 0.92)
+            );
+            if (shouldResize) {
+              await callWithTimeout('window:resize', {
+                profileId,
+                width: windowTarget.width,
+                height: windowTarget.height,
+              }, apiTimeoutMs);
+              if (settleMs > 0) await new Promise((resolve) => setTimeout(resolve, settleMs));
+              measured = await probeWindow();
+              resizedWindow = true;
+            }
+          }
+        } catch {
+          // display probing is best-effort and must not block follow-window sync
+        }
+      }
+
       const innerWidth = Math.max(320, Number(measured.innerWidth || 0) || 1280);
       const innerHeight = Math.max(240, Number(measured.innerHeight || 0) || 720);
       const outerWidth = Math.max(320, Number(measured.outerWidth || 0) || innerWidth);
@@ -77,6 +121,8 @@ export async function executeViewportOperation({ profileId, action, params = {} 
           followWindow: true,
           viewport: { width: followWidth, height: followHeight },
           frame: { width: frameW, height: frameH },
+          resizedWindow,
+          windowTarget,
           measured: synced,
         },
       };
