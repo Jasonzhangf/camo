@@ -27,3 +27,8 @@ coverage/
 tmp/
 temp/
 .tmp/
+
+# Backup files
+*.bak
+*.syntax-error
+
