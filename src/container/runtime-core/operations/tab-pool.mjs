@@ -9,6 +9,7 @@ const DEFAULT_VIEWPORT_API_TIMEOUT_MS = 8000;
 const DEFAULT_VIEWPORT_SETTLE_MS = 120;
 const DEFAULT_VIEWPORT_ATTEMPTS = 1;
 const DEFAULT_VIEWPORT_TOLERANCE_PX = 3;
+const RUNTIME_LAYER_TIMEOUT_MS = 10000;
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -55,6 +56,43 @@ function resolveViewportSyncConfig({ params = {}, inherited = null }) {
       Number(params.viewportTolerancePx ?? inherited?.tolerancePx ?? DEFAULT_VIEWPORT_TOLERANCE_PX) || DEFAULT_VIEWPORT_TOLERANCE_PX,
     ),
   };
+}
+
+
+
+/**
+ * 双重超时保护：在 runtime 层强制超时，即使 fetch 超时失效
+ */
+async function withRuntimeLayerTimeout(promise, timeoutMs, timeoutMessage) {
+  let runtimeTimer = null;
+
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      runtimeTimer = setTimeout(() => {
+        console.error(`[RuntimeLayerTimeout] ${timeoutMessage}`);
+        reject(new Error(`Runtime layer timeout after ${timeoutMs}ms: ${timeoutMessage}`));
+      }, timeoutMs);
+    }),
+  ]).finally(() => {
+    if (runtimeTimer) clearTimeout(runtimeTimer);
+  });
+}
+
+/**
+ * 带强制 runtime 层超时的 API 调用
+ */
+async function callApiWithRuntimeTimeout(action, payload, timeoutMs, runtimeTimeoutMs) {
+  const effectiveTimeoutMs = resolveTimeoutMs(timeoutMs, DEFAULT_API_TIMEOUT_MS);
+  const effectiveRuntimeTimeoutMs = Math.min(effectiveTimeoutMs + 5000, RUNTIME_LAYER_TIMEOUT_MS);
+
+  console.log(`[callApiWithRuntimeTimeout] ${action} timeout: ${effectiveTimeoutMs}ms, runtime: ${effectiveRuntimeTimeoutMs}ms`);
+
+  return withRuntimeLayerTimeout(
+    callAPI(action, payload),
+    effectiveRuntimeTimeoutMs,
+    `${action} runtime timeout after ${effectiveRuntimeTimeoutMs}ms`,
+  );
 }
 
 async function callApiWithTimeout(action, payload, timeoutMs) {
@@ -208,7 +246,9 @@ async function waitForTabCountIncrease({
 
   while (Date.now() - startedAt <= waitMs) {
     try {
-      const listed = await callApiWithTimeout('page:list', { profileId }, listTimeoutMs);
+      const pollStartTime = Date.now();
+      const listed = await callApiWithRuntimeTimeout('page:list', { profileId }, listTimeoutMs, RUNTIME_LAYER_TIMEOUT_MS);
+      console.log(`[waitForTabCountIncrease] page:list took ${Date.now() - pollStartTime}ms`);
       const { pages } = extractPageList(listed);
       if (pages.length > beforeCount) {
         return {

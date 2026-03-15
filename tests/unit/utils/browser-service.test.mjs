@@ -74,6 +74,10 @@ describe('browser-service utilities', () => {
       const result = await callAPI('/test-action', { foo: 'bar' });
       assert.ok(calledUrl.includes('/command'));
       assert.strictEqual(calledOptions.method, 'POST');
+      const body = JSON.parse(calledOptions.body);
+      assert.strictEqual(body.meta.sender.cwd, process.cwd());
+      assert.ok(Array.isArray(body.meta.sender.argv));
+      assert.strictEqual(body.meta.sender.source, 'browser-service-client');
       assert.strictEqual(result.result, 'ok');
     });
 

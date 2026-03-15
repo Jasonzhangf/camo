@@ -33,6 +33,7 @@ import {
 import { handleSessionWatchdogCommand } from './lifecycle/session-watchdog.mjs';
 import { safeAppendProgressEvent } from './events/progress-log.mjs';
 import { ensureProgressEventDaemon } from './events/daemon.mjs';
+import { appendCommandLog, buildCommandSenderMeta } from './utils/command-log.mjs';
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_JSON_PATH = path.resolve(CURRENT_DIR, '..', 'package.json');
@@ -119,6 +120,14 @@ function inferProfileId(cmd, args) {
 async function runTrackedCommand(cmd, args, fn) {
   const startedAt = Date.now();
   const profileId = inferProfileId(cmd, args);
+  appendCommandLog({
+    action: cmd,
+    command: cmd,
+    profileId,
+    args: args.slice(1),
+    payload: { mode: 'cli' },
+    meta: buildCommandSenderMeta({ source: 'cli', cwd: process.cwd(), argv: process.argv.slice() }),
+  });
   safeAppendProgressEvent({
     source: 'cli.command',
     mode: cmd === 'autoscript' ? 'autoscript' : 'normal',

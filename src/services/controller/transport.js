@@ -21,11 +21,18 @@ export function createTransport({ env = process.env, defaults = {}, debugLog = n
       ? options.timeoutMs
       : 20000;
     const profileId = (args?.profileId || args?.profile || args?.sessionId || '').toString();
+    const senderMeta = {
+      source: String(options?.source || env.CAMO_COMMAND_SOURCE || 'controller').trim() || 'controller',
+      cwd: String(options?.cwd || env.CAMO_COMMAND_CWD || process.cwd()).trim() || process.cwd(),
+      pid: Number(options?.pid || env.CAMO_COMMAND_PID || process.pid) || process.pid,
+      ppid: Number(options?.ppid || env.CAMO_COMMAND_PPID || process.ppid) || process.ppid,
+      argv: Array.isArray(options?.argv) ? options.argv.map((item) => String(item)) : process.argv.slice(),
+    };
     debugLog?.('browserServiceCommand:start', { action, profileId, timeoutMs });
     const res = await fetch(`${getBrowserHttpBase()}/command`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, args }),
+      body: JSON.stringify({ action, args, meta: { sender: senderMeta } }),
       signal: AbortSignal.timeout ? AbortSignal.timeout(timeoutMs) : undefined,
     });
 

@@ -7,6 +7,7 @@ import { BrowserWsServer } from './internal/ws-server.js';
 import { logDebug } from './internal/logging.js';
 import { installServiceProcessLogger } from './internal/service-process-logger.js';
 import { startHeartbeatWriter } from './internal/heartbeat.js';
+import { appendCommandLog } from '../../utils/command-log.mjs';
 const clients = new Set();
 const autoLoops = new Map();
 function readNumber(value) {
@@ -215,6 +216,18 @@ export async function startBrowserService(opts = {}) {
                         const t0 = Date.now();
                         const action = String(payload?.action || '');
                         const profileId = String(payload?.args?.profileId || payload?.args?.profile || payload?.args?.sessionId || '');
+                        appendCommandLog({
+                            action,
+                            profileId,
+                            payload: payload?.args ?? {},
+                            meta: {
+                                source: 'browser-service',
+                                cwd: process.cwd(),
+                                pid: process.pid,
+                                ppid: process.ppid,
+                                sender: payload?.meta?.sender && typeof payload.meta.sender === 'object' ? payload.meta.sender : {},
+                            },
+                        });
                         logEvent('browser.command.start', { action, profileId });
                         const result = await handleCommand(payload, sessionManager, wsServer, { onSessionStart: markSessionStarted });
                         logEvent('browser.command.done', { action, profileId, ok: result.ok, ms: Date.now() - t0 });

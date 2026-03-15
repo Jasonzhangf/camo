@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { BROWSER_SERVICE_URL, loadConfig, setRepoRoot } from './config.mjs';
 import { touchSessionActivity } from '../lifecycle/session-registry.mjs';
 import { buildResolvedSessionView, resolveSessionViewByProfile } from '../lifecycle/session-view.mjs';
+import { buildCommandSenderMeta } from './command-log.mjs';
 
 const require = createRequire(import.meta.url);
 const DEFAULT_API_TIMEOUT_MS = 90000;
@@ -117,12 +118,23 @@ function shouldTrackSessionActivity(action, payload) {
 
 export async function callAPI(action, payload = {}, options = {}) {
   const timeoutMs = resolveApiTimeoutMs(options);
+  const senderMeta = buildCommandSenderMeta({
+    source: String(options?.source || payload?.__commandSource || 'browser-service-client').trim() || 'browser-service-client',
+    cwd: String(options?.cwd || payload?.__commandCwd || process.cwd()).trim() || process.cwd(),
+    pid: Number(options?.pid || payload?.__commandPid || process.pid) || process.pid,
+    ppid: Number(options?.ppid || payload?.__commandPpid || process.ppid) || process.ppid,
+    argv: Array.isArray(options?.argv)
+      ? options.argv
+      : Array.isArray(payload?.__commandArgv)
+        ? payload.__commandArgv
+        : process.argv.slice(),
+  });
   let r;
   try {
     r = await fetch(`${BROWSER_SERVICE_URL}/command`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, args: payload }),
+      body: JSON.stringify({ action, args: payload, meta: { sender: senderMeta } }),
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
