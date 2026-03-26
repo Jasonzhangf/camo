@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { ensurePageRuntime } from '../pageRuntime.js';
-import { resolveNavigationWaitUntil, normalizeUrl, shouldSkipBringToFront } from './utils.js';
+import { resolveNavigationWaitUntil, normalizeUrl } from './utils.js';
 export class BrowserSessionPageManagement {
     deps;
     trackedPages = [];
@@ -190,9 +190,6 @@ export class BrowserSessionPageManagement {
         const opener = this.deps.getActivePage() || ctx.pages()[0];
         if (!opener)
             throw new Error('no_opener_page');
-        if (!shouldSkipBringToFront()) {
-            await opener.bringToFront().catch(() => null);
-        }
         const before = this.collectPages(ctx).length;
         if (!options?.strictShortcut) {
             page = await this.openPageViaContext(ctx, before);
@@ -245,14 +242,6 @@ export class BrowserSessionPageManagement {
         catch {
             /* ignore */
         }
-        if (!shouldSkipBringToFront()) {
-            try {
-                await page.bringToFront();
-            }
-            catch {
-                /* ignore */
-            }
-        }
         if (url) {
             await page.goto(url, { waitUntil: resolveNavigationWaitUntil() });
             await ensurePageRuntime(page);
@@ -275,14 +264,6 @@ export class BrowserSessionPageManagement {
         }
         catch {
             /* ignore */
-        }
-        if (!shouldSkipBringToFront()) {
-            try {
-                await page.bringToFront();
-            }
-            catch {
-                /* ignore */
-            }
         }
         await ensurePageRuntime(page, true).catch(() => { });
         this.deps.recordLastKnownUrl(page.url());
@@ -309,14 +290,6 @@ export class BrowserSessionPageManagement {
         if (nextIndex >= 0) {
             const nextPage = remaining[nextIndex];
             this.deps.setActivePage(nextPage);
-            if (!shouldSkipBringToFront()) {
-                try {
-                    await nextPage.bringToFront();
-                }
-                catch {
-                    /* ignore */
-                }
-            }
             await ensurePageRuntime(nextPage, true).catch(() => { });
             this.deps.recordLastKnownUrl(nextPage.url());
         }
