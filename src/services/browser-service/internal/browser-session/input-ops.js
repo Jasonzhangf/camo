@@ -1,4 +1,39 @@
 import { isTimeoutLikeError } from './utils.js';
+import { resolveInputMode } from './utils.js';
+
+async function createCDPSession(page) {
+    const context = page.context();
+    return context.newCDPSession(page);
+}
+
+async function cdpMouseClick(cdp, x, y, button = 'left', delay = 50) {
+    const normalizedButton = button === 'left' ? 'left' : button === 'right' ? 'right' : button === 'middle' ? 'middle' : 'left';
+    await cdp.send('Input.dispatchMouseEvent', {
+        type: 'mousePressed',
+        x: Math.round(x),
+        y: Math.round(y),
+        button: normalizedButton,
+        clickCount: 1
+    });
+    if (delay > 0) {
+        await new Promise(r => setTimeout(r, delay));
+    }
+    await cdp.send('Input.dispatchMouseEvent', {
+        type: 'mouseReleased',
+        x: Math.round(x),
+        y: Math.round(y),
+        button: normalizedButton,
+        clickCount: 1
+    });
+}
+
+async function cdpMouseMove(cdp, x, y) {
+    await cdp.send('Input.dispatchMouseEvent', {
+        type: 'mouseMoved',
+        x: Math.round(x),
+        y: Math.round(y)
+    });
+}
 
 async function readInteractiveViewport(page) {
     const fallback = page.viewportSize?.() || null;
@@ -39,9 +74,34 @@ export class BrowserSessionInputOps {
         this.withInputActionLock = withInputActionLock;
         const envMode = String(process.env.CAMO_SCROLL_INPUT_MODE || '').trim().toLowerCase();
         this.wheelMode = envMode === 'keyboard' ? 'keyboard' : 'wheel';
+        this.inputMode = resolveInputMode();
     }
     async mouseClick(opts) {
         const page = await this.ensurePrimaryPage();
+
+        if (this.inputMode === 'cdp') {
+            const { x, y, button = 'left', clicks = 1, delay = 50 } = opts;
+            let cdp = null;
+            try {
+                cdp = await createCDPSession(page);
+                for (let i = 0; i < clicks; i++) {
+                    if (i > 0) {
+                        await new Promise(r => setTimeout(r, 100 + Math.random() * 100));
+                    }
+                    await this.withInputActionLock(async () => {
+                        await this.runInputAction(page, 'mouse:click(cdp)', async () => {
+                            await cdpMouseClick(cdp, x, y, button, delay);
+                        });
+                    });
+                }
+            } finally {
+                if (cdp) {
+                    await cdp.detach().catch(() => {});
+                }
+            }
+            return;
+        }
+
         await this.withInputActionLock(async () => {
             await this.runInputAction(page, 'input:ready', (activePage) => this.ensureInputReady(activePage));
             const { x, y, button = 'left', clicks = 1, delay = 50, nudgeBefore = false } = opts;

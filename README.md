@@ -473,6 +473,7 @@ Condition types:
 
 ### Environment Variables
 
+- `CAMO_INPUT_MODE` - Input mode: `playwright` (default) or `cdp`. CDP mode uses `Input.dispatchMouseEvent` via Chrome DevTools Protocol, bypassing OS-level input system. Does not require window foreground. See [CDP Input Mode](#cdp-input-mode) below.
 - `CAMO_BROWSER_URL` - Browser service URL (default: `http://127.0.0.1:7704`)
 - `CAMO_INSTALL_DIR` - `@web-auto/camo` 安装目录（可选，首次安装兜底）
 - `CAMO_REPO_ROOT` - Camo repository root (optional, dev mode)
@@ -483,6 +484,51 @@ Condition types:
 - `CAMO_PROGRESS_EVENTS_FILE` - Optional progress event JSONL path override
 - `CAMO_PROGRESS_WS_HOST` / `CAMO_PROGRESS_WS_PORT` - Progress websocket daemon bind address (default: `127.0.0.1:7788`)
 - `CAMO_DEFAULT_WINDOW_VERTICAL_RESERVE` - Reserved vertical pixels for default headful auto-size
+
+### CDP Input Mode
+
+By default, Camo uses Playwright's high-level input API (`page.mouse.click`), which goes through the OS input system and requires the browser window to be in the foreground. This can cause hangs (up to 30s timeout) on Windows when the window loses focus.
+
+CDP mode sends mouse events directly via the Chrome DevTools Protocol (`Input.dispatchMouseEvent`), which:
+
+- **Does not require window foreground** — works with minimized, background, or headless windows
+- **Does not depend on OS input system** — no `bringToFront`, no `ensureInputReady`
+- **Bypasses input pipeline checks** — no 30s timeout risk from `ensureInputReady` hanging
+
+#### How to enable
+
+```bash
+# Environment variable (recommended)
+CAMO_INPUT_MODE=cdp camo start xhs-qa-1 --url https://www.xiaohongshu.com
+
+# Or set in shell profile
+export CAMO_INPUT_MODE=cdp
+```
+
+#### Behavior differences
+
+| Feature | Playwright (default) | CDP mode |
+|---------|---------------------|----------|
+| Window foreground required | Yes | No |
+| OS input system | Yes | No |
+| Auto-scroll to element | Yes (via Playwright) | No (caller must ensure element in viewport) |
+| `ensureInputReady` check | Yes (can hang 30s) | Skipped |
+| `bringToFront` | Yes (default) | Skipped |
+| Nudge/recovery on timeout | Yes | No (fast fail) |
+| Input coordinate system | Viewport-relative | Viewport-relative (same) |
+
+#### Limitations
+
+- **Element must be in viewport**: CDP clicks at coordinates only. If the target element is scrolled out of view, the click will miss. Callers (like webauto's `clickPoint`) already resolve viewport-relative coordinates via `getBoundingClientRect`.
+- **No auto-scroll**: Unlike Playwright's `page.click(selector)`, CDP mode does not scroll to bring elements into view.
+- **keyboard operations still use Playwright**: `keyboard:press` and `keyboard:type` are not affected by CDP mode (they already work reliably in background via Playwright's keyboard API).
+
+#### Related environment variables
+
+- `CAMO_INPUT_ACTION_TIMEOUT_MS` — Max wait for input action (default: 30000)
+- `CAMO_INPUT_ACTION_MAX_ATTEMPTS` — Retry count on failure (default: 2)
+- `CAMO_INPUT_READY_SETTLE_MS` — Settle time after input ready (default: 80)
+- `CAMO_BRING_TO_FRONT_MODE` — `never` (skip) or `auto` (default, bring window to front)
 
 ## Session Persistence
 

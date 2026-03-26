@@ -90,10 +90,30 @@ Session isolation hard rule:
 
 ## Environment Variables
 
+- `CAMO_INPUT_MODE` — Input mode: `playwright` (default) or `cdp`. CDP mode bypasses OS input system, does not require window foreground. Recommended for Windows automation.
 - `CAMO_BROWSER_URL` (default `http://127.0.0.1:7704`)
 - `CAMO_REPO_ROOT` (optional explicit repo root)
 - `CAMO_PROGRESS_EVENTS_FILE` (optional progress JSONL path)
 - `CAMO_PROGRESS_WS_HOST` / `CAMO_PROGRESS_WS_PORT` (progress ws daemon host/port)
+
+## CDP Input Mode
+
+Use CDP mode when:
+- Running on Windows where `ensureInputReady` can hang for 30s
+- Window may not be in foreground (minimized, background, multi-tasking)
+- Headless automation without bringing window to front
+
+Enable:
+```bash
+export CAMO_INPUT_MODE=cdp
+camo start xhs-qa-1 --url https://www.xiaohongshu.com
+```
+
+Behavior:
+- Uses `Input.dispatchMouseEvent` via Chrome DevTools Protocol
+- Skips `ensureInputReady` and `bringToFront` checks
+- Fast fail on errors (no 30s timeout hangs)
+- Caller must ensure target element is in viewport
 
 ## Quick Verification
 

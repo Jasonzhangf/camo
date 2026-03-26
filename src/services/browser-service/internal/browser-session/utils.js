@@ -46,6 +46,12 @@ export function isTimeoutLikeError(error) {
     const message = String(error?.message || error || '').toLowerCase();
     return message.includes('timed out') || message.includes('timeout');
 }
+
+export function resolveInputMode() {
+    const raw = String(process.env.CAMO_INPUT_MODE ?? '').trim().toLowerCase();
+    return raw === 'cdp' ? 'cdp' : 'playwright';
+}
+
 export function normalizeUrl(raw) {
     try {
         const url = new URL(raw);

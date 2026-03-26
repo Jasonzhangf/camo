@@ -1,4 +1,4 @@
-import { resolveInputActionMaxAttempts, resolveInputActionTimeoutMs, resolveInputRecoveryBringToFrontTimeoutMs, resolveInputRecoveryDelayMs, resolveInputReadySettleMs, shouldSkipBringToFront } from './utils.js';
+import { resolveInputActionMaxAttempts, resolveInputActionTimeoutMs, resolveInputMode, resolveInputRecoveryBringToFrontTimeoutMs, resolveInputRecoveryDelayMs, resolveInputReadySettleMs, shouldSkipBringToFront } from './utils.js';
 import { ensurePageRuntime } from '../pageRuntime.js';
 export class BrowserInputPipeline {
     ensurePrimaryPage;
@@ -9,6 +9,8 @@ export class BrowserInputPipeline {
     }
     inputActionTail = Promise.resolve();
     async ensureInputReady(page) {
+        if (resolveInputMode() === 'cdp')
+            return;
         if (this.isHeadless())
             return;
         if (shouldSkipBringToFront()) {
