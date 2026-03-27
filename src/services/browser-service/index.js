@@ -493,6 +493,7 @@ async function handleCommand(payload, manager, wsServer, options = {}) {
             return { ok: true, body: { ok: true, pages, activeIndex } };
         }
         case 'page:new':
+        case 'newTab':
         case 'newPage': {
             const profileId = args.profileId || 'default';
             const session = manager.getSession(profileId);

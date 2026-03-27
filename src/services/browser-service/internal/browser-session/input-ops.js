@@ -120,25 +120,28 @@ export class BrowserSessionInputOps {
                 await clickPage.mouse.move(nudgeX, nudgeY, { steps: 3 }).catch(() => { });
                 await clickPage.waitForTimeout(40).catch(() => { });
             };
+            const performClick = async (clickPage, label) => {
+                await this.runInputAction(page, label, async (activePage) => {
+                    if (nudgeBefore)
+                        await nudgePointer(activePage);
+                    await moveToTarget(activePage);
+                    await activePage.mouse.down({ button });
+                    const pause = Math.max(0, Number(delay) || 0);
+                    if (pause > 0)
+                        await activePage.waitForTimeout(pause).catch(() => { });
+                    await activePage.mouse.up({ button });
+                });
+            };
             for (let i = 0; i < clicks; i++) {
                 if (i > 0)
                     await new Promise(r => setTimeout(r, 100 + Math.random() * 100));
                 try {
-                    await this.runInputAction(page, 'mouse:click(direct)', async (clickPage) => {
-                        if (nudgeBefore)
-                            await nudgePointer(clickPage);
-                        await moveToTarget(clickPage);
-                        await clickPage.mouse.click(x, y, { button, clickCount: 1, delay: Math.max(0, Number(delay) || 0) });
-                    });
+                    await performClick(page, 'mouse:click(direct)');
                 }
                 catch (error) {
                     if (!isTimeoutLikeError(error))
                         throw error;
-                    await this.runInputAction(page, 'mouse:click(retry)', async (clickPage) => {
-                        await nudgePointer(clickPage);
-                        await moveToTarget(clickPage);
-                        await clickPage.mouse.click(x, y, { button, clickCount: 1, delay: Math.max(0, Number(delay) || 0) });
-                    });
+                    await performClick(page, 'mouse:click(retry)');
                 }
             }
         });
