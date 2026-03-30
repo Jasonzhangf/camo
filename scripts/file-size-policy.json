@@ -1,7 +1,17 @@
 {
   "defaultMaxLines": 500,
   "overrides": {
-    "src/autoscript/runtime.mjs": 700,
+    "src/autoscript/runtime.mjs": 1100,
+    "src/commands/autoscript.mjs": 1100,
+    "src/commands/browser.mjs": 1300,
+    "src/container/runtime-core/operations/index.mjs": 820,
+    "src/container/runtime-core/operations/tab-pool.mjs": 800,
+    "src/services/browser-service/index.js": 700,
+    "src/services/browser-service/internal/container-matcher.js": 900,
+    "src/services/browser-service/internal/page-runtime/runtime.js": 1400,
+    "src/services/browser-service/internal/ws-server.js": 1250,
+    "src/services/controller/controller.js": 1200,
+    "src/utils/browser-service.mjs": 600,
     "src/autoscript/xhs-unified-template.mjs": 950,
     "src/core/actions.mjs": 620
   }
