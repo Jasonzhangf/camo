@@ -1,6 +1,6 @@
 {
   "name": "@web-auto/camo",
-  "version": "0.2.2",
+  "version": "0.2.0",
   "description": "Camoufox Browser CLI - Cross-platform browser automation",
   "type": "module",
   "bin": {
@@ -43,7 +43,9 @@
     "c8": "^10.1.3"
   },
   "dependencies": {
-    "playwright-core": "^1.54.1",
+    "jsqr": "^1.4.0",
+    "playwright": "^1.58.2",
+    "pngjs": "^7.0.0",
     "ws": "^8.19.0"
   }
 }

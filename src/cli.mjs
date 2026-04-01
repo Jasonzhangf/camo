@@ -26,6 +26,7 @@ import {
   handleNewPageCommand, handleClosePageCommand, handleSwitchPageCommand,
   handleListPagesCommand, handleShutdownCommand
 } from './commands/browser.mjs';
+import { handleQRScreenshotCommand } from './commands/qr-screenshot.mjs';
 import {
   handleCleanupCommand, handleForceStopCommand, handleLockCommand,
  handleUnlockCommand, handleSessionsCommand, handleInstancesCommand
@@ -71,6 +72,7 @@ function inferProfileId(cmd, args) {
     'scroll', 'click', 'type', 'highlight', 'clear-highlight', 'viewport',
     'new-page', 'close-page', 'switch-page', 'list-pages',
     'cleanup', 'force-stop', 'lock', 'unlock', 'sessions',
+    'qr-screenshot',
   ].includes(cmd)) {
     if ((cmd === 'stop' || cmd === 'close') && (args.includes('--id') || args.includes('--alias'))) {
       return null;
@@ -314,7 +316,7 @@ async function main() {
     'start', 'stop', 'close', 'status', 'list', 'goto', 'navigate', 'back', 'screenshot',
     'new-page', 'close-page', 'switch-page', 'list-pages', 'shutdown',
     'scroll', 'click', 'type', 'highlight', 'clear-highlight', 'viewport',
-    'cookies', 'window', 'mouse', 'system', 'container', 'autoscript', 'events', 'devtools', 'record', 'highlight-mode',
+    'cookies', 'window', 'mouse', 'system', 'container', 'autoscript', 'events', 'devtools', 'record', 'highlight-mode', 'qr-screenshot',
   ]);
 
   if (!serviceCommands.has(cmd)) {
@@ -394,6 +396,9 @@ async function main() {
         break;
       case 'highlight-mode':
         await handleHighlightModeCommand(args);
+        break;
+      case 'qr-screenshot':
+        await handleQRScreenshotCommand(args);
         break;
     }
   });

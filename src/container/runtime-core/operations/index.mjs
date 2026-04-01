@@ -2,6 +2,7 @@ import { callAPI, getDomSnapshotByProfile } from '../../../utils/browser-service
 import { isJsExecutionEnabled } from '../../../utils/js-policy.mjs';
 import { executeTabPoolOperation } from './tab-pool.mjs';
 import { executeViewportOperation } from './viewport.mjs';
+import { executeQRScreenshotOperation } from './qr-screenshot.mjs';
 import {
   asErrorPayload,
   buildSelectorCheck,
@@ -743,6 +744,13 @@ export async function executeOperation({ profileId, operation, context = {} }) {
 
     if (action === 'verify_subscriptions') {
       return executeVerifySubscriptions({ profileId: resolvedProfile, params });
+    }
+
+    if (action === 'screenshot_qr') {
+      return await executeQRScreenshotOperation({
+        profileId: resolvedProfile,
+        params,
+      });
     }
 
     if (action === 'evaluate') {

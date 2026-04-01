@@ -50,6 +50,7 @@ NAVIGATION:
   goto [profileId] <url>                    Navigate to URL (uses default if profileId omitted)
   back [profileId]                          Navigate back (uses default)
   screenshot [profileId] [--output <file>] [--full]
+  qr-screenshot [profileId] [--output <dir>] [--full] [--padding <px>]
 
 INTERACTION:
   scroll [profileId] [--down|--up|--left|--right] [--amount <px>] [--selector <css>] [--highlight|--no-highlight]

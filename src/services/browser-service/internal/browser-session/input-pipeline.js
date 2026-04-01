@@ -1,5 +1,9 @@
 import { resolveInputActionMaxAttempts, resolveInputActionTimeoutMs, resolveInputMode, resolveInputRecoveryBringToFrontTimeoutMs, resolveInputRecoveryDelayMs, resolveInputReadySettleMs, shouldSkipBringToFront } from './utils.js';
 import { ensurePageRuntime } from '../pageRuntime.js';
+
+// 15s 强制操作超时（熔断阈值）
+const INPUT_ACTION_HARD_TIMEOUT_MS = 15000;
+
 export class BrowserInputPipeline {
     ensurePrimaryPage;
     isHeadless;
@@ -7,7 +11,37 @@ export class BrowserInputPipeline {
         this.ensurePrimaryPage = ensurePrimaryPage;
         this.isHeadless = isHeadless;
     }
+    // 队列状态监控（生命周期管理）
+    inputActionStartTime = null;
+    inputActionLabel = null;
     inputActionTail = Promise.resolve();
+
+    // 获取队列健康状态
+    getInputPipelineHealth() {
+        if (!this.inputActionStartTime) return { healthy: true, idle: true, elapsedMs: 0 };
+        const elapsed = Date.now() - this.inputActionStartTime;
+        return {
+            healthy: elapsed < INPUT_ACTION_HARD_TIMEOUT_MS,
+            idle: false,
+            elapsedMs: elapsed,
+            label: this.inputActionLabel,
+        };
+    }
+
+    // 检查当前操作是否已超时
+    isCurrentActionTimedOut() {
+        if (!this.inputActionStartTime) return false;
+        return Date.now() - this.inputActionStartTime > INPUT_ACTION_HARD_TIMEOUT_MS;
+    }
+
+    // 强制重置队列（熔断恢复）
+    async resetInputActionQueue(reason) {
+        console.warn(`[BrowserInputPipeline] 队列熔断: ${reason}, 重置队列`);
+        this.inputActionTail = Promise.resolve();
+        this.inputActionStartTime = null;
+        this.inputActionLabel = null;
+    }
+
     async ensureInputReady(page) {
         if (resolveInputMode() === 'cdp')
             return;
@@ -128,12 +162,26 @@ export class BrowserInputPipeline {
         throw new Error(`${label} failed`);
     }
     async withInputActionLock(run) {
+        // 熔断检查：前一个操作超时则强制重置队列
+        if (this.isCurrentActionTimedOut()) {
+            await this.resetInputActionQueue(`操作超时 (${this.inputActionLabel || 'unknown'}, ${(Date.now() - this.inputActionStartTime) / 1000}s)`);
+        }
         const previous = this.inputActionTail;
         let release = null;
-        this.inputActionTail = new Promise((resolve) => { release = resolve; });
+        this.inputActionTail = new Promise((resolve) => {
+            release = () => {
+                this.inputActionStartTime = null;
+                this.inputActionLabel = null;
+                resolve();
+            };
+        });
         await previous.catch(() => { });
+        // 记录当前操作（生命周期追踪）
+        this.inputActionStartTime = Date.now();
+        this.inputActionLabel = run.name || 'anonymous';
         try {
-            return await run();
+            // 15s 强制超时保护
+            return await this.withInputActionTimeout('withInputActionLock', run, INPUT_ACTION_HARD_TIMEOUT_MS);
         }
         finally {
             if (release)
