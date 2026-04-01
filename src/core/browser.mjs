@@ -212,7 +212,7 @@ export function getBrowserStatus(profileId) {
  * Creates one if needed using camoufox-js
  */
 export async function getPlaywrightBrowser(profileId) {
-  const { chromium } = await import('playwright');
+  const { chromium } = await import('playwright-core');
   
   const browser = activeBrowsers.get(profileId);
   if (!browser) {
