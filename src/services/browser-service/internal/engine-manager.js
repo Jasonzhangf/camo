@@ -194,55 +194,65 @@ export async function launchEngineContext(opts) {
             : process.platform === 'darwin'
                 ? 'macos'
                 : 'linux';
+        const isWindows = process.platform === 'win32';
+        const useMinimalWindowsOptions = isWindows;
         // Build config to force actual display dimensions (without screen constraints to avoid position calc issues)
-        const config = {
-            'screen.width': Math.floor(physicalW),
-            'screen.height': Math.floor(physicalH),
-            'screen.availWidth': Math.floor(workW),
-            'screen.availHeight': Math.floor(workH),
-            'window.screenX': 0,
-            'window.screenY': 0,
-        };
+        const config = useMinimalWindowsOptions
+            ? null
+            : {
+                'screen.width': Math.floor(physicalW),
+                'screen.height': Math.floor(physicalH),
+                'screen.availWidth': Math.floor(workW),
+                'screen.availHeight': Math.floor(workH),
+                'window.screenX': 0,
+                'window.screenY': 0,
+            };
         // Force tabs to open in same window (not new windows)
-        const firefox_user_prefs = {
-            // Force all new windows (including script popups) to open as tabs
-            'browser.link.open_newwindow': 3,
-            'browser.link.open_newwindow.restriction': 0,
-            'browser.link.open_newwindow.override.external': -1,
-            // Make sure tab strip is visible and no single-window mode
-            'browser.tabs.loadInBackground': false,
-            'browser.tabs.loadDivertedInBackground': false,
-            'browser.tabs.closeWindowWithLastTab': false,
-            'browser.tabs.warnOnClose': false,
-            'browser.tabs.tabMinWidth': 50,
-        };
+        const firefox_user_prefs = useMinimalWindowsOptions
+            ? null
+            : {
+                // Force all new windows (including script popups) to open as tabs
+                'browser.link.open_newwindow': 3,
+                'browser.link.open_newwindow.restriction': 0,
+                'browser.link.open_newwindow.override.external': -1,
+                // Make sure tab strip is visible and no single-window mode
+                'browser.tabs.loadInBackground': false,
+                'browser.tabs.loadDivertedInBackground': false,
+                'browser.tabs.closeWindowWithLastTab': false,
+                'browser.tabs.warnOnClose': false,
+                'browser.tabs.tabMinWidth': 50,
+            };
         const result = await Camoufox({
             headless,
             os: targetOS,
             window: [intWinW, intWinH],
             viewport: headless ? { width: headlessW, height: headlessH } : null,
-            firefox_user_prefs,
-            config,
+            ...(firefox_user_prefs ? { firefox_user_prefs } : {}),
+            ...(config ? { config } : {}),
             data_dir: opts.profileDir,
-            humanize: true,
+            ...(useMinimalWindowsOptions ? {} : { humanize: true }),
             iKnowWhatImDoing: true,
-            locale: 'zh-CN',
-            fonts: [
-                'PingFang SC',
-                'Hiragino Sans GB',
-                'STHeiti',
-                'Microsoft YaHei',
-                'SimHei',
-                'SimSun',
-                'Microsoft JhengHei',
-                'Noto Sans CJK SC',
-                'Source Han Sans SC',
-                'Arial Unicode MS',
-                'Helvetica',
-                'Arial',
-                'Sans-Serif',
-            ],
-            custom_fonts_only: false,
+            ...(useMinimalWindowsOptions ? {} : { locale: 'zh-CN' }),
+            ...(useMinimalWindowsOptions
+                ? {}
+                : {
+                    fonts: [
+                        'PingFang SC',
+                        'Hiragino Sans GB',
+                        'STHeiti',
+                        'Microsoft YaHei',
+                        'SimHei',
+                        'SimSun',
+                        'Microsoft JhengHei',
+                        'Noto Sans CJK SC',
+                        'Source Han Sans SC',
+                        'Arial Unicode MS',
+                        'Helvetica',
+                        'Arial',
+                        'Sans-Serif',
+                    ],
+                    custom_fonts_only: false,
+                }),
         });
         if (result && typeof result.pages === 'function') {
             // Already a BrowserContext
