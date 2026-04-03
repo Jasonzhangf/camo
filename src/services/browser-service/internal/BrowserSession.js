@@ -14,6 +14,7 @@ import { logDebug } from './logging.js';
 import { loadOrGenerateFingerprint, applyFingerprint } from './fingerprint.js';
 import { launchEngineContext } from './engine-manager.js';
 import { resolveProfilesRoot } from './storage-paths.js';
+import { cleanupOrphanedProfileProcesses } from './process-cleanup.js';
 export class BrowserSession {
     options;
     browser;
@@ -105,6 +106,7 @@ export class BrowserSession {
             throw new Error(`无法获取 profile ${this.options.profileId} 的锁`);
         }
         this.cleanupProfileLocks();
+        cleanupOrphanedProfileProcesses(this.profileDir, this.options.profileId);
         const engine = 'camoufox';
         // 加载或生成指纹（支持 Win/Mac 随机�?
         const fingerprint = await loadOrGenerateFingerprint(this.options.profileId, {
