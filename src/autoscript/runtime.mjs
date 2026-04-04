@@ -325,10 +325,29 @@ export class AutoscriptRunner {
 
   getDefaultTimeoutMs(operation) {
     const action = String(operation?.action || '').trim().toLowerCase();
+
+    // Self-terminating business operations:
+    // These have their own exit conditions (bottom detection, stagnation,
+    // budget exhaustion). An operation-level timeout is meaningless here:
+    // it only kills legitimate in-progress work. The single-shot CDP calls
+    // inside these operations already carry their own withTimeout.
+    const SELF_TERMINATING_ACTIONS = new Set([
+      'xhs_detail_harvest',
+      'xhs_comments_harvest',
+      'xhs_expand_replies',
+      'xhs_comment_match',
+      'xhs_comment_like',
+      'xhs_feed_like',
+      'xhs_feed_like_tab_switch',
+    ]);
+    if (SELF_TERMINATING_ACTIONS.has(action)) return 0;
+
     if (action === 'wait') {
       const ms = Math.max(0, Number(operation?.params?.ms ?? operation?.params?.value ?? 0) || 0);
       return Math.max(30_000, ms + 5_000);
     }
+
+    // Infrastructure / navigation operations (always need timeout)
     if ([
       'evaluate',
       'goto',
@@ -339,17 +358,72 @@ export class AutoscriptRunner {
       'tab_pool_switch_slot',
       'sync_window_viewport',
       'verify_subscriptions',
+      'xhs_submit_search',
+      'xhs_assert_logged_in',
+      'xhs_open_detail',
+      'xhs_close_detail',
+      'xhs_comment_reply',
     ].includes(action)) {
       return 45_000;
     }
+
     if (['click', 'type', 'back', 'scroll_into_view', 'scroll', 'press_key', 'get_current_url', 'raise_error'].includes(action)) {
       return 30_000;
     }
+
     return 20_000;
   }
 
   resolveTimeoutMs(operation) {
+    const action = String(operation?.action || '').trim().toLowerCase();
+
+    // Self-terminating actions: NO timeout regardless of explicit timeoutMs.
+    // Operation definitions may have stale timeoutMs from before this rule;
+    // the whitelist is the single source of truth.
+    const SELF_TERMINATING_ACTIONS = new Set([
+      'xhs_detail_harvest',
+      'xhs_comments_harvest',
+      'xhs_expand_replies',
+      'xhs_comment_match',
+      'xhs_comment_like',
+      'xhs_feed_like',
+      'xhs_feed_like_tab_switch',
+    ]);
+    if (SELF_TERMINATING_ACTIONS.has(action)) return 0;
+
     const pacing = this.resolvePacing(operation);
+    const operationDisableTimeout = operation?.disableTimeout;
+    if (operationDisableTimeout === true) return 0;
+
+    const rawOperationTimeout = operation?.timeoutMs ?? operation?.pacing?.timeoutMs;
+    const hasOperationTimeout = Number.isFinite(Number(rawOperationTimeout))
+      && Number(rawOperationTimeout) > 0;
+    const defaultDisableTimeout = Boolean(this.script?.defaults?.disableTimeout);
+
+    // Startup and infrastructure operations must ALWAYS have a timeout –
+    // they can hang (headless display probe, tab-pool stall, viewport lock)
+    // and there is no user-visible anchor to detect the hang.
+    const NON_DISABLABLE_ACTIONS = new Set([
+      'sync_window_viewport',
+      'verify_subscriptions',
+      'ensure_tab_pool',
+      'goto',
+      'evaluate',
+      'new_page',
+      'switch_page',
+    ]);
+    const isNonDisablable = NON_DISABLABLE_ACTIONS.has(action);
+
+    // Keep default "no-timeout" mode, but allow operation-level timeout to opt in.
+    if (defaultDisableTimeout && operationDisableTimeout !== false && !hasOperationTimeout) {
+      // Even when timeout is disabled by default, infrastructure actions get a safety net.
+      if (isNonDisablable) {
+        return this.getDefaultTimeoutMs(operation);
+      }
+      return 0;
+    }
+
+    if (pacing.timeoutMs === 0) return 0;
     if (Number.isFinite(pacing.timeoutMs) && pacing.timeoutMs > 0) return pacing.timeoutMs;
     return this.getDefaultTimeoutMs(operation);
   }
