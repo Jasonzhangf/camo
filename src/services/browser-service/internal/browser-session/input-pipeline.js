@@ -2,7 +2,7 @@ import { resolveInputActionMaxAttempts, resolveInputActionTimeoutMs, resolveInpu
 import { ensurePageRuntime } from '../pageRuntime.js';
 
 // 15s 强制操作超时（熔断阈值）
-const INPUT_ACTION_HARD_TIMEOUT_MS = 15000;
+// Timeout sourced from utils.resolveInputActionTimeoutMs() (env: CAMO_INPUT_ACTION_TIMEOUT_MS, default 30s)
 
 export class BrowserInputPipeline {
     ensurePrimaryPage;
@@ -21,7 +21,7 @@ export class BrowserInputPipeline {
         if (!this.inputActionStartTime) return { healthy: true, idle: true, elapsedMs: 0 };
         const elapsed = Date.now() - this.inputActionStartTime;
         return {
-            healthy: elapsed < INPUT_ACTION_HARD_TIMEOUT_MS,
+            healthy: elapsed < resolveInputActionTimeoutMs(),
             idle: false,
             elapsedMs: elapsed,
             label: this.inputActionLabel,
@@ -31,7 +31,7 @@ export class BrowserInputPipeline {
     // 检查当前操作是否已超时
     isCurrentActionTimedOut() {
         if (!this.inputActionStartTime) return false;
-        return Date.now() - this.inputActionStartTime > INPUT_ACTION_HARD_TIMEOUT_MS;
+        return Date.now() - this.inputActionStartTime > resolveInputActionTimeoutMs();
     }
 
     // 强制重置队列（熔断恢复）
@@ -180,8 +180,8 @@ export class BrowserInputPipeline {
         this.inputActionStartTime = Date.now();
         this.inputActionLabel = run.name || 'anonymous';
         try {
-            // 15s 强制超时保护
-            return await this.withInputActionTimeout('withInputActionLock', run, INPUT_ACTION_HARD_TIMEOUT_MS);
+            // 超时保护（来自 resolveInputActionTimeoutMs，默认 30s）
+            return await this.withInputActionTimeout('withInputActionLock', run, resolveInputActionTimeoutMs());
         }
         finally {
             if (release)
