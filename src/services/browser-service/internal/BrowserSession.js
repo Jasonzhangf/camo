@@ -46,7 +46,8 @@ export class BrowserSession {
         this.recordingManager = new BrowserSessionRecording(profileId, () => this.getCurrentUrl(), () => this.context);
         this.cookiesManager = new BrowserSessionCookies(profileId, () => this.context, () => this.getActivePage());
         this.inputPipeline = new BrowserInputPipeline(() => this.ensurePrimaryPage(), () => this.options.headless === true);
-        this.inputOps = new BrowserSessionInputOps(() => this.ensurePrimaryPage(), (page) => this.inputPipeline.ensureInputReady(page), (page, label, run) => this.inputPipeline.runInputAction(page, label, run), (run) => this.inputPipeline.withInputActionLock(run));
+        this.inputOps = new BrowserSessionInputOps(() => this.ensurePrimaryPage(), (page) => this.inputPipeline.ensureInputReady(page), (page, label, run) => this.inputPipeline.runInputAction(page, label, run), (run) => this.inputPipeline.withInputActionLock(run),
+        (run) => this.inputPipeline.withReadLock(run));
         this.viewportManager = new BrowserSessionViewportManager(profileId, () => this.context, () => String(this.options.engine ?? 'camoufox'), () => this.options.headless === true);
         this.runtimeEvents = createRuntimeEventManager(profileId);
         this.pageHooks = createPageHooksManager({
@@ -108,7 +109,7 @@ export class BrowserSession {
         this.cleanupProfileLocks();
         cleanupOrphanedProfileProcesses(this.profileDir, this.options.profileId);
         const engine = 'camoufox';
-        // 加载或生成指纹（支持 Win/Mac 随机�?
+        // 加载或生成指纹（支持 Win/Mac 随机�?
         const fingerprint = await loadOrGenerateFingerprint(this.options.profileId, {
             platform: this.options.fingerprintPlatform || null,
         });
@@ -130,7 +131,7 @@ export class BrowserSession {
         const viewport = explicitViewport || fingerprint?.viewport || fallbackViewport;
         const headless = !!this.options.headless;
         const followWindowViewport = !headless;
-        // 使用 EngineManager 启动上下文（Chromium 已移除，仅支�?Camoufox�?
+        // 使用 EngineManager 启动上下文（Chromium 已移除，仅支�?Camoufox�?
         this.context = await launchEngineContext({
             engine,
             headless,
@@ -140,7 +141,7 @@ export class BrowserSession {
             locale: 'zh-CN',
             timezoneId: fingerprint?.timezoneId || 'Asia/Shanghai',
         });
-        // 应用指纹到上下文（Playwright JS 注入�?
+        // 应用指纹到上下文（Playwright JS 注入�?
         await applyFingerprint(this.context, fingerprint);
         // NOTE: deviceScaleFactor override was Chromium-only (CDP). Chromium removed.
         this.viewportManager.setInitialViewport(viewport, followWindowViewport);
@@ -261,21 +262,21 @@ export class BrowserSession {
         return page.screenshot({ fullPage });
     }
     /**
-     * 基于屏幕坐标的系统级鼠标点击（Playwright 原生�?
+     * 基于屏幕坐标的系统级鼠标点击（Playwright 原生�?
      * @param opts 屏幕坐标及点击选项
      */
     async mouseClick(opts) {
         return this.inputOps.mouseClick(opts);
     }
     /**
-     * 基于屏幕坐标的鼠标移动（Playwright 原生�?
+     * 基于屏幕坐标的鼠标移动（Playwright 原生�?
      * @param opts 目标坐标及移动选项
      */
     async mouseMove(opts) {
         return this.inputOps.mouseMove(opts);
     }
     /**
-     * 基于键盘的系统输入（Playwright keyboard�?
+     * 基于键盘的系统输入（Playwright keyboard�?
      */
     async keyboardType(opts) {
         return this.inputOps.keyboardType(opts);
@@ -284,8 +285,8 @@ export class BrowserSession {
         return this.inputOps.keyboardPress(opts);
     }
     /**
-     * 基于鼠标滚轮的系统滚动（Playwright mouse.wheel�?
-     * @param opts deltaY 为垂直滚动（�?向下，负=向上），deltaX 可�?
+     * 基于鼠标滚轮的系统滚动（Playwright mouse.wheel�?
+     * @param opts deltaY 为垂直滚动（�?向下，负=向上），deltaX 可�?
      */
     async mouseWheel(opts) {
         return this.inputOps.mouseWheel(opts);
@@ -296,10 +297,12 @@ export class BrowserSession {
     }
     async evaluate(expression, arg) {
         const page = await this.ensurePrimaryPage();
-        if (typeof arg === 'undefined') {
-            return page.evaluate(expression);
-        }
-        return page.evaluate(expression, arg);
+        return this.inputOps.withReadLock(async () => {
+            if (typeof arg === 'undefined') {
+                return page.evaluate(expression);
+            }
+            return page.evaluate(expression, arg);
+        });
     }
     getCurrentUrl() {
         return this.navigation.getCurrentUrl();

@@ -45,7 +45,7 @@ function urlMatchesFilter(url, item) {
 export async function watchSubscriptions({
   profileId,
   subscriptions,
-  throttle = 500,
+  throttle = 2000,
   filterMode = 'strict',
   onEvent = () => {},
   onError = () => {},
@@ -82,7 +82,7 @@ export async function watchSubscriptions({
     presenceVersion: 0,
     elementKeys: [],
   }]));
-  const intervalMs = Math.max(100, Number(throttle) || 500);
+  const intervalMs = Math.max(100, Number(throttle) || 2000);
   let stopped = false;
 
   const emit = async (payload) => {

@@ -72,6 +72,14 @@ export class BrowserSessionInputOps {
         this.ensureInputReady = ensureInputReady;
         this.runInputAction = runInputAction;
         this.withInputActionLock = withInputActionLock;
+        this.withReadLock = typeof withReadLock === 'function' ? withReadLock : null;
+
+    getReadPipelineHealth() {
+        if (typeof this.inputPipeline?.getReadPipelineHealth === 'function') {
+            return this.inputPipeline.getReadPipelineHealth();
+        }
+        return { healthy: true, idle: true, elapsedMs: 0 };
+    }
         const envMode = String(process.env.CAMO_SCROLL_INPUT_MODE || '').trim().toLowerCase();
         this.wheelMode = envMode === 'keyboard' ? 'keyboard' : 'wheel';
         this.inputMode = resolveInputMode();

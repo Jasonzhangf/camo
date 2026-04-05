@@ -3,6 +3,8 @@ import { ensurePageRuntime } from '../pageRuntime.js';
 
 // 15s 强制操作超时（熔断阈值）
 const INPUT_ACTION_HARD_TIMEOUT_MS = 15000;
+const READ_ACTION_HARD_TIMEOUT_MS = 10000;
+const READ_ACTION_DEFAULT_TIMEOUT_MS = 5000;
 
 export class BrowserInputPipeline {
     ensurePrimaryPage;
@@ -14,6 +16,11 @@ export class BrowserInputPipeline {
     // 队列状态监控（生命周期管理）
     inputActionStartTime = null;
     inputActionLabel = null;
+
+    // Read operations queue (evaluate/query - separate from input)
+    readActionTail = Promise.resolve();
+    readActionStartTime = null;
+    readActionLabel = null;
     inputActionTail = Promise.resolve();
 
     // 获取队列健康状态
@@ -26,6 +33,30 @@ export class BrowserInputPipeline {
             elapsedMs: elapsed,
             label: this.inputActionLabel,
         };
+    }
+
+    // 获取 Read 队列健康状态
+    getReadPipelineHealth() {
+        if (!this.readActionStartTime) return { healthy: true, idle: true, elapsedMs: 0 };
+        const elapsed = Date.now() - this.readActionStartTime;
+        return {
+            healthy: elapsed < READ_ACTION_HARD_TIMEOUT_MS,
+            idle: false,
+            elapsedMs: elapsed,
+            label: this.readActionLabel,
+        };
+    }
+
+    isCurrentReadTimedOut() {
+        if (!this.readActionStartTime) return false;
+        return Date.now() - this.readActionStartTime > READ_ACTION_HARD_TIMEOUT_MS;
+    }
+
+    async resetReadActionQueue(reason) {
+        console.warn('[BrowserInputPipeline] Read队列熔断: ' + reason + ', 重置队列');
+        this.readActionTail = Promise.resolve();
+        this.readActionStartTime = null;
+        this.readActionLabel = null;
     }
 
     // 检查当前操作是否已超时
@@ -188,5 +219,29 @@ export class BrowserInputPipeline {
                 release();
         }
     }
+
+    async withReadLock(run) {
+        if (this.isCurrentReadTimedOut()) {
+            await this.resetReadActionQueue('Read操作超时');
+        }
+        const previous = this.readActionTail;
+        let release = null;
+        this.readActionTail = new Promise((resolve) => {
+            release = () => {
+                this.readActionStartTime = null;
+                this.readActionLabel = null;
+                resolve();
+            };
+        });
+        await previous.catch(() => { });
+        this.readActionStartTime = Date.now();
+        this.readActionLabel = run.name || 'anonymous';
+        try {
+            return await this.withInputActionTimeout('withReadLock', run, READ_ACTION_HARD_TIMEOUT_MS);
+        } finally {
+            if (release) release();
+        }
+    }
 }
+
 //# sourceMappingURL=input-pipeline.js.map

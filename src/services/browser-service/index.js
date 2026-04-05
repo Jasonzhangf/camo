@@ -193,8 +193,14 @@ export async function startBrowserService(opts = {}) {
                 return;
             }
             if (url.pathname === '/health') {
+                const inputHealth = getActiveSession()?.inputOps?.getInputPipelineHealth?.() || { healthy: true, idle: true };
+                const readHealth = getActiveSession()?.inputOps?.getReadPipelineHealth?.() || { healthy: true, idle: true };
                 res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ ok: true }));
+                res.end(JSON.stringify({
+                    ok: true,
+                    inputPipeline: inputHealth,
+                    readPipeline: readHealth,
+                }));
                 return;
             }
             if (url.pathname === '/events') {
