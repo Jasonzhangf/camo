@@ -135,6 +135,11 @@ export class BrowserSessionPageManagement {
     }
     async ensurePrimaryPage() {
         const ctx = this.deps.ensureContext();
+        // Check if browser is still connected before any page operation
+        const browser = ctx.browser();
+        if (browser && typeof browser.isConnected === 'function' && !browser.isConnected()) {
+            throw new Error('browser_disconnected');
+        }
         const existing = this.deps.getActivePage();
         if (existing) {
             this.rememberPage(existing);
@@ -143,6 +148,16 @@ export class BrowserSessionPageManagement {
             }
             catch {
                 /* ignore */
+            }
+            // Double-check: page might have been closed during ensurePageViewport
+            if (existing.isClosed()) {
+                const freshPage = this.rememberPage(await ctx.newPage(), {
+                    forceAliveMs: BrowserSessionPageManagement.NEW_PAGE_FORCE_ALIVE_MS,
+                });
+                this.deps.setActivePage(freshPage);
+                this.deps.setupPageHooks(freshPage);
+                try { await this.deps.ensurePageViewport(freshPage); } catch { /* ignore */ }
+                return freshPage;
             }
             return existing;
         }
