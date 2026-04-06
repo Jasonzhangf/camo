@@ -9,58 +9,39 @@ import {
   normalizeArray,
 } from './utils.mjs';
 
-export const XHS_CHECKPOINTS = {
-  search_ready: [
-    '#search-input',
-    'input.search-input',
-    '.search-result-list',
-  ],
-  home_ready: [
-    '.feeds-page',
-    '.note-item',
-  ],
-  detail_ready: [
-    '.note-scroller',
-    '.note-content',
-    '.interaction-container',
-  ],
-  comments_ready: [
-    '.comments-container',
-    '.comment-item',
-  ],
-  login_guard: [
-    '.login-container',
-    '.login-dialog',
-    '#login-container',
-  ],
-  risk_control: [
-    '.qrcode-box',
-    '.captcha-container',
-    '[class*="captcha"]',
-  ],
+// Default empty checkpoints - platform-specific checkpoints should be provided by caller
+const DEFAULT_CHECKPOINTS = {
+  search_ready: [],
+  home_ready: [],
+  detail_ready: [],
+  comments_ready: [],
+  login_guard: [],
+  risk_control: [],
 };
 
-export async function detectCheckpoint({ profileId, platform = 'generic' }) {
+/**
+ * Detect checkpoint based on DOM selectors.
+ * @param {Object} options
+ * @param {string} options.profileId - Browser profile ID
+ * @param {string} [options.platform='generic'] - Platform identifier
+ * @param {Object} [options.checkpoints] - Platform-specific selectors
+ * @param {string[]} [options.checkpoints.search_ready] - Selectors for search page
+ * @param {string[]} [options.checkpoints.home_ready] - Selectors for home page
+ * @param {string[]} [options.checkpoints.detail_ready] - Selectors for detail page
+ * @param {string[]} [options.checkpoints.comments_ready] - Selectors for comments section
+ * @param {string[]} [options.checkpoints.login_guard] - Selectors for login dialog
+ * @param {string[]} [options.checkpoints.risk_control] - Selectors for risk control page
+ * @param {string} [options.platformHost] - Expected hostname (e.g., 'xiaohongshu.com')
+ */
+export async function detectCheckpoint({ 
+  profileId, 
+  platform = 'generic',
+  checkpoints = DEFAULT_CHECKPOINTS,
+  platformHost = null,
+}) {
   try {
     const session = await ensureActiveSession(profileId);
     const resolvedProfile = session.profileId || profileId;
-
-    if (platform !== 'xiaohongshu') {
-      const url = await getCurrentUrl(resolvedProfile);
-      return {
-        ok: true,
-        code: 'CHECKPOINT_DETECTED',
-        message: 'Checkpoint detected',
-        data: {
-          profileId: resolvedProfile,
-          platform,
-          checkpoint: 'unknown',
-          url,
-          signals: [],
-          selectorHits: {},
-        },
-      };
-    }
 
     const [url, snapshot] = await Promise.all([
       getCurrentUrl(resolvedProfile),
@@ -79,15 +60,15 @@ export async function detectCheckpoint({ profileId, platform = 'generic' }) {
       }
     };
 
-    addCount('search_ready', XHS_CHECKPOINTS.search_ready);
-    addCount('home_ready', XHS_CHECKPOINTS.home_ready);
-    addCount('detail_ready', XHS_CHECKPOINTS.detail_ready);
-    addCount('comments_ready', XHS_CHECKPOINTS.comments_ready);
-    addCount('login_guard', XHS_CHECKPOINTS.login_guard);
-    addCount('risk_control', XHS_CHECKPOINTS.risk_control);
+    addCount('search_ready', checkpoints.search_ready || []);
+    addCount('home_ready', checkpoints.home_ready || []);
+    addCount('detail_ready', checkpoints.detail_ready || []);
+    addCount('comments_ready', checkpoints.comments_ready || []);
+    addCount('login_guard', checkpoints.login_guard || []);
+    addCount('risk_control', checkpoints.risk_control || []);
 
     let checkpoint = 'unknown';
-    if (!url || !url.includes('xiaohongshu.com')) checkpoint = 'offsite';
+    if (!url || (platformHost && !url.includes(platformHost))) checkpoint = 'offsite';
     else if (isCheckpointRiskUrl(url)) checkpoint = 'risk_control';
     else if (signals.some((item) => item.startsWith('login_guard:'))) checkpoint = 'login_guard';
     else if (signals.some((item) => item.startsWith('comments_ready:'))) checkpoint = 'comments_ready';
@@ -118,11 +99,18 @@ export async function captureCheckpoint({
   containerId = null,
   selector = null,
   platform = 'generic',
+  checkpoints = DEFAULT_CHECKPOINTS,
+  platformHost = null,
 }) {
   try {
     const session = await ensureActiveSession(profileId);
     const resolvedProfile = session.profileId || profileId;
-    const checkpointRes = await detectCheckpoint({ profileId: resolvedProfile, platform });
+    const checkpointRes = await detectCheckpoint({ 
+      profileId: resolvedProfile, 
+      platform,
+      checkpoints,
+      platformHost,
+    });
     const effectiveSelector = maybeSelector({ profileId: resolvedProfile, containerId, selector });
     const snapshot = await getDomSnapshotByProfile(resolvedProfile);
     const matched = effectiveSelector ? buildSelectorCheck(snapshot, effectiveSelector) : [];
@@ -133,12 +121,12 @@ export async function captureCheckpoint({
       message: 'Checkpoint captured',
       data: {
         profileId: resolvedProfile,
-        checkpoint: checkpointRes?.data?.checkpoint || 'unknown',
-        checkpointUrl: checkpointRes?.data?.url || '',
         containerId,
-        selector: effectiveSelector,
-        selectorCount: matched.length,
-        capturedAt: new Date().toISOString(),
+        selector,
+        checkpoint: checkpointRes.data?.checkpoint || 'unknown',
+        matched: matched.length,
+        snapshot: snapshot ? true : false,
+        url: checkpointRes.data?.url,
       },
     };
   } catch (err) {
@@ -148,62 +136,42 @@ export async function captureCheckpoint({
 
 export async function restoreCheckpoint({
   profileId,
-  checkpoint = null,
-  action,
-  containerId = null,
-  selector = null,
-  targetCheckpoint = null,
+  checkpointData,
   platform = 'generic',
+  checkpoints = DEFAULT_CHECKPOINTS,
+  platformHost = null,
 }) {
   try {
     const session = await ensureActiveSession(profileId);
     const resolvedProfile = session.profileId || profileId;
-    const effectiveSelector = maybeSelector({ profileId: resolvedProfile, containerId, selector });
-    let actionResult = null;
-
-    if (action === 'requery_container') {
-      if (!effectiveSelector) return asErrorPayload('CONTAINER_NOT_FOUND', 'Selector is required for requery_container');
-      const snapshot = await getDomSnapshotByProfile(resolvedProfile);
-      const matches = buildSelectorCheck(snapshot, effectiveSelector);
-      if (matches.length === 0) return asErrorPayload('CONTAINER_NOT_FOUND', `Container selector not found: ${effectiveSelector}`);
-      actionResult = { selector: effectiveSelector, count: matches.length };
-    } else if (action === 'scroll_into_view') {
-      if (!effectiveSelector) return asErrorPayload('CONTAINER_NOT_FOUND', 'Selector is required for scroll_into_view');
-      actionResult = await callAPI('evaluate', {
-        profileId: resolvedProfile,
-        script: `(async () => {
-          const el = document.querySelector(${JSON.stringify(effectiveSelector)});
-          if (!el) throw new Error('Element not found');
-          el.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
-          return { ok: true, selector: ${JSON.stringify(effectiveSelector)} };
-        })()`,
-      });
-    } else if (action === 'page_back') {
-      actionResult = await callAPI('page:back', { profileId: resolvedProfile });
-    } else if (action === 'goto_checkpoint_url') {
-      const url = checkpoint?.checkpointUrl || checkpoint?.url || '';
-      if (!url) return asErrorPayload('CHECKPOINT_RESTORE_FAILED', 'checkpointUrl is required for goto_checkpoint_url');
-      actionResult = await callAPI('goto', { profileId: resolvedProfile, url });
-    } else {
-      return asErrorPayload('UNSUPPORTED_RECOVERY_ACTION', `Unsupported recovery action: ${action}`);
+    
+    // Basic restore logic - navigate to URL if provided
+    if (checkpointData?.url) {
+      await callAPI('goto', { profileId: resolvedProfile, url: checkpointData.url });
     }
 
-    const checkpointAfter = await detectCheckpoint({ profileId: resolvedProfile, platform });
-    const reached = checkpointAfter?.data?.checkpoint || 'unknown';
-    const targetMatched = targetCheckpoint ? reached === targetCheckpoint : true;
+    const checkpointAfter = await detectCheckpoint({ 
+      profileId: resolvedProfile, 
+      platform,
+      checkpoints,
+      platformHost,
+    });
+
     return {
       ok: true,
-      code: targetMatched ? 'CHECKPOINT_RESTORED' : 'CHECKPOINT_RESTORE_PARTIAL',
-      message: targetMatched ? 'Checkpoint restored' : 'Recovery action completed but target checkpoint not reached',
+      code: 'CHECKPOINT_RESTORED',
+      message: 'Checkpoint restored',
       data: {
         profileId: resolvedProfile,
-        action,
-        actionResult,
-        reachedCheckpoint: reached,
-        targetCheckpoint,
+        checkpointBefore: checkpointData?.checkpoint || 'unknown',
+        checkpointAfter: checkpointAfter.data?.checkpoint || 'unknown',
+        url: checkpointAfter.data?.url,
       },
     };
   } catch (err) {
     return asErrorPayload('CHECKPOINT_RESTORE_FAILED', err?.message || String(err));
   }
 }
+
+// Export empty default for backward compatibility
+export const XHS_CHECKPOINTS = DEFAULT_CHECKPOINTS;

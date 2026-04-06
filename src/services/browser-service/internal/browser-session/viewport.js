@@ -6,7 +6,8 @@ export function resolveDeviceScaleFactor(profileId) {
         if (Number.isFinite(parsed) && parsed > 0)
             return parsed;
     }
-    if (os.platform() === 'win32' && profileId?.startsWith('xiaohongshu_')) {
+    const winDsfProfiles = String(process.env.CAMO_WINDOWS_DSF_PROFILES || 'xiaohongshu_,weibo_').split(',').map(s => s.trim()).filter(Boolean);
+    if (os.platform() === 'win32' && winDsfProfiles.some(p => profileId?.startsWith(p))) {
         return 1;
     }
     return null;

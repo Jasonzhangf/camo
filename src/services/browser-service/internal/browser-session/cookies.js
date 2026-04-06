@@ -103,8 +103,12 @@ export class BrowserSessionCookies {
                 if (hostSegment) {
                     targets.add(path.join(cookieDir, `${hostSegment}-latest.json`));
                 }
-                if (hostname && hostname.includes('weibo')) {
-                    targets.add(path.join(cookieDir, 'weibo.com-latest.json'));
+                const cookieDomains = String(process.env.CAMO_COOKIE_DOMAINS || 'weibo.com,xiaohongshu.com').split(',').map(s => s.trim()).filter(Boolean);
+                for (const domain of cookieDomains) {
+                  if (hostname && hostname.includes(domain.split('.')[0])) {
+                    targets.add(path.join(cookieDir, `${domain}-latest.json`));
+                  }
+                }
                 }
             }
             catch {
