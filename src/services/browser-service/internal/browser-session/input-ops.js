@@ -67,7 +67,7 @@ export class BrowserSessionInputOps {
     withInputActionLock;
     wheelMode = 'wheel';
     inputActionTail = Promise.resolve();
-    constructor(ensurePrimaryPage, ensureInputReady, runInputAction, withInputActionLock) {
+    constructor(ensurePrimaryPage, ensureInputReady, runInputAction, withInputActionLock, withReadLock) {
         this.ensurePrimaryPage = ensurePrimaryPage;
         this.ensureInputReady = ensureInputReady;
         this.runInputAction = runInputAction;
