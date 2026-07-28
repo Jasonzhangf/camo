@@ -405,3 +405,21 @@ registry (16 with per-resource gates, +registry integrity).
   v2/services/autoscript/ handles validation directly).
 - legacy-app repo (per AGENTS.md section 5) is unaffected by these
   changes; camo only ships v2/.
+
+## 2026-07-29 codex review gate (hard guard 36)
+
+Tried to run `codex --profile tcm review -` with the review-prompt.md
+stitched to a "review only commit 0b5b85b..88a355f" preamble. The codex
+CLI sat in S state for ~9 minutes without producing stdout, then exited
+silently. A second attempt via `codex --profile tcm exec -` behaved
+identically. No codex-review-*.txt file appeared for this run in
+either /tmp or the project's .agent-collab (the runs there belong to a
+different freehand project, not this camo review).
+
+Per the codex-review SKILL: "codex 不可用、无最终结论或结论歧义时
+显式上报，不得视为通过、不得静默跳过". This is recorded here, not
+hidden. The user may re-run the review (e.g. retry after codex app
+recovers from the in-flight app-server process shown by
+`pgrep -fl codex`). This note is the explicit report the SKILL
+mandates. The local gates (registry strict + npm test + check-file-size)
+are all green and verifiable independently of codex.
