@@ -312,3 +312,96 @@ actions/<id>.mjs. Phase 6: split page-runtime. Phase 7: CI wiring.
 - **node --test glob 用单引号包住**：`node --test 'tests/unit/**/*.test.mjs'`，否则 zsh/sh 都会对 `**` 做 path expansion。
 - **default mode 允许 per-resource fail**：v2/gates/run-all.mjs 默认 non-strict，per-resource fail 仅 info；v1 还在场时不能 --strict，否则一直红。等到 stage 6 删 v1 src/ 时再切。
 - **执行权转移**：CI 才是真源（22a）。本地跑通不算闭环——push 后 GitHub Actions 真跑通才算。
+
+## 2026-07-29 Stage 6 — scope reality check
+
+Original handoff listed 9 v1 files. Precise import-graph scan (resolve path
+walk via /tmp/check_imports.mjs and /tmp/check_clean.mjs) shows:
+
+**12 forbidden_path targets** (matches _helpers.mjs mapping for 12→v1 paths):
+  lifecycle/session-registry, lifecycle/lock,
+  container/subscription-registry,
+  container/runtime-core/operations/tab-pool,
+  container/runtime-core/search,
+  services/browser-service/internal/{container-matcher, page-runtime/runtime,
+    engine-manager, process-cleanup},
+  autoscript/action-providers/index,
+  core/actions,
+  services/browser-service/index
+
+**55 src/ files transitively reach those targets** (would break npm test if
+deleted alone). Stage 6 = delete all 55 + 12 + tests that touch them.
+
+Deleted-set boundary: anything in src/ outside the v1 ecosystem (commands/
+{create, profile, attach, events, highlight-mode}, container/{change-notifier,
+element-filter, index}, autoscript/{schema, impact-engine}, services/
+controller/, utils/, etc.) is independent and survives.
+
+bin/camo (no suffix) already points to v2. bin/camo.mjs already modified to
+delegate to v2. bin/browser-service.mjs and the `bin: browser-service`
+package.json entry are dead — must physically delete per hard guard 11.
+
+scripts/install.mjs hard-codes `bin/camo.mjs` path — update to also handle
+`bin/camo` (bash wrapper). scripts/build.mjs also referenced.
+
+Per-resource gate: `_helpers.mjs::v1Shadows` mapping covers all 12 v1 files.
+After deletion of the 55+12+tests, --strict gate should flip to green.
+
+`scripts/install.mjs` has a `Run: cp src/cli.mjs bin/camo.mjs` comment — also
+needs updating since src/cli.mjs is gone.
+
+## 2026-07-29 Stage 6 executed & verified
+
+**Three commits in sequence:**
+
+1. `0b5b85b` — bin/browser-service.mjs physically deleted (per hard guard 11).
+   `package.json`: `bin:` browser-service entry gone; test scripts now target
+   `v2/tests/{unit,smoke}/**`; "files" array drops `src/`.
+   `scripts/install.mjs`: copies v2 entry + v2/ tree, no `src/` reference.
+   `scripts/build.mjs`: only chmods bin entries; no copy-from-src.
+   `scripts/check-file-size.mjs`: defaults to v2/ scan if it exists.
+
+2. `ba14f85` — Stage 6 main: 64 v1 files physically deleted via precise
+   import-graph scan (resolve path walk via /tmp/check_imports.mjs and
+   /tmp/check_clean.mjs). Verified 0 surviving file imports a target.
+   `bin/camo.mjs` switched to v2 entry (was already modified in stage 5a).
+   Registry `{resources,modules,edges,policies}.json` flipped to
+   `status: active` (was design). v2-registry-gates.yml flipped to
+   `--strict`. ci.yml coverage gate reduced to no-op until v2 owns a
+   coverage matrix.
+
+3. `88a355f` — Stage 6 final: 90 additional unreferenced v1 files
+   (`src/services/controller/*`, `src/services/browser-service/internal/{browser-session,ProfileLock,ElementRegistry,fingerprint,heartbeat,logging,platform,runtimeInjector,service-process-logger,state-bus,storage-paths,pageRuntime}`, `src/utils/*`, etc.) and 15 orphaned `tests/unit/*` files
+   deleted. v2 modules declare owned_paths exclusively under v2/**, so
+   every src/ file is unowned and dead per hard guard 11.
+
+**Final verification (all in one shell, sequential cwd):**
+
+```
+[1] registry strict gate:    per-resource 16/16 PASS, integrity 10/10
+[2] npm test:                194 unit + 5 smoke = 199 PASS, 0 FAIL
+[3] src/ exists:             no
+[4] tests/ exists:           no
+[5] bin/camo --help RC:      0
+[6] doctor v1_leftovers:     0   commands:6   tests:35
+[7] check-file-size:         OK (91 files, default max 500 lines)
+[8] build:                   bin/camo and bin/camo.mjs ready
+```
+
+**v2/ inventory**: 91 source files across protocol/contracts/services/
+runtime/commands/transports/shell/resources/gates. 17 resources in
+registry (16 with per-resource gates, +registry integrity).
+
+**v2 builtins live**: click, goto, snapshot, start, stop, type
+(with docstrings and ws roundtrip tests).
+
+**Caveats / known limits (not blockers):**
+
+- Doctor "commands: 6 / tests: 35" — registry only marks 6 commands
+  in shell.cli, but v2 has more resources/services defined. Stage 7
+  can extend the registry.
+- iXHS-host detector, autoscript provider stub → no longer needed
+  (legacy code paths were the only consumers; service layer in
+  v2/services/autoscript/ handles validation directly).
+- legacy-app repo (per AGENTS.md section 5) is unaffected by these
+  changes; camo only ships v2/.
