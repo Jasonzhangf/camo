@@ -39,8 +39,10 @@ jobs:
         run: npm test
 
       - name: Run mode coverage gate (record/highlight, >=90%)
+        # Stage 6: coverage scripts targeting v1 records were removed; this
+        # stage is a no-op until v2 builds a coverage matrix.
         if: matrix.os == 'ubuntu-latest' && matrix.node == 20
-        run: npm run test:coverage:modes
+        run: echo 'skip v1 coverage gate; see v2-registry-gates.yml'
 
       - name: Test global install (Unix)
         run: npm install -g .

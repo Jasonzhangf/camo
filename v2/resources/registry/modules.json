@@ -1,46 +1,272 @@
 {
   "$schema": "./schemas/modules.schema.json",
   "schema_version": "1.0.0",
-  "status": "design",
+  "status": "active",
   "modules": [
-    {"id": "protocol.versions",            "layer": "L0_protocol",  "owned_paths": ["v2/protocol/versions/**"],                                                                               "status": "pending"},
-    {"id": "protocol.middleware",          "layer": "L0_protocol",  "owned_paths": ["v2/protocol/middleware/**"],                                                                             "status": "pending"},
-    {"id": "protocol.serde",               "layer": "L0_protocol",  "owned_paths": ["v2/protocol/serde/**"],                                                                                  "status": "pending"},
-
-    {"id": "contracts.ws_messages",        "layer": "L1_contract",  "owned_paths": ["v2/contracts/ws_messages/**"],                                                                           "status": "pending"},
-    {"id": "contracts.http_messages",      "layer": "L1_contract",  "owned_paths": ["v2/contracts/http_messages/**"],                                                                         "status": "pending"},
-    {"id": "contracts.error_envelope",     "layer": "L1_contract",  "owned_paths": ["v2/contracts/error_envelope/**"],                                                                        "status": "pending"},
-    {"id": "contracts.requests",           "layer": "L1_contract",  "owned_paths": ["v2/contracts/requests/**"],                                                                              "status": "pending"},
-    {"id": "contracts.responses",          "layer": "L1_contract",  "owned_paths": ["v2/contracts/responses/**"],                                                                             "status": "pending"},
-    {"id": "contracts.operations",         "layer": "L1_contract",  "owned_paths": ["v2/contracts/operations/**"],                                                                            "status": "pending"},
-
-    {"id": "services.profile",             "layer": "L2_service",   "owned_paths": ["v2/services/profile/**"],                                                                               "status": "pending"},
-    {"id": "services.session",             "layer": "L2_service",   "owned_paths": ["v2/services/session/**"],                                                                               "status": "pending"},
-    {"id": "services.lock",                "layer": "L2_service",   "owned_paths": ["v2/services/lock/**"],                                                                                  "status": "pending"},
-    {"id": "services.container",           "layer": "L2_service",   "owned_paths": ["v2/services/container/**"],                                                                             "status": "pending"},
-    {"id": "services.subscription",        "layer": "L2_service",   "owned_paths": ["v2/services/subscription/**"],                                                                          "status": "pending"},
-    {"id": "services.page_runtime",        "layer": "L2_service",   "owned_paths": ["v2/services/page_runtime/**"],                                                                         "status": "pending"},
-    {"id": "services.display",             "layer": "L2_service",   "owned_paths": ["v2/services/display/**"],                                                                               "status": "pending"},
-    {"id": "services.autoscript",          "layer": "L2_service",   "owned_paths": ["v2/services/autoscript/**"],                                                                            "status": "pending"},
-    {"id": "services.autoscript.actions",  "layer": "L2_service",   "owned_paths": ["v2/services/autoscript/actions/**"],                                                                     "status": "pending"},
-    {"id": "services.progress_event",      "layer": "L2_service",   "owned_paths": ["v2/services/progress_event/**"],                                                                        "status": "pending"},
-    {"id": "services.command_log",         "layer": "L2_service",   "owned_paths": ["v2/services/command_log/**"],                                                                           "status": "pending"},
-    {"id": "services.browser_service",     "layer": "L2_service",   "owned_paths": ["v2/services/browser_service/**"],                                                                       "status": "pending"},
-
-    {"id": "runtime.page_scripts",         "layer": "L2_service",   "owned_paths": ["v2/runtime/page_scripts/**"],                                                                           "status": "pending"},
-
-    {"id": "transports.ws",                "layer": "L3_transport", "owned_paths": ["v2/transports/ws/**"],                                                                                  "status": "pending"},
-    {"id": "transports.http",              "layer": "L3_transport", "owned_paths": ["v2/transports/http/**"],                                                                                "status": "pending"},
-    {"id": "transports.daemon",            "layer": "L3_transport", "owned_paths": ["v2/transports/daemon/**"],                                                                              "status": "pending"},
-    {"id": "transports.client",            "layer": "L3_transport", "owned_paths": ["v2/transports/client/**"],                                                                              "status": "pending"},
-
-    {"id": "commands.builtins",            "layer": "L4_command",   "owned_paths": ["v2/commands/builtins/**"],                                                                              "status": "pending"},
-    {"id": "commands.registry",            "layer": "L4_command",   "owned_paths": ["v2/commands/registry/**"],                                                                              "status": "pending"},
-    {"id": "commands.parsers",             "layer": "L4_command",   "owned_paths": ["v2/commands/parsers/**"],                                                                               "status": "pending"},
-    {"id": "commands.docstrings",          "layer": "L4_command",   "owned_paths": ["v2/commands/docstrings/**"],                                                                            "status": "pending"},
-
-    {"id": "shell.cli",                    "layer": "L5_shell",     "owned_paths": ["v2/shell/cli/**"],                                                                                      "status": "pending"},
-    {"id": "shell.bin_entry",              "layer": "L5_shell",     "owned_paths": ["v2/shell/bin_entry/**", "v2/examples/**"],                                                               "status": "pending"},
-    {"id": "shell.doctor",                 "layer": "L5_shell",     "owned_paths": ["v2/shell/doctor/**"],                                                                                   "status": "pending"}
+    {
+      "id": "protocol.versions",
+      "layer": "L0_protocol",
+      "owned_paths": [
+        "v2/protocol/versions/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "protocol.middleware",
+      "layer": "L0_protocol",
+      "owned_paths": [
+        "v2/protocol/middleware/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "protocol.serde",
+      "layer": "L0_protocol",
+      "owned_paths": [
+        "v2/protocol/serde/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "contracts.ws_messages",
+      "layer": "L1_contract",
+      "owned_paths": [
+        "v2/contracts/ws_messages/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "contracts.http_messages",
+      "layer": "L1_contract",
+      "owned_paths": [
+        "v2/contracts/http_messages/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "contracts.error_envelope",
+      "layer": "L1_contract",
+      "owned_paths": [
+        "v2/contracts/error_envelope/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "contracts.requests",
+      "layer": "L1_contract",
+      "owned_paths": [
+        "v2/contracts/requests/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "contracts.responses",
+      "layer": "L1_contract",
+      "owned_paths": [
+        "v2/contracts/responses/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "contracts.operations",
+      "layer": "L1_contract",
+      "owned_paths": [
+        "v2/contracts/operations/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "services.profile",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/services/profile/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "services.session",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/services/session/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "services.lock",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/services/lock/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "services.container",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/services/container/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "services.subscription",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/services/subscription/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "services.page_runtime",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/services/page_runtime/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "services.display",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/services/display/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "services.autoscript",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/services/autoscript/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "services.autoscript.actions",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/services/autoscript/actions/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "services.progress_event",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/services/progress_event/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "services.command_log",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/services/command_log/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "services.browser_service",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/services/browser_service/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "runtime.page_scripts",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/runtime/page_scripts/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "transports.ws",
+      "layer": "L3_transport",
+      "owned_paths": [
+        "v2/transports/ws/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "transports.http",
+      "layer": "L3_transport",
+      "owned_paths": [
+        "v2/transports/http/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "transports.daemon",
+      "layer": "L3_transport",
+      "owned_paths": [
+        "v2/transports/daemon/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "transports.client",
+      "layer": "L3_transport",
+      "owned_paths": [
+        "v2/transports/client/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "commands.builtins",
+      "layer": "L4_command",
+      "owned_paths": [
+        "v2/commands/builtins/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "commands.registry",
+      "layer": "L4_command",
+      "owned_paths": [
+        "v2/commands/registry/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "commands.parsers",
+      "layer": "L4_command",
+      "owned_paths": [
+        "v2/commands/parsers/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "commands.docstrings",
+      "layer": "L4_command",
+      "owned_paths": [
+        "v2/commands/docstrings/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "shell.cli",
+      "layer": "L5_shell",
+      "owned_paths": [
+        "v2/shell/cli/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "shell.bin_entry",
+      "layer": "L5_shell",
+      "owned_paths": [
+        "v2/shell/bin_entry/**",
+        "v2/examples/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "shell.doctor",
+      "layer": "L5_shell",
+      "owned_paths": [
+        "v2/shell/doctor/**"
+      ],
+      "status": "active"
+    }
   ]
 }

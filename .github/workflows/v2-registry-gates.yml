@@ -30,13 +30,11 @@ jobs:
           node-version: '22'
 
       - name: v2 registry integrity
-        # Default mode: integrity 10/10 must be green. Per-resource
-        # gates run for visibility but only fail the build under
-        # --strict, which we do NOT enable while v1 is still in place.
-        # When v1 src/ is removed (stage 6 of v2/PLAN.md), flip this
-        # command to `node v2/gates/run-all.mjs --strict`.
+        # Stage 6 of v2/PLAN.md: v1 src/ is now physically removed.
+        # Strict mode is the default — per-resource gates MUST be green
+        # or this job fails (hard guard 22a).
         working-directory: v2
-        run: node gates/run-all.mjs
+        run: node gates/run-all.mjs --strict
 
       - name: v2 unit tests
         working-directory: v2
@@ -45,14 +43,16 @@ jobs:
         run: node --test 'tests/unit/**/*.test.mjs'
 
       - name: v1 src/ untouched by this workflow
+        # Stage 6 deletes v1 src/ entirely. This step is informational:
         # Sanity check: the v2 rebuild must not touch v1 paths in this
         # branch. We do not fail the build on v1 diffs because other
         # worktrees may legitimately land v1 fixes; this step is
         # informational for reviewers.
         run: |
-          if git diff --name-only origin/main -- src/ | grep -q .; then
-            echo "::warning::v1 src/ differs from origin/main in this PR; review the diff."
-            git diff --name-only origin/main -- src/ || true
+          remaining=$(git ls-files src/ 2>/dev/null | wc -l | tr -d ' ')
+          if [ "$remaining" -gt 0 ]; then
+            echo "::warning::v1 src/ still has $remaining files; review the diff."
+            git ls-files src/ || true
           else
-            echo "v1 src/ matches origin/main (no v1 changes in this PR)."
+            echo "v1 src/ fully removed (stage 6). Strict registry gate is in effect."
           fi
