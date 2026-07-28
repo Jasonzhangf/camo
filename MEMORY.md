@@ -16,3 +16,14 @@
 **测试通过**: 创建 5 个 tab，关闭 1 个，剩余 4 个，total 与 list 一致
 
 Tags: camo, close-page, playwright, bug-fix
+
+## 2026-07-29 v2 CI registry gate 接入
+
+- 入口 workflow: `.github/workflows/v2-registry-gates.yml`
+- 触发: push/PR 到 main+master, workflow_dispatch
+- 步骤:
+  1. `cd v2 && node gates/run-all.mjs`  → integrity 10/10
+  2. `cd v2 && node --test 'tests/unit/**/*.test.mjs'`  → 117/117
+  3. v1 src/ vs origin/main diff warning（信息性）
+- 默认 `run-all.mjs` 不带 `--strict`：per-resource fail 仍允许 v1 在场；stage 6（删 v1）后切 `--strict`。
+- v1 `ci.yml` 不动；新 job 独立并行。
