@@ -1,0 +1,50 @@
+{
+  "$id": "camo.v2.resources",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["$schema", "schema_version", "layers", "resources"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema":         {"type": "string"},
+    "schema_version":  {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+    "status":          {"enum": ["design", "active", "deprecated"]},
+    "design_note":     {"type": "string"},
+    "layers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "purpose", "depends_on"],
+        "properties": {
+          "id":         {"type": "string", "pattern": "^L[0-9]_\\w+$"},
+          "purpose":    {"type": "string", "maxLength": 200},
+          "depends_on": {"type": "array", "items": {"type": "string", "pattern": "^L[0-9]_\\w+$"}}
+        },
+        "additionalProperties": false
+      }
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["resource_id", "layer", "truth_owner", "read_paths", "write_paths", "forbidden_paths", "verification_gate", "policy_id"],
+        "properties": {
+          "resource_id":      {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+          "display_name":     {"type": "string"},
+          "layer":            {"type": "string", "pattern": "^L[0-9]_\\w+$"},
+          "truth_owner":      {"type": "string", "pattern": "^v2/(services|runtime|protocol|contracts)/"},
+          "truth_store":      {"enum": ["memory_in_owner_process", "memory_in_ws_server", "memory_per_session", "memory_per_run", "memory_cache_per_process", "transient_per_request", "disk_json", "disk_jsonl", "disk_json_with_sigterm", "compiled_page_scripts", "code_schema", "code_registry"]},
+          "truth_path":       {"type": "string"},
+          "read_paths":       {"type": "array", "items": {"type": "string"}},
+          "write_paths":      {"type": "array", "items": {"type": "string"}},
+          "indirect_paths":   {"type": "array", "items": {"type": "string"}},
+          "forbidden_paths":  {"type": "array", "items": {"type": "string"}},
+          "verification_gate":{"type": "string", "pattern": "^registry\\.resources\\.[a-z][a-z0-9_]*$"},
+          "policy_id":        {"type": "string"},
+          "status":           {"enum": ["design", "active", "deprecated"]},
+          "design_note":      {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}

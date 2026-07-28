@@ -1,0 +1,58 @@
+{
+  "$schema": "./schemas/edges.schema.json",
+  "schema_version": "1.0.0",
+  "status": "design",
+  "edges": [
+    {"from": "shell.cli",                          "to": "commands.registry",          "kind": "load",     "reason": "load command table"},
+    {"from": "shell.cli",                          "to": "commands.builtins",          "kind": "call",     "reason": "dispatch by cmd id"},
+    {"from": "shell.cli",                          "to": "commands.parsers",           "kind": "call",     "reason": "infer profile + parse args"},
+    {"from": "shell.cli",                          "to": "services.command_log",       "kind": "call",     "reason": "append command_log entry"},
+    {"from": "shell.cli",                          "to": "services.progress_event",    "kind": "call",     "reason": "append start/end progress events"},
+    {"from": "shell.cli",                          "to": "shell.doctor",               "kind": "call",     "reason": "doctor subcommand"},
+
+    {"from": "commands.registry",                  "to": "commands.builtins",          "kind": "registry", "reason": "registry maps cmd_id -> builtin module"},
+    {"from": "commands.builtins",                  "to": "transports.client",          "kind": "call",     "reason": "send request to service"},
+    {"from": "commands.builtins",                  "to": "services.profile",           "kind": "call",     "reason": "read profile defaults (read-only)"},
+
+    {"from": "transports.client",                  "to": "transports.ws",              "kind": "call",     "reason": "open ws to browser-service"},
+    {"from": "transports.ws",                      "to": "services.browser_service",   "kind": "call",     "reason": "deliver message to handler"},
+    {"from": "transports.http",                    "to": "services.browser_service",   "kind": "call",     "reason": "deliver http request to handler"},
+    {"from": "transports.daemon",                  "to": "services.progress_event",    "kind": "call",     "reason": "fan out ws subscriptions"},
+
+    {"from": "services.browser_service",           "to": "contracts.ws_messages",      "kind": "call",     "reason": "parse/build envelope"},
+    {"from": "services.browser_service",           "to": "contracts.http_messages",    "kind": "call",     "reason": "parse/build envelope"},
+    {"from": "services.browser_service",           "to": "contracts.error_envelope",   "kind": "call",     "reason": "project errors"},
+    {"from": "services.browser_service",           "to": "services.session",           "kind": "call",     "reason": "create/read/delete session"},
+    {"from": "services.browser_service",           "to": "services.profile",           "kind": "call",     "reason": "resolve profile"},
+    {"from": "services.browser_service",           "to": "services.container",         "kind": "call",     "reason": "match container"},
+    {"from": "services.browser_service",           "to": "services.subscription",      "kind": "call",     "reason": "register / fire subscriptions"},
+    {"from": "services.browser_service",           "to": "services.page_runtime",      "kind": "call",     "reason": "inject + invoke page primitives"},
+    {"from": "services.browser_service",           "to": "services.lock",              "kind": "call",     "reason": "acquire/release profile lock"},
+    {"from": "services.browser_service",           "to": "services.display",           "kind": "call",     "reason": "read display metrics"},
+
+    {"from": "services.session",                   "to": "services.profile",           "kind": "call",     "reason": "profile required input"},
+    {"from": "services.session",                   "to": "services.lock",              "kind": "call",     "reason": "acquire on create, release on delete"},
+    {"from": "services.session",                   "to": "services.page_runtime",      "kind": "call",     "reason": "tab/page operations"},
+    {"from": "services.container",                 "to": "services.page_runtime",      "kind": "call",     "reason": "page context queries"},
+    {"from": "services.subscription",              "to": "services.container",         "kind": "call",     "reason": "match event source"},
+    {"from": "services.page_runtime",              "to": "runtime.page_scripts",       "kind": "load",     "reason": "load compiled bootstrap"},
+    {"from": "services.autoscript",                "to": "services.container",         "kind": "call",     "reason": "container subscription watcher"},
+    {"from": "services.autoscript",                "to": "services.page_runtime",      "kind": "call",     "reason": "execute operation"},
+    {"from": "services.autoscript",                "to": "services.autoscript.actions","kind": "call",     "reason": "delegate to per-action owner"},
+    {"from": "services.autoscript",                "to": "services.progress_event",    "kind": "call",     "reason": "append run event"},
+    {"from": "services.progress_event",            "to": "transports.daemon",          "kind": "call",     "reason": "fan out ws subscribers"}
+  ],
+  "forbidden_edges": [
+    {"from": "shell.cli",            "to": "services.session",          "reason": "shell may only read session; writes must go through ws/http"},
+    {"from": "shell.cli",            "to": "services.container",        "reason": "container match is service-only"},
+    {"from": "shell.cli",            "to": "services.lock",             "reason": "single-writer rule"},
+    {"from": "shell.cli",            "to": "services.page_runtime",     "reason": "page runtime is server-only"},
+    {"from": "commands.builtins",    "to": "services.session",          "reason": "must use transports"},
+    {"from": "commands.builtins",    "to": "services.container",        "reason": "must use transports"},
+    {"from": "transports.client",    "to": "services.lock",             "reason": "clients only observe; locks are server-writer"},
+    {"from": "L5_shell",             "to": "L2_service",                "reason": "shell must never import a service module directly; only via command+transport"},
+    {"from": "L4_command",           "to": "L0_protocol",               "reason": "command must use contracts/parsers, never protocol"},
+    {"from": "L3_transport",         "to": "L4_command",                "reason": "reverse dependency forbidden"}
+  ],
+  "reverse_dependency_rule": "edges are directional. importing the reverse edge is a hard fail."
+}

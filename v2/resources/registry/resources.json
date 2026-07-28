@@ -1,0 +1,268 @@
+{
+  "$schema": "./schemas/resources.schema.json",
+  "schema_version": "1.0.0",
+  "status": "design",
+  "design_note": "status=design per hard guard 22b. Do not cite as truth until all status fields are active AND gate_registry resources-coverage is green in CI.",
+  "layers": [
+    {"id": "L0_protocol",  "purpose": "wire formats, version envelopes, middleware",          "depends_on": []},
+    {"id": "L1_contract",  "purpose": "per-resource builder/parser, owns the type lock",        "depends_on": ["L0_protocol"]},
+    {"id": "L2_service",   "purpose": "single business-truth owner per resource",               "depends_on": ["L1_contract"]},
+    {"id": "L3_transport", "purpose": "servers and clients over ws/http/uds",                  "depends_on": ["L2_service"]},
+    {"id": "L4_command",   "purpose": "command orchestration, one handler per cmd id",         "depends_on": ["L3_transport"]},
+    {"id": "L5_shell",     "purpose": "process entry, cli dispatch, doctor",                   "depends_on": ["L4_command"]}
+  ],
+  "resources": [
+    {
+      "resource_id": "profile",
+      "display_name": "Browser profile",
+      "layer": "L2_service",
+      "truth_owner": "v2/services/profile",
+      "truth_store": "disk_json",
+      "truth_path": "~/.camo/profiles/<profile_id>/camo-profile.json",
+      "read_paths": ["v2/services/profile/store.mjs::read", "v2/services/session/manager.mjs::read", "v2/services/lock/manager.mjs::read"],
+      "write_paths": ["v2/services/profile/store.mjs::write", "v2/services/profile/store.mjs::delete"],
+      "indirect_paths": [],
+      "forbidden_paths": [
+        "v2/lifecycle/**::write",
+        "v2/commands/**::write_to_profile_meta"
+      ],
+      "verification_gate": "registry.resources.profile",
+      "policy_id": "single-truth",
+      "status": "pending"
+    },
+    {
+      "resource_id": "browser_session",
+      "display_name": "Browser session",
+      "layer": "L2_service",
+      "truth_owner": "v2/services/session",
+      "truth_store": "memory_in_owner_process",
+      "read_paths": ["v2/services/session/manager.mjs::read", "v2/services/session/manager.mjs::list", "v2/transports/ws/server.mjs::route"],
+      "write_paths": ["v2/services/session/manager.mjs::create", "v2/services/session/manager.mjs::delete", "v2/services/session/manager.mjs::mark_closed"],
+      "indirect_paths": ["v2/services/lock/manager.mjs::on_session_change"],
+      "forbidden_paths": [
+        "v2/lifecycle/session_registry.mjs::write",
+        "v2/commands/**::session_write"
+      ],
+      "verification_gate": "registry.resources.browser_session",
+      "policy_id": "no-cli-projection-write",
+      "status": "pending"
+    },
+    {
+      "resource_id": "profile_lock",
+      "display_name": "Profile ownership lock",
+      "layer": "L2_service",
+      "truth_owner": "v2/services/lock",
+      "truth_store": "disk_json_with_sigterm",
+      "truth_path": "~/.camo/locks/<profile_id>.lock",
+      "read_paths": ["v2/services/lock/manager.mjs::read", "v2/services/lock/manager.mjs::probe"],
+      "write_paths": ["v2/services/lock/manager.mjs::acquire", "v2/services/lock/manager.mjs::release", "v2/services/lock/manager.mjs::force_acquire"],
+      "indirect_paths": [],
+      "forbidden_paths": [
+        "v2/lifecycle/lock.mjs::write",
+        "v2/commands/**::lock_write"
+      ],
+      "verification_gate": "registry.resources.profile_lock",
+      "policy_id": "no-cli-write",
+      "status": "pending"
+    },
+    {
+      "resource_id": "container_match",
+      "display_name": "Container element match result",
+      "layer": "L2_service",
+      "truth_owner": "v2/services/container",
+      "truth_store": "transient_per_request",
+      "read_paths": ["v2/services/container/matcher.mjs::match", "v2/services/container/matcher.mjs::inspect"],
+      "write_paths": ["v2/services/container/matcher.mjs::match"],
+      "indirect_paths": ["v2/runtime/page_scripts/state_bus.mjs::subscribe"],
+      "forbidden_paths": [
+        "v2/container/runtime_core/search.mjs::match",
+        "v2/services/browser_service/internal/container_matcher.js::match"
+      ],
+      "verification_gate": "registry.resources.container_match",
+      "policy_id": "single-algorithm",
+      "status": "pending"
+    },
+    {
+      "resource_id": "subscription",
+      "display_name": "Container subscription",
+      "layer": "L2_service",
+      "truth_owner": "v2/services/subscription",
+      "truth_store": "memory_in_ws_server",
+      "read_paths": ["v2/services/subscription/registry.mjs::list", "v2/transports/ws/server.mjs::route"],
+      "write_paths": ["v2/services/subscription/registry.mjs::register", "v2/services/subscription/registry.mjs::unregister"],
+      "indirect_paths": ["v2/services/container/matcher.mjs::event_emit"],
+      "forbidden_paths": ["v2/container/subscription_registry.mjs::write"],
+      "verification_gate": "registry.resources.subscription",
+      "policy_id": "single-truth",
+      "status": "pending"
+    },
+    {
+      "resource_id": "tab_pool",
+      "display_name": "Tab pool",
+      "layer": "L2_service",
+      "truth_owner": "v2/services/page_runtime",
+      "truth_store": "memory_per_session",
+      "read_paths": ["v2/services/page_runtime/tab_pool.mjs::list", "v2/services/page_runtime/tab_pool.mjs::current"],
+      "write_paths": ["v2/services/page_runtime/tab_pool.mjs::next", "v2/services/page_runtime/tab_pool.mjs::set_slot"],
+      "indirect_paths": [],
+      "forbidden_paths": ["v2/operations/tab_pool.mjs::write"],
+      "verification_gate": "registry.resources.tab_pool",
+      "policy_id": "single-truth",
+      "status": "pending"
+    },
+    {
+      "resource_id": "input_pipeline",
+      "display_name": "Input pipeline (mouse/keyboard)",
+      "layer": "L2_service",
+      "truth_owner": "v2/services/page_runtime",
+      "truth_store": "memory_per_session",
+      "read_paths": ["v2/services/page_runtime/input_pipeline.mjs::status"],
+      "write_paths": ["v2/services/page_runtime/input_pipeline.mjs::run"],
+      "indirect_paths": [],
+      "forbidden_paths": [
+        "v2/services/page_runtime/input_ops.mjs::run",
+        "v2/core/actions.mjs::run"
+      ],
+      "verification_gate": "registry.resources.input_pipeline",
+      "policy_id": "single-owner",
+      "status": "pending"
+    },
+    {
+      "resource_id": "page_runtime",
+      "display_name": "Injected page runtime bundle",
+      "layer": "L2_service",
+      "truth_owner": "v2/runtime/page_scripts",
+      "truth_store": "compiled_page_scripts",
+      "truth_path": "v2/runtime/page_scripts/dist/<version>.bundle.js",
+      "read_paths": ["v2/runtime/page_scripts/bootstrap.mjs::load", "v2/services/page_runtime/injector.mjs::inject"],
+      "write_paths": ["v2/runtime/page_scripts/bootstrap.mjs::register"],
+      "indirect_paths": [],
+      "forbidden_paths": [
+        "v2/services/browser_service/internal/page_runtime/runtime.js::write"
+      ],
+      "verification_gate": "registry.resources.page_runtime",
+      "policy_id": "small-files",
+      "status": "pending"
+    },
+    {
+      "resource_id": "display_metrics",
+      "display_name": "Display screen size resolution",
+      "layer": "L2_service",
+      "truth_owner": "v2/services/display",
+      "truth_store": "memory_cache_per_process",
+      "read_paths": ["v2/services/display/resolver.mjs::read", "v2/services/browser_service/bootstrap.mjs::read"],
+      "write_paths": ["v2/services/display/resolver.mjs::refresh"],
+      "indirect_paths": [],
+      "forbidden_paths": [
+        "v2/services/browser_service/index.js::osascript",
+        "v2/services/browser_service/internal/engine_manager.js::osascript",
+        "v2/services/browser_service/internal/process_cleanup.js::osascript"
+      ],
+      "verification_gate": "registry.resources.display_metrics",
+      "policy_id": "single-owner",
+      "status": "pending"
+    },
+    {
+      "resource_id": "autoscript_run",
+      "display_name": "Autoscript execution run",
+      "layer": "L2_service",
+      "truth_owner": "v2/services/autoscript",
+      "truth_store": "memory_per_run",
+      "read_paths": ["v2/services/autoscript/runner.mjs::read", "v2/services/autoscript/runner.mjs::status"],
+      "write_paths": ["v2/services/autoscript/runner.mjs::start", "v2/services/autoscript/runner.mjs::stop"],
+      "indirect_paths": ["v2/services/progress_event/log.mjs::append"],
+      "forbidden_paths": ["v2/commands/autoscript.mjs::state_write"],
+      "verification_gate": "registry.resources.autoscript_run",
+      "policy_id": "single-truth+explicit-actions",
+      "status": "pending"
+    },
+    {
+      "resource_id": "autoscript_action",
+      "display_name": "Autoscript action provider",
+      "layer": "L2_service",
+      "truth_owner": "v2/services/autoscript/actions",
+      "truth_store": "code_registry",
+      "truth_path": "v2/services/autoscript/actions/<actionId>.mjs",
+      "read_paths": ["v2/services/autoscript/runner.mjs::execute", "v2/contracts/operations/registry.json::validate"],
+      "write_paths": ["v2/services/autoscript/actions/<actionId>.mjs::run"],
+      "indirect_paths": [],
+      "forbidden_paths": ["v2/autoscript/action_providers/index.mjs::stub"],
+      "verification_gate": "registry.resources.autoscript_action",
+      "policy_id": "no-stub+per-action-owner",
+      "status": "pending"
+    },
+    {
+      "resource_id": "progress_event",
+      "display_name": "Progress / event stream",
+      "layer": "L2_service",
+      "truth_owner": "v2/services/progress_event",
+      "truth_store": "disk_jsonl",
+      "truth_path": "~/.camo/runs/<run_id>/events.jsonl",
+      "read_paths": ["v2/services/progress_event/log.mjs::read", "v2/transports/ws/server.mjs::subscribe"],
+      "write_paths": ["v2/services/progress_event/log.mjs::append"],
+      "indirect_paths": [],
+      "forbidden_paths": ["v2/commands/**::events_append"],
+      "verification_gate": "registry.resources.progress_event",
+      "policy_id": "single-truth+true-fanout",
+      "status": "pending"
+    },
+    {
+      "resource_id": "command_log",
+      "display_name": "Command audit log",
+      "layer": "L2_service",
+      "truth_owner": "v2/services/command_log",
+      "truth_store": "disk_jsonl",
+      "truth_path": "~/.camo/runs/<run_id>/commands.jsonl",
+      "read_paths": ["v2/services/command_log/log.mjs::read"],
+      "write_paths": ["v2/shell/cli/dispatch.mjs::append"],
+      "indirect_paths": [],
+      "forbidden_paths": ["v2/commands/**::commands_append"],
+      "verification_gate": "registry.resources.command_log",
+      "policy_id": "single-writer",
+      "status": "pending"
+    },
+    {
+      "resource_id": "ws_message",
+      "display_name": "WS wire message envelope",
+      "layer": "L0_protocol",
+      "truth_owner": "v2/protocol/versions",
+      "truth_store": "code_schema",
+      "read_paths": ["v2/contracts/ws_messages/<version>/envelope.mjs::parse"],
+      "write_paths": ["v2/contracts/ws_messages/<version>/envelope.mjs::build"],
+      "indirect_paths": [],
+      "forbidden_paths": ["v2/transports/ws/server.mjs::ad_hoc_json"],
+      "verification_gate": "registry.resources.ws_message",
+      "policy_id": "type-lock+versioned",
+      "status": "pending"
+    },
+    {
+      "resource_id": "http_message",
+      "display_name": "HTTP wire envelope",
+      "layer": "L0_protocol",
+      "truth_owner": "v2/protocol/versions",
+      "truth_store": "code_schema",
+      "read_paths": ["v2/contracts/http_messages/<version>/envelope.mjs::parse"],
+      "write_paths": ["v2/contracts/http_messages/<version>/envelope.mjs::build"],
+      "indirect_paths": [],
+      "forbidden_paths": [],
+      "verification_gate": "registry.resources.http_message",
+      "policy_id": "type-lock+versioned",
+      "status": "pending"
+    },
+    {
+      "resource_id": "error_envelope",
+      "display_name": "Error code/projection envelope",
+      "layer": "L1_contract",
+      "truth_owner": "v2/contracts/error_envelope",
+      "truth_store": "code_registry",
+      "truth_path": "v2/contracts/error_envelope/codes.json",
+      "read_paths": ["v2/contracts/error_envelope/projector.mjs::project"],
+      "write_paths": ["v2/contracts/error_envelope/codes.json::add"],
+      "indirect_paths": [],
+      "forbidden_paths": ["v2/**::throw_inline_user_message"],
+      "verification_gate": "registry.resources.error_envelope",
+      "policy_id": "single-truth+code-required",
+      "status": "pending"
+    }
+  ]
+}

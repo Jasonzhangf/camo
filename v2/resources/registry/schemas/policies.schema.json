@@ -1,0 +1,24 @@
+{
+  "$id": "camo.v2.policies",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["schema_version", "policies"],
+  "properties": {
+    "schema_version": {"type": "string"},
+    "status":         {"enum": ["design", "active", "deprecated"]},
+    "policies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "applies_to", "rule"],
+        "properties": {
+          "id":         {"type": "string", "pattern": "^[a-z][a-z0-9_+]*$"},
+          "applies_to": {"oneOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}]},
+          "rule":       {"type": "string", "maxLength": 400}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

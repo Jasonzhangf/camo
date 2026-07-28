@@ -1,0 +1,20 @@
+{
+  "$schema": "./schemas/policies.schema.json",
+  "schema_version": "1.0.0",
+  "status": "design",
+  "policies": [
+    {"id": "single-truth",                       "applies_to": "every resource",          "rule": "exactly one truth_owner per resource_id"},
+    {"id": "no-cli-projection-write",            "applies_to": "browser_session",         "rule": "CLI may only project; writes only via service SessionManager"},
+    {"id": "no-cli-write",                       "applies_to": "profile_lock",            "rule": "CLI does not hold lock file; only service writes"},
+    {"id": "single-algorithm",                   "applies_to": "container_match",         "rule": "exactly one matcher implementation across service and CLI"},
+    {"id": "single-owner",                       "applies_to": "input_pipeline, display_metrics", "rule": "single owner; other modules may import types only"},
+    {"id": "small-files",                        "applies_to": "page_runtime",            "rule": "no source file > 500 lines; bootstrap only owns the loader, every primitive in its own file"},
+    {"id": "no-stub+per-action-owner",           "applies_to": "autoscript_action",       "rule": "no stubs; every action_id must point to a real module under services/autoscript/actions/"},
+    {"id": "single-truth+explicit-actions",      "applies_to": "autoscript_run",          "rule": "action_id must exist in registry; missing action_id fails schema validation, never silently ok"},
+    {"id": "single-truth+true-fanout",           "applies_to": "progress_event",          "rule": "single writer; ws daemon only fans out"},
+    {"id": "single-writer",                      "applies_to": "command_log",             "rule": "shell.cli is the only writer"},
+    {"id": "type-lock+versioned",                "applies_to": "ws_message, http_message","rule": "every envelope has explicit version; ad-hoc json is forbidden"},
+    {"id": "single-truth+code-required",         "applies_to": "error_envelope",          "rule": "every error carries an Error01Code; user-facing message is projected, never constructed inline"},
+    {"id": "single-truth+small-files",           "applies_to": "page_runtime",            "rule": "see small-files"}
+  ]
+}

@@ -1,0 +1,34 @@
+<!doctype html>
+<html><head>
+<meta charset="utf-8">
+<title>camo v2 verification</title>
+<style>
+body { font: 14px/1.5 -apple-system, system-ui, sans-serif; max-width: 800px; margin: 24px auto; padding: 0 16px; }
+code { font-family: ui-monospace, Menlo, monospace; }
+table { border-collapse: collapse; width: 100%; }
+th,td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }
+th { background: #f4f4f4; }
+.pill { display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px; }
+.pill.design { background:#ffecb3; color:#6d4c00; }
+.pill.active { background:#c8e6c9; color:#1b5e20; }
+</style></head>
+<body>
+<h1>camo v2 verification</h1>
+<p>One page per gate. Each gate has a hard/soft label and a CI-runner entry.</p>
+<table>
+<thead><tr><th>gate id</th><th>type</th><th>script</th><th>resource</th><th>status</th></tr></thead>
+<tbody>
+<tr><td>registry-gates</td><td>hard (integrity), soft (per-resource)</td><td>v2/gates/run-all.mjs</td><td>all</td><td><span class="pill design">design</span></td></tr>
+</tbody>
+</table>
+<h2>Adding a new gate</h2>
+<ol>
+<li>Create the gate script under <code>v2/gates/&lt;group&gt;/&lt;name&gt;.mjs</code>.</li>
+<li>Add a verification doc at <code>v2/docs/verification/&lt;name&gt;.md</code>.</li>
+<li>Register the gate in this index.</li>
+<li>Wire it into <code>v2/gates/run-all.mjs</code> or a separate CI step.</li>
+<li>Add at least one positive and one negative test.</li>
+</ol>
+<h2>Promote to active</h2>
+<p>When the v2 module for a resource lands and all its forbidden_paths are physically absent from v1, the resource status flips to <code>active</code> and the corresponding per-resource gate turns into a hard CI gate (via <code>--strict</code>). Hard guard 22b: never cite a design entry as live truth.</p>
+</body></html>

@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>camo v2 architecture wiki</title>
+  <style>
+    body { font: 14px/1.5 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; max-width: 960px; margin: 24px auto; padding: 0 16px; color: #1a1a1a; }
+    h1, h2, h3 { color: #111; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    pre { background: #f4f4f4; padding: 12px 14px; border-radius: 6px; overflow-x: auto; }
+    .layer { padding: 12px 16px; border-left: 4px solid #888; margin: 16px 0; background: #fafafa; border-radius: 0 6px 6px 0; }
+    .L0 { border-color: #c62828; }
+    .L1 { border-color: #ad1457; }
+    .L2 { border-color: #6a1b9a; }
+    .L3 { border-color: #1565c0; }
+    .L4 { border-color: #2e7d32; }
+    .L5 { border-color: #ef6c00; }
+    .pill { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #eee; margin-left: 6px; }
+    .pill.design { background: #ffecb3; color: #6d4c00; }
+    .pill.active { background: #c8e6c9; color: #1b5e20; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }
+    th { background: #f4f4f4; }
+  </style>
+</head>
+<body>
+<h1>camo v2 architecture wiki</h1>
+<p>This page is the human mirror of <code>v2/resources/registry/</code>.
+The registry is the source of truth. This page repeats the same node ids
+(<code>resource_id</code>, <code>module_id</code>, <code>edge id</code>) so a
+reader can map a paragraph back to a machine-checked entry.</p>
+
+<h2>Entry points</h2>
+<ul>
+  <li>CLI binary: <code>v2/shell/bin_entry/camo.mjs</code> -> <code>v2/shell/cli/main.mjs</code></li>
+  <li>Service binary: <code>v2/shell/bin_entry/browser-service.mjs</code> -> <code>v2/services/browser_service/main.mjs</code></li>
+  <li>Doctor: <code>camo doctor</code> -> <code>v2/shell/doctor/main.mjs</code></li>
+</ul>
+
+<h2>Layers</h2>
+
+<div class="layer L0">
+  <h3>L0 protocol <span class="pill design">design</span></h3>
+  <p>Wire formats and version envelopes. Owns <code>v2/protocol/versions/</code>, <code>v2/protocol/middleware/</code>, <code>v2/protocol/serde/</code>.</p>
+  <p>No business logic. No resource truth. Everything passes through here on the way in/out.</p>
+</div>
+
+<div class="layer L1">
+  <h3>L1 contract <span class="pill design">design</span></h3>
+  <p>Per-resource builder/parser. The type lock lives here. Owns
+    <code>v2/contracts/ws_messages/</code>, <code>v2/contracts/http_messages/</code>,
+    <code>v2/contracts/error_envelope/</code>, <code>v2/contracts/requests/</code>,
+    <code>v2/contracts/responses/</code>, <code>v2/contracts/operations/</code>.</p>
+</div>
+
+<div class="layer L2">
+  <h3>L2 service <span class="pill design">design</span></h3>
+  <p>Single truth owner per resource. Each service module is named after the resource(s) it owns. Owns
+    <code>v2/services/&lt;resource&gt;/</code>.</p>
+  <p>Modules: profile, session, lock, container, subscription, page_runtime, display, autoscript, progress_event, browser_service.</p>
+</div>
+
+<div class="layer L3">
+  <h3>L3 transport <span class="pill design">design</span></h3>
+  <p>WS, HTTP, daemon, client. Owns
+    <code>v2/transports/ws/</code>, <code>v2/transports/http/</code>,
+    <code>v2/transports/daemon/</code>, <code>v2/transports/client/</code>.</p>
+</div>
+
+<div class="layer L4">
+  <h3>L4 command <span class="pill design">design</span></h3>
+  <p>One handler per command id. Loads from <code>v2/commands/registry/</code>.
+    Owns <code>v2/commands/builtins/</code>, <code>v2/commands/registry/</code>,
+    <code>v2/commands/parsers/</code>, <code>v2/commands/docstrings/</code>.</p>
+</div>
+
+<div class="layer L5">
+  <h3>L5 shell <span class="pill design">design</span></h3>
+  <p>Process entry, dispatch, doctor. Owns
+    <code>v2/shell/cli/</code>, <code>v2/shell/bin_entry/</code>, <code>v2/shell/doctor/</code>.</p>
+</div>
+
+<h2>Resource quick view</h2>
+<table>
+  <thead>
+    <tr><th>resource_id</th><th>layer</th><th>truth_owner</th><th>gate</th><th>status</th></tr>
+  </thead>
+  <tbody id="tbody-resources">
+    <tr>
+      <td><code>profile</code></td>
+      <td>L2_service</td>
+      <td><code>v2/services/profile</code></td>
+      <td><code>registry.resources.profile</code></td>
+      <td><span class="pill pending">pending</span></td>
+    </tr>
+
+    <tr>
+      <td><code>browser_session</code></td>
+      <td>L2_service</td>
+      <td><code>v2/services/session</code></td>
+      <td><code>registry.resources.browser_session</code></td>
+      <td><span class="pill pending">pending</span></td>
+    </tr>
+
+    <tr>
+      <td><code>profile_lock</code></td>
+      <td>L2_service</td>
+      <td><code>v2/services/lock</code></td>
+      <td><code>registry.resources.profile_lock</code></td>
+      <td><span class="pill pending">pending</span></td>
+    </tr>
+
+    <tr>
+      <td><code>container_match</code></td>
+      <td>L2_service</td>
+      <td><code>v2/services/container</code></td>
+      <td><code>registry.resources.container_match</code></td>
+      <td><span class="pill pending">pending</span></td>
+    </tr>
+
+    <tr>
+      <td><code>subscription</code></td>
+      <td>L2_service</td>
+      <td><code>v2/services/subscription</code></td>
+      <td><code>registry.resources.subscription</code></td>
+      <td><span class="pill pending">pending</span></td>
+    </tr>
+
+    <tr>
+      <td><code>tab_pool</code></td>
+      <td>L2_service</td>
+      <td><code>v2/services/page_runtime</code></td>
+      <td><code>registry.resources.tab_pool</code></td>
+      <td><span class="pill pending">pending</span></td>
+    </tr>
+
+    <tr>
+      <td><code>input_pipeline</code></td>
+      <td>L2_service</td>
+      <td><code>v2/services/page_runtime</code></td>
+      <td><code>registry.resources.input_pipeline</code></td>
+      <td><span class="pill pending">pending</span></td>
+    </tr>
+
+    <tr>
+      <td><code>page_runtime</code></td>
+      <td>L2_service</td>
+      <td><code>v2/runtime/page_scripts</code></td>
+      <td><code>registry.resources.page_runtime</code></td>
+      <td><span class="pill pending">pending</span></td>
+    </tr>
+
+    <tr>
+      <td><code>display_metrics</code></td>
+      <td>L2_service</td>
+      <td><code>v2/services/display</code></td>
+      <td><code>registry.resources.display_metrics</code></td>
+      <td><span class="pill pending">pending</span></td>
+    </tr>
+
+    <tr>
+      <td><code>autoscript_run</code></td>
+      <td>L2_service</td>
+      <td><code>v2/services/autoscript</code></td>
+      <td><code>registry.resources.autoscript_run</code></td>
+      <td><span class="pill pending">pending</span></td>
+    </tr>
+
+    <tr>
+      <td><code>autoscript_action</code></td>
+      <td>L2_service</td>
+      <td><code>v2/services/autoscript/actions</code></td>
+      <td><code>registry.resources.autoscript_action</code></td>
+      <td><span class="pill pending">pending</span></td>
+    </tr>
+
+    <tr>
+      <td><code>progress_event</code></td>
+      <td>L2_service</td>
+      <td><code>v2/services/progress_event</code></td>
+      <td><code>registry.resources.progress_event</code></td>
+      <td><span class="pill pending">pending</span></td>
+    </tr>
+
+    <tr>
+      <td><code>command_log</code></td>
+      <td>L2_service</td>
+      <td><code>v2/services/command_log</code></td>
+      <td><code>registry.resources.command_log</code></td>
+      <td><span class="pill pending">pending</span></td>
+    </tr>
+
+    <tr>
+      <td><code>ws_message</code></td>
+      <td>L0_protocol</td>
+      <td><code>v2/protocol/versions</code></td>
+      <td><code>registry.resources.ws_message</code></td>
+      <td><span class="pill pending">pending</span></td>
+    </tr>
+
+    <tr>
+      <td><code>http_message</code></td>
+      <td>L0_protocol</td>
+      <td><code>v2/protocol/versions</code></td>
+      <td><code>registry.resources.http_message</code></td>
+      <td><span class="pill pending">pending</span></td>
+    </tr>
+
+    <tr>
+      <td><code>error_envelope</code></td>
+      <td>L1_contract</td>
+      <td><code>v2/contracts/error_envelope</code></td>
+      <td><code>registry.resources.error_envelope</code></td>
+      <td><span class="pill pending">pending</span></td>
+    </tr></tbody>
+</table>
+
+<h2>Edge quick view</h2>
+<table>
+  <thead>
+    <tr><th>from</th><th>to</th><th>kind</th><th>reason</th></tr>
+  </thead>
+  <tbody id="tbody-edges">
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>commands.registry</code></td>
+      <td>load</td>
+      <td>load command table</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>commands.builtins</code></td>
+      <td>call</td>
+      <td>dispatch by cmd id</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>commands.parsers</code></td>
+      <td>call</td>
+      <td>infer profile + parse args</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.command_log</code></td>
+      <td>call</td>
+      <td>append command_log entry</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.progress_event</code></td>
+      <td>call</td>
+      <td>append start/end progress events</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>shell.doctor</code></td>
+      <td>call</td>
+      <td>doctor subcommand</td>
+    </tr>
+
+    <tr>
+      <td><code>commands.registry</code></td>
+      <td><code>commands.builtins</code></td>
+      <td>registry</td>
+      <td>registry maps cmd_id -&gt; builtin module</td>
+    </tr>
+
+    <tr>
+      <td><code>commands.builtins</code></td>
+      <td><code>transports.client</code></td>
+      <td>call</td>
+      <td>send request to service</td>
+    </tr>
+
+    <tr>
+      <td><code>commands.builtins</code></td>
+      <td><code>services.profile</code></td>
+      <td>call</td>
+      <td>read profile defaults (read-only)</td>
+    </tr>
+
+    <tr>
+      <td><code>transports.client</code></td>
+      <td><code>transports.ws</code></td>
+      <td>call</td>
+      <td>open ws to browser-service</td>
+    </tr>
+
+    <tr>
+      <td><code>transports.ws</code></td>
+      <td><code>services.browser_service</code></td>
+      <td>call</td>
+      <td>deliver message to handler</td>
+    </tr>
+
+    <tr>
+      <td><code>transports.http</code></td>
+      <td><code>services.browser_service</code></td>
+      <td>call</td>
+      <td>deliver http request to handler</td>
+    </tr>
+
+    <tr>
+      <td><code>transports.daemon</code></td>
+      <td><code>services.progress_event</code></td>
+      <td>call</td>
+      <td>fan out ws subscriptions</td>
+    </tr>
+
+    <tr>
+      <td><code>services.browser_service</code></td>
+      <td><code>contracts.ws_messages</code></td>
+      <td>call</td>
+      <td>parse/build envelope</td>
+    </tr>
+
+    <tr>
+      <td><code>services.browser_service</code></td>
+      <td><code>contracts.http_messages</code></td>
+      <td>call</td>
+      <td>parse/build envelope</td>
+    </tr>
+
+    <tr>
+      <td><code>services.browser_service</code></td>
+      <td><code>contracts.error_envelope</code></td>
+      <td>call</td>
+      <td>project errors</td>
+    </tr>
+
+    <tr>
+      <td><code>services.browser_service</code></td>
+      <td><code>services.session</code></td>
+      <td>call</td>
+      <td>create/read/delete session</td>
+    </tr>
+
+    <tr>
+      <td><code>services.browser_service</code></td>
+      <td><code>services.profile</code></td>
+      <td>call</td>
+      <td>resolve profile</td>
+    </tr>
+
+    <tr>
+      <td><code>services.browser_service</code></td>
+      <td><code>services.container</code></td>
+      <td>call</td>
+      <td>match container</td>
+    </tr>
+
+    <tr>
+      <td><code>services.browser_service</code></td>
+      <td><code>services.subscription</code></td>
+      <td>call</td>
+      <td>register / fire subscriptions</td>
+    </tr>
+
+    <tr>
+      <td><code>services.browser_service</code></td>
+      <td><code>services.page_runtime</code></td>
+      <td>call</td>
+      <td>inject + invoke page primitives</td>
+    </tr>
+
+    <tr>
+      <td><code>services.browser_service</code></td>
+      <td><code>services.lock</code></td>
+      <td>call</td>
+      <td>acquire/release profile lock</td>
+    </tr>
+
+    <tr>
+      <td><code>services.browser_service</code></td>
+      <td><code>services.display</code></td>
+      <td>call</td>
+      <td>read display metrics</td>
+    </tr>
+
+    <tr>
+      <td><code>services.session</code></td>
+      <td><code>services.profile</code></td>
+      <td>call</td>
+      <td>profile required input</td>
+    </tr>
+
+    <tr>
+      <td><code>services.session</code></td>
+      <td><code>services.lock</code></td>
+      <td>call</td>
+      <td>acquire on create, release on delete</td>
+    </tr>
+
+    <tr>
+      <td><code>services.session</code></td>
+      <td><code>services.page_runtime</code></td>
+      <td>call</td>
+      <td>tab/page operations</td>
+    </tr>
+
+    <tr>
+      <td><code>services.container</code></td>
+      <td><code>services.page_runtime</code></td>
+      <td>call</td>
+      <td>page context queries</td>
+    </tr>
+
+    <tr>
+      <td><code>services.subscription</code></td>
+      <td><code>services.container</code></td>
+      <td>call</td>
+      <td>match event source</td>
+    </tr>
+
+    <tr>
+      <td><code>services.page_runtime</code></td>
+      <td><code>runtime.page_scripts</code></td>
+      <td>load</td>
+      <td>load compiled bootstrap</td>
+    </tr>
+
+    <tr>
+      <td><code>services.autoscript</code></td>
+      <td><code>services.container</code></td>
+      <td>call</td>
+      <td>container subscription watcher</td>
+    </tr>
+
+    <tr>
+      <td><code>services.autoscript</code></td>
+      <td><code>services.page_runtime</code></td>
+      <td>call</td>
+      <td>execute operation</td>
+    </tr>
+
+    <tr>
+      <td><code>services.autoscript</code></td>
+      <td><code>services.autoscript.actions</code></td>
+      <td>call</td>
+      <td>delegate to per-action owner</td>
+    </tr>
+
+    <tr>
+      <td><code>services.autoscript</code></td>
+      <td><code>services.progress_event</code></td>
+      <td>call</td>
+      <td>append run event</td>
+    </tr>
+
+    <tr>
+      <td><code>services.progress_event</code></td>
+      <td><code>transports.daemon</code></td>
+      <td>call</td>
+      <td>fan out ws subscribers</td>
+    </tr></tbody>
+</table>
+
+<h2>Forbidden cross-layer patterns</h2>
+<ul>
+  <li>L5 importing L2 directly: hard fail.</li>
+  <li>L4 importing L0 directly (must use L1 contracts): hard fail.</li>
+  <li>L3 importing L4 (reverse flow): hard fail.</li>
+  <li>Commands or transports opening files outside a service: hard fail.</li>
+<h3>Forbidden edges</h3><table><thead><tr><th>from</th><th>to</th><th>reason</th></tr></thead><tbody>
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.session</code></td>
+      <td>shell may only read session; writes must go through ws/http</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.container</code></td>
+      <td>container match is service-only</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.lock</code></td>
+      <td>single-writer rule</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.page_runtime</code></td>
+      <td>page runtime is server-only</td>
+    </tr>
+
+    <tr>
+      <td><code>commands.builtins</code></td>
+      <td><code>services.session</code></td>
+      <td>must use transports</td>
+    </tr>
+
+    <tr>
+      <td><code>commands.builtins</code></td>
+      <td><code>services.container</code></td>
+      <td>must use transports</td>
+    </tr>
+
+    <tr>
+      <td><code>transports.client</code></td>
+      <td><code>services.lock</code></td>
+      <td>clients only observe; locks are server-writer</td>
+    </tr>
+
+    <tr>
+      <td><code>L5_shell</code></td>
+      <td><code>L2_service</code></td>
+      <td>shell must never import a service module directly; only via command+transport</td>
+    </tr>
+
+    <tr>
+      <td><code>L4_command</code></td>
+      <td><code>L0_protocol</code></td>
+      <td>command must use contracts/parsers, never protocol</td>
+    </tr>
+
+    <tr>
+      <td><code>L3_transport</code></td>
+      <td><code>L4_command</code></td>
+      <td>reverse dependency forbidden</td>
+    </tr></tbody></table></ul><h2>Checklist</h2>
+<ol>
+  <li>Resource truth: each <code>resource_id</code> has exactly one <code>truth_owner</code>.</li>
+  <li>Module ownership: each source file is in exactly one module's <code>owned_paths</code>.</li>
+  <li>Imports: cross-module imports must hit a declared edge; reverse edges are forbidden.</li>
+  <li>Gate: every <code>verification_gate</code> in registry has a real gate script under <code>v2/gates/registry_gates/</code>.</li>
+  <li>CI: every gate runs in CI on push.</li>
+</ol>
+
+<h2>Canonical docs</h2>
+<ul>
+  <li><a href="resources.html">resources.html</a> per-resource narrative</li>
+  <li><a href="../migration_contracts/mainline_call_map.md">mainline_call_map.md</a> per-edge narrative</li>
+  <li><a href="../verification/index.html">verification/index.html</a> gate index</li>
+</ul>
+
+<script>
+// Pseudo-style filler. Pure-static page; generated mirrors stay hand-edited
+// until a v2 generator script lands. See v2/scripts/build-wiki.mjs.
+</script>
+</body>
+</html>

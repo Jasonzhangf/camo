@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0.0",
+  "status": "design",
+  "design_note": "Maps feature_id -> required tests. CI gate verifies each resource has at least one positive + one negative test before status flips to active.",
+  "features": [
+    {"id": "err.project",          "owner_resource": "error_envelope",     "positive": ["v2/tests/unit/contracts/error_envelope.projector.test.mjs"], "negative": ["v2/tests/unit/contracts/error_envelope.unknown_code.test.mjs"]},
+    {"id": "profile.read",         "owner_resource": "profile",            "positive": ["v2/tests/unit/services/profile.store.test.mjs"],            "negative": ["v2/tests/unit/services/profile.store.missing.test.mjs"]},
+    {"id": "session.create",       "owner_resource": "browser_session",    "positive": ["v2/tests/unit/services/session.create.test.mjs"],          "negative": ["v2/tests/unit/services/session.duplicate.test.mjs"]},
+    {"id": "lock.acquire",         "owner_resource": "profile_lock",       "positive": ["v2/tests/unit/services/lock.acquire.test.mjs"],            "negative": ["v2/tests/unit/services/lock.force_acquire.test.mjs"]},
+    {"id": "container.match",      "owner_resource": "container_match",    "positive": ["v2/tests/unit/services/container.match.test.mjs"],         "negative": ["v2/tests/unit/services/container.empty.test.mjs"]},
+    {"id": "subscription.reg",     "owner_resource": "subscription",       "positive": ["v2/tests/unit/services/subscription.register.test.mjs"],   "negative": ["v2/tests/unit/services/subscription.unregister.test.mjs"]},
+    {"id": "tab_pool.next",        "owner_resource": "tab_pool",           "positive": ["v2/tests/unit/services/page_runtime.tab_pool.test.mjs"],  "negative": ["v2/tests/unit/services/page_runtime.tab_pool.empty.test.mjs"]},
+    {"id": "input.run",            "owner_resource": "input_pipeline",     "positive": ["v2/tests/unit/services/page_runtime.input.test.mjs"],      "negative": ["v2/tests/unit/services/page_runtime.input.locked.test.mjs"]},
+    {"id": "display.resolve",      "owner_resource": "display_metrics",    "positive": ["v2/tests/unit/services/display.env.test.mjs"],            "negative": ["v2/tests/unit/services/display.invalid_env.test.mjs"]},
+    {"id": "autoscript.run",       "owner_resource": "autoscript_run",     "positive": ["v2/tests/unit/services/autoscript.runner.test.mjs"],      "negative": ["v2/tests/unit/services/autoscript.missing_action.test.mjs"]},
+    {"id": "autoscript.action",    "owner_resource": "autoscript_action",  "positive": ["v2/tests/unit/services/autoscript.actions.click.test.mjs"], "negative": ["v2/tests/unit/services/autoscript.actions.unknown.test.mjs"]},
+    {"id": "progress.append",      "owner_resource": "progress_event",     "positive": ["v2/tests/unit/services/progress_event.append.test.mjs"], "negative": ["v2/tests/unit/services/progress_event.invalid.test.mjs"]},
+    {"id": "command_log.append",   "owner_resource": "command_log",        "positive": ["v2/tests/unit/services/command_log.append.test.mjs"],    "negative": ["v2/tests/unit/services/command_log.missing_dir.test.mjs"]},
+    {"id": "ws.envelope",          "owner_resource": "ws_message",         "positive": ["v2/tests/unit/contracts/ws_messages.roundtrip.test.mjs"], "negative": ["v2/tests/unit/contracts/ws_messages.bad_version.test.mjs"]},
+    {"id": "http.envelope",        "owner_resource": "http_message",       "positive": ["v2/tests/unit/contracts/http_messages.roundtrip.test.mjs"], "negative": ["v2/tests/unit/contracts/http_messages.bad_version.test.mjs"]},
+    {"id": "shell.cli.dispatch",   "owner_resource": "command_log",        "positive": ["v2/tests/unit/shell.cli.dispatch.test.mjs"],              "negative": ["v2/tests/unit/shell.cli.unknown_cmd.test.mjs"]}
+  ]
+}
