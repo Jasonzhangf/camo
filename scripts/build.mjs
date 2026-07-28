@@ -1,19 +1,19 @@
 #!/usr/bin/env node
-import { copyFileSync, chmodSync, mkdirSync } from 'node:fs';
+// v2 build: no transpile step yet. Keep the entry points executable so
+// `npm run install:global` produces a working shim. Stage 6 strips the
+// `src/` directory; v2/ sources are consumed directly from the repo.
+import { chmodSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
-
-// Ensure bin directory exists
 const binDir = path.join(root, 'bin');
-try { mkdirSync(binDir, { recursive: true }); } catch {}
+mkdirSync(binDir, { recursive: true });
 
-// Copy source files to dist (if needed)
-// For now, we're running directly from src/
+for (const name of ['camo', 'camo.mjs']) {
+  const p = path.join(binDir, name);
+  chmodSync(p, 0o755);
+}
 
-// Make bin/camo.mjs executable
-const binFile = path.join(binDir, 'camo.mjs');
-chmodSync(binFile, 0o755);
-console.log('Build: bin/camo.mjs ready');
+console.log('Build: bin/camo and bin/camo.mjs ready');

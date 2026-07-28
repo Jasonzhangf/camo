@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 const ROOT = process.cwd();
-const TARGET_DIR = path.join(ROOT, 'src');
+// Stage 6: source of truth is v2/. Fall back to src/ for backwards compat.
+const TARGET_DIR = existsSync(path.join(ROOT, 'v2'))
+  ? path.join(ROOT, 'v2')
+  : path.join(ROOT, 'src');
 const MAX_LINES = Number(process.env.FILE_MAX_LINES || 500);
 const POLICY_FILE = path.join(ROOT, 'scripts', 'file-size-policy.json');
 const EXTS = new Set(['.mjs', '.js', '.ts', '.tsx']);

@@ -5,11 +5,10 @@
   "type": "module",
   "bin": {
     "camo": "./bin/camo.mjs",
-    "browser-service": "./bin/browser-service.mjs"
+    "camo-bash": "./bin/camo"
   },
   "files": [
     "bin/",
-    "src/",
     "scripts/",
     "README.md",
     "LICENSE"
@@ -17,9 +16,10 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check:file-size": "node scripts/check-file-size.mjs",
-    "test": "node --test 'tests/**/*.test.mjs'",
-    "test:coverage": "c8 --reporter=text --reporter=lcov node --test 'tests/**/*.test.mjs'",
-    "test:coverage:modes": "c8 --all --check-coverage --lines 90 --functions 90 --branches 90 --statements 90 --include src/commands/record.mjs --include src/commands/highlight-mode.mjs --include src/container/runtime-core/operations/selector-scripts.mjs node --test tests/unit/commands/record.test.mjs tests/unit/commands/highlight-mode.test.mjs tests/unit/container/selector-scripts.test.mjs tests/unit/commands/browser.test.mjs",
+    "test": "node --test 'v2/tests/unit/**/*.test.mjs' && node --test 'v2/tests/smoke/**/*.test.mjs'",
+    "test:v2": "node --test 'v2/tests/unit/**/*.test.mjs'",
+    "test:smoke": "node --test 'v2/tests/smoke/**/*.test.mjs'",
+    "gates": "cd v2 && node gates/run-all.mjs --strict",
     "version:bump": "node scripts/bump-version.mjs",
     "install:global": "npm run build && npm install -g .",
     "uninstall:global": "npm uninstall -g @web-auto/camo",

@@ -1,12 +1,11 @@
 #!/usr/bin/env node
-/**
- * camo CLI Global Installer
- * Usage: node scripts/install.mjs [--prefix /usr/local]
- */
+// camo v2 global installer. Stage 6 is v2-only; install the v2 entry shims.
+// Usage: node scripts/install.mjs [--prefix /usr/local]
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 const isWin = os.platform() === 'win32';
 
@@ -30,7 +29,6 @@ function detectPrefix() {
       return p;
     } catch {}
   }
-
   return path.join(os.homedir(), '.local');
 }
 
@@ -39,7 +37,7 @@ function install() {
   const binDir = path.join(prefix, 'bin');
   const targetDir = path.join(prefix, 'share', 'camo');
 
-  console.log(`Installing camo CLI...`);
+  console.log('Installing camo CLI (v2)...');
   console.log(`  Prefix: ${prefix}`);
   console.log(`  Target: ${targetDir}`);
   console.log(`  Bin: ${binDir}`);
@@ -47,30 +45,48 @@ function install() {
   fs.mkdirSync(targetDir, { recursive: true });
   fs.mkdirSync(binDir, { recursive: true });
 
-  const thisDir = path.dirname(new URL(import.meta.url).pathname);
-  const moduleDir = path.resolve(thisDir, '..');
-  const srcFile = path.join(moduleDir, 'bin', 'camo.mjs');
+  const moduleDir = path.dirname(fileURLToPath(import.meta.url)) + '/..';
+  const repoRoot = path.resolve(moduleDir);
 
-  if (!fs.existsSync(srcFile)) {
-    console.error(`Source not found: ${srcFile}`);
-    console.error('Run: cp src/cli.mjs bin/camo.mjs');
-    process.exit(1);
+  // Copy the v2 entry point and runtime artifacts.
+  for (const rel of ['bin/camo', 'bin/camo.mjs', 'v2']) {
+    const src = path.join(repoRoot, rel);
+    const dst = path.join(targetDir, rel);
+    if (!fs.existsSync(src)) {
+      console.error(`Missing artifact: ${src}`);
+      process.exit(1);
+    }
+    const stat = fs.statSync(src);
+    if (stat.isDirectory()) {
+      copyDir(src, dst);
+    } else {
+      fs.copyFileSync(src, dst);
+    }
   }
-
-  const targetFile = path.join(targetDir, 'camo.mjs');
-  fs.copyFileSync(srcFile, targetFile);
-  fs.chmodSync(targetFile, 0o755);
+  fs.chmodSync(path.join(targetDir, 'bin/camo.mjs'), 0o755);
 
   const binPath = path.join(binDir, 'camo');
   const wrapper = `#!/usr/bin/env sh
-exec node "${targetFile}" "$@"`;
+exec node "${path.join(targetDir, 'bin/camo.mjs')}" "$@"`;
   fs.writeFileSync(binPath, wrapper);
   fs.chmodSync(binPath, 0o755);
 
-  console.log(`\n✅ camo CLI installed!`);
-  console.log(`\nAdd to PATH if needed:`);
+  console.log('\ncamo CLI installed!\n');
+  console.log('Add to PATH if needed:');
   console.log(`  export PATH="${binDir}:$PATH"`);
-  console.log(`\nUsage: camo --help`);
+  console.log('\nUsage: camo --help');
+}
+
+function copyDir(src, dst) {
+  fs.mkdirSync(dst, { recursive: true });
+  for (const e of fs.readdirSync(src, { withFileTypes: true })) {
+    const sp = path.join(src, e.name);
+    const dp = path.join(dst, e.name);
+    if (e.isDirectory()) copyDir(sp, dp);
+    else if (e.isFile()) {
+      fs.copyFileSync(sp, dp);
+    }
+  }
 }
 
 install();
