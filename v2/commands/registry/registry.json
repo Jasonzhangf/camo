@@ -1,0 +1,91 @@
+{
+  "schema_version": "1.0.0",
+  "status": "wired",
+  "design_note": "Single source of truth for command metadata. Each entry maps cmd_id -> {module, args_schema, docstring, runner_module}. Adding a new cmd requires appending here, in parsers/, and in docstrings/ in the same change.",
+  "defaults": {
+    "require_profile": true,
+    "idle_timeout_ms": null,
+    "min_args": 0
+  },
+  "commands": [
+    {
+      "cmd": "start",
+      "module": "commands/builtins/start.mjs",
+      "args_schema": {
+        "named": {
+          "profile":       { "type": "string",  "pattern": "^[a-zA-Z0-9._-]+$", "required": false, "doc": "profile id (defaults to $CAMO_PROFILE or 'default')" },
+          "url":           { "type": "string",  "pattern": "^https?://",         "required": false, "doc": "initial url to open" },
+          "headless":      { "type": "boolean", "required": false,                "doc": "run without foreground window" }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/start.md"
+    },
+    {
+      "cmd": "stop",
+      "module": "commands/builtins/stop.mjs",
+      "args_schema": {
+        "named": {
+          "profile": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "required": false, "doc": "profile id to stop" }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/stop.md"
+    },
+    {
+      "cmd": "goto",
+      "module": "commands/builtins/goto.mjs",
+      "args_schema": {
+        "named": {
+          "profile": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "required": false, "doc": "profile id" },
+          "waitUntil": { "type": "enum", "values": ["load", "domcontentloaded", "networkidle"], "required": false, "doc": "page wait condition" }
+        },
+        "positional": [
+          { "name": "url", "type": "string", "pattern": "^https?://", "required": true, "doc": "absolute http(s) url" }
+        ]
+      },
+      "docstring": "commands/docstrings/goto.md"
+    },
+    {
+      "cmd": "click",
+      "module": "commands/builtins/click.mjs",
+      "args_schema": {
+        "named": {
+          "profile": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "required": false, "doc": "profile id" },
+          "selector": { "type": "string", "min_len": 1, "required": false, "doc": "CSS selector for the target element" },
+          "text":     { "type": "string", "min_len": 1, "required": false, "doc": "text-based locator" },
+          "button":   { "type": "enum", "values": ["left", "middle", "right"], "required": false, "doc": "mouse button" }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/click.md"
+    },
+    {
+      "cmd": "type",
+      "module": "commands/builtins/type.mjs",
+      "args_schema": {
+        "named": {
+          "profile": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "required": false, "doc": "profile id" },
+          "selector": { "type": "string", "min_len": 1, "required": false, "doc": "CSS selector for the input element" },
+          "delay":    { "type": "integer", "min": 0, "max": 5000, "required": false, "doc": "ms between keystrokes" }
+        },
+        "positional": [
+          { "name": "text", "type": "string", "required": true, "doc": "text to type" }
+        ]
+      },
+      "docstring": "commands/docstrings/type.md"
+    },
+    {
+      "cmd": "snapshot",
+      "module": "commands/builtins/snapshot.mjs",
+      "args_schema": {
+        "named": {
+          "profile": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "required": false, "doc": "profile id" },
+          "format":  { "type": "enum", "values": ["json", "yaml"], "required": false, "doc": "output format" }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/snapshot.md"
+    }
+  ]
+}

@@ -1,11 +1,12 @@
-# commands-parsers (design)
+# commands/parsers (stage 4a wired)
 
-Module owner placeholder. Real implementation will live in this directory.
-See `v2/resources/registry/modules.json` for the canonical id.
+Layer: L4_command. Owner module id registered in `v2/resources/registry/modules.json`.
 
-Layer: see modules.json.
+`flags.mjs` is the single argument parser for camo v2. Pure function;
+collects errors instead of throwing so `shell/cli` can print them all
+at once.
 
-Skeletons to land here before this module becomes active:
-- `manager.mjs` (or equivalent) with single owner of the resource(s) listed in resources.json.
-- One thin `index.mjs` re-exporting public surface.
-- Tests under `v2/tests/unit/<path>/`.
+Hard guards:
+- No CLI parsing outside this module.
+- No direct imports from `v1/commands/**`. Only `commands/registry` and
+  `contracts/error_envelope` are allowed dependencies.

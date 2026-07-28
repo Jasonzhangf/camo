@@ -1,11 +1,11 @@
-# commands-registry (design)
+# commands/registry (stage 4a wired)
 
-Module owner placeholder. Real implementation will live in this directory.
-See `v2/resources/registry/modules.json` for the canonical id.
+Layer: L4_command. Owner module id registered in `v2/resources/registry/modules.json`.
 
-Layer: see modules.json.
+`registry.json` is the single source of truth for cmd_id metadata. The
+companion `registry.mjs` reads it, freezes the table, and rejects
+unknown cmd_ids at `look()` time with `E_PROTO_NO_HANDLER`.
 
-Skeletons to land here before this module becomes active:
-- `manager.mjs` (or equivalent) with single owner of the resource(s) listed in resources.json.
-- One thin `index.mjs` re-exporting public surface.
-- Tests under `v2/tests/unit/<path>/`.
+Hard guards:
+- One entry per cmd; no duplicates (enforced at load).
+- `cmd`, `module`, `args_schema`, `docstring` are required fields.

@@ -1,11 +1,11 @@
-# commands-docstrings (design)
+# commands/docstrings (stage 4a wired)
 
-Module owner placeholder. Real implementation will live in this directory.
-See `v2/resources/registry/modules.json` for the canonical id.
+Layer: L4_command. Owner module id registered in `v2/resources/registry/modules.json`.
 
-Layer: see modules.json.
+Each command in `commands/registry/registry.json` references exactly one
+markdown file here. The docstring is what `camo <cmd> --help` prints.
 
-Skeletons to land here before this module becomes active:
-- `manager.mjs` (or equivalent) with single owner of the resource(s) listed in resources.json.
-- One thin `index.mjs` re-exporting public surface.
-- Tests under `v2/tests/unit/<path>/`.
+Hard guards:
+- Docstring file basename must equal `cmd`. The `docstring` field in
+  `registry.json` is read-only.
+- No code in this directory.
