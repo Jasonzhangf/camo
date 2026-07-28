@@ -1,11 +1,13 @@
-# shell-doctor (design)
+# shell/doctor (stage 5a wired)
 
-Module owner placeholder. Real implementation will live in this directory.
-See `v2/resources/registry/modules.json` for the canonical id.
+Layer: L5_shell. Owner module id registered in `v2/resources/registry/modules.json`.
 
-Layer: see modules.json.
+`check.mjs` returns a structured report (read-only). The CLI invocation
+`camo doctor` prints it as JSON.
 
-Skeletons to land here before this module becomes active:
-- `manager.mjs` (or equivalent) with single owner of the resource(s) listed in resources.json.
-- One thin `index.mjs` re-exporting public surface.
-- Tests under `v2/tests/unit/<path>/`.
+The report covers:
+- node version
+- protocol version
+- registry command count, docstring count, test count
+- v1 leftover count (informational; the CI gate is the source of truth)
+- CI mode (strict when CAMO_V2_STRICT=1, non-strict otherwise)

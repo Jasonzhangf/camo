@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# camo v2 entry — delegates to v2/shell/bin_entry/index.mjs
+# No fallback; one process path. Per-resource gate flips CI to strict
+# only after stage 6 (v1 removal).
+set -eu
+
+CAMO_REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
+exec node "$CAMO_REPO_ROOT/v2/shell/bin_entry/index.mjs" "$@"

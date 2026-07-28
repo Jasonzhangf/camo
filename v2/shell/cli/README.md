@@ -1,11 +1,27 @@
-# shell-cli (design)
+# shell/cli (stage 5a wired)
 
-Module owner placeholder. Real implementation will live in this directory.
-See `v2/resources/registry/modules.json` for the canonical id.
+Layer: L5_shell. Owner module id registered in `v2/resources/registry/modules.json`.
 
-Layer: see modules.json.
+`dispatch.mjs` is the only argv parser entry point. It pulls together:
+- `commands/parsers/flags.mjs` (single source of arg parsing)
+- `commands/registry/registry.mjs` (single source of cmd metadata)
+- `commands/builtins/index.mjs` (single source of builtin dispatch)
+- `transports/client/api.mjs` (single wire surface)
 
-Skeletons to land here before this module becomes active:
-- `manager.mjs` (or equivalent) with single owner of the resource(s) listed in resources.json.
-- One thin `index.mjs` re-exporting public surface.
-- Tests under `v2/tests/unit/<path>/`.
+Hard guards:
+- No service imports (forbidden edge per registry edges.json).
+- No business helpers here; only arg flow.
+
+## Help
+
+```
+camo --help
+camo help
+camo <cmd> --help
+```
+
+## Doctor
+
+```
+camo doctor
+```

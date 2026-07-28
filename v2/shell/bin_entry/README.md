@@ -1,11 +1,11 @@
-# shell-bin_entry (design)
+# shell/bin_entry (stage 5a wired)
 
-Module owner placeholder. Real implementation will live in this directory.
-See `v2/resources/registry/modules.json` for the canonical id.
+Layer: L5_shell. Owner module id registered in `v2/resources/registry/modules.json`.
 
-Layer: see modules.json.
+`index.mjs` is the process entry invoked by the top-level `bin/camo`
+shell wrapper. argv flows into `cli/dispatch.mjs::dispatch`, the
+result/error is printed, and the process exits with code 0/2/3.
 
-Skeletons to land here before this module becomes active:
-- `manager.mjs` (or equivalent) with single owner of the resource(s) listed in resources.json.
-- One thin `index.mjs` re-exporting public surface.
-- Tests under `v2/tests/unit/<path>/`.
+Hard guards:
+- One argv entry; no side effects on import.
+- Errors projected to wire format via `error_envelope/projector.mjs`.
