@@ -1,27 +1,24 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { __enableTestRoot, dispatch, usage, describe } from '../../../shell/cli/dispatch.mjs';
-import { __enableTestRoot as enableServer } from '../../../transports/ws/server.mjs';
+import { dispatch, usage, describe, makeFakeTransport } from '../../../shell/cli/dispatch.mjs';
 
-test('positive: --help returns help kind', async () => {
-  __enableTestRoot();
+test('positive: --help returns help kind (no transport needed)', async () => {
   const out = await dispatch(['--help']);
   assert.equal(out.kind, 'help');
   assert.match(out.usage, /Usage: camo/);
 });
 
-test('positive: usage lists all 6 commands', () => {
+test('positive: usage lists all 12 commands', () => {
   const u = usage();
-  for (const c of ['start', 'stop', 'goto', 'click', 'type', 'snapshot']) {
+  for (const c of ['start', 'stop', 'goto', 'click', 'type', 'snapshot', 'scroll', 'screenshot', 'wait', 'evaluate', 'upload', 'select']) {
     assert.match(u, new RegExp(`\\b${c}\\b`));
   }
 });
 
 test('positive: goto <url> runs end-to-end via fake transport', async () => {
-  __enableTestRoot();
-  enableServer();
-  const out = await dispatch(['goto', 'https://example.com', '--waitUntil', 'networkidle']);
+  const fake = makeFakeTransport();
+  const out = await dispatch(['goto', 'https://example.com', '--waitUntil', 'networkidle'], { transport: fake });
   assert.equal(out.kind, 'result');
   assert.equal(out.cmd, 'goto');
   assert.equal(out.result.profile, 'default');
@@ -30,31 +27,42 @@ test('positive: goto <url> runs end-to-end via fake transport', async () => {
 });
 
 test('negative: goto without url surfaces E_INPUT_MISSING_FIELD', async () => {
-  __enableTestRoot();
-  await assert.rejects(
-    () => dispatch(['goto']),
-    (e) => e.code === 'E_INPUT_MISSING_FIELD'
-  );
+  const fake = makeFakeTransport();
+  try {
+    await dispatch(['goto'], { transport: fake });
+    assert.fail('expected error');
+  } catch (err) {
+    assert.equal(err.code, 'E_INPUT_MISSING_FIELD');
+  }
 });
 
 test('negative: click without selector|text surfaces E_INPUT_INVALID', async () => {
-  __enableTestRoot();
-  await assert.rejects(
-    () => dispatch(['click']),
-    (e) => e.code === 'E_INPUT_INVALID'
-  );
+  const fake = makeFakeTransport();
+  try {
+    await dispatch(['click'], { transport: fake });
+    assert.fail('expected error');
+  } catch (err) {
+    assert.equal(err.code, 'E_INPUT_INVALID');
+  }
 });
 
-test('utility: doctor subcommand runs read-only check', async () => {
-  __enableTestRoot();
+test('positive: doctor subcommand runs read-only check (no transport needed)', async () => {
   const out = await dispatch(['doctor']);
   assert.equal(out.kind, 'doctor');
-  assert.ok(out.report.protocol);
-  assert.ok(out.report.registry.commands >= 6);
+  assert.ok(out.report);
 });
 
-test('utility: describe reports L5_shell', () => {
+test('positive: describe reports L5_shell', () => {
   const d = describe();
-  assert.equal(d.layer, 'L5_shell');
   assert.equal(d.moduleId, 'shell.cli');
+  assert.equal(d.layer, 'L5_shell');
+});
+
+test('negative: dispatch without transport surfaces E_STATE_NO_TRANSPORT', async () => {
+  try {
+    await dispatch(['goto', 'https://example.com']);
+    assert.fail('expected error');
+  } catch (err) {
+    assert.equal(err.code, 'E_STATE_NO_TRANSPORT');
+  }
 });

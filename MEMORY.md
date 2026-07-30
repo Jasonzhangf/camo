@@ -93,3 +93,81 @@ Tags: camo, close-page, playwright, bug-fix
 - Hard guard 36 (codex review) not yet run on this round of changes.
 
 Tags: camo, v2, stage-6, registry-gate, strict-mode, src-deletion
+
+## 2026-07-29 v2 stage 6 review correction
+
+The earlier stage-6 "production baseline" claim is invalid. Confirmed blockers:
+
+- npm package allowlist excludes `v2/`; packed CLI fails with
+  `MODULE_NOT_FOUND`.
+- source CLI defaults to an in-process fake transport; `start` and `goto`
+  produce success-shaped output without browser side effects.
+- `snapshot` is registered but has no builtin implementation.
+- unknown/removed commands return usage with exit code 0.
+- strict resource gates prove only v1-shadow deletion, not active owner paths,
+  symbols, import edges, feature-test mappings, or live browser behavior.
+  Active registry entries currently reference missing runtime files.
+
+Do not publish stage 6 or cite active registry/green strict gates as runtime
+completion until artifact install plus real browser command replay passes and
+registry gates validate actual code bindings.
+
+Tags: camo, v2, stage-6-review, false-green-gate, package-artifact, fake-transport
+
+## 2026-07-29 Stage 7: Browser Runtime 实现完成
+
+### 完成内容
+
+**Stage 7a: browser_service bootstrap 真实 Playwright 集成**
+- 创建 `v2/services/browser_service/internal/playwright_bridge.mjs`
+  - `launchBrowser(profileId, opts)` - 启动 Chromium 实例
+  - `closeBrowser(profileId)` - 关闭浏览器
+  - `getPage(profileId)` - 获取当前 page 对象
+  - `closeAll()` - 关闭所有浏览器
+- 重写 `v2/services/browser_service/bootstrap.mjs`
+  - `startSession()` - 真实启动浏览器 + 创建 session
+  - `stopSession()` - 关闭浏览器 + 释放资源
+  - `getCurrentPage()` - 获取当前 page
+  - `getSession()` - 获取 session 信息
+  - `shutdown()` - 优雅关闭
+
+**Stage 7b: page_runtime input_pipeline 真实页面操作**
+- 创建 `v2/services/page_runtime/operations/page_ops.mjs`
+  - `goto({ profileId, url, waitUntil })` - 页面导航
+  - `click({ profileId, selector, text, button })` - 点击
+  - `type({ profileId, text, delay })` - 输入文本
+  - `scroll({ profileId, x, y })` - 页面滚动
+  - `screenshot({ profileId, fullPage })` - 截图
+  - `snapshot({ profileId })` - DOM 快照
+  - `wait({ profileId, ms })` - 等待
+  - `evaluate({ profileId, script })` - JS 执行
+  - `upload({ profileId, selector, files })` - 文件上传
+  - `select({ profileId, selector, value })` - 下拉选择
+- 更新 `v2/services/page_runtime/input_pipeline.mjs`
+  - 每个操作函数调用 page_ops 对应实现
+  - 状态锁防止并发操作
+
+**Stage 7c: daemon WS 处理器完善**
+- 重写 `v2/shell/daemon/index.mjs`
+  - WS + HTTP 双服务器
+  - 12 个命令处理器完整实现
+  - progress event + command logging 集成
+  - SIGTERM/SIGINT 优雅关闭
+
+### 验证结果
+- npm test: 223 unit + 5 smoke = 228 PASS, 0 FAIL
+- gates: registry integrity 10/10, per-resource 16/16 PASS
+
+### 关键架构决策
+1. Playwright 桥接层是唯一 Playwright 导入点，其他模块禁止直接导入
+2. browser_service 是 orchestrator，调用各个 service 模块
+3. input_pipeline 是状态锁 + 路由，实际操作在 page_ops
+4. daemon 是入口进程，管理整个 browser_service 生命周期
+
+### 待完成 (Stage 8+)
+- CLI 分离模式 (--daemon/--fork/--local)
+- 剩余 v1 命令迁移
+- e2e 测试
+- package.json files 数组修复
+
+Tags: camo, v2, stage-7, browser-runtime, playwright, daemon

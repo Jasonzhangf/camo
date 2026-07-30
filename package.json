@@ -9,6 +9,7 @@
   },
   "files": [
     "bin/",
+    "v2/",
     "scripts/",
     "README.md",
     "LICENSE"
@@ -19,6 +20,8 @@
     "test": "node --test 'v2/tests/unit/**/*.test.mjs' && node --test 'v2/tests/smoke/**/*.test.mjs'",
     "test:v2": "node --test 'v2/tests/unit/**/*.test.mjs'",
     "test:smoke": "node --test 'v2/tests/smoke/**/*.test.mjs'",
+    "test:e2e": "node --test 'v2/tests/e2e/**/*.test.mjs'",
+    "test:all": "node --test 'v2/tests/unit/**/*.test.mjs' && node --test 'v2/tests/smoke/**/*.test.mjs' && node --test 'v2/tests/integration/**/*.test.mjs' && node --test 'v2/tests/e2e/**/*.test.mjs'",
     "gates": "cd v2 && node gates/run-all.mjs --strict",
     "version:bump": "node scripts/bump-version.mjs",
     "install:global": "npm run build && npm install -g .",

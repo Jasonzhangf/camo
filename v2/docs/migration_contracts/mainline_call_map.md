@@ -78,3 +78,23 @@ refuse to flip a resource to active while its mainline edges are
 design. To flip an edge to active: both module files exist, both
 called + caller sides import the contract types, and a smoke test in
 `tests/smoke/<edge>.smoke.mjs` runs green.
+
+## New command edges (Stage 9, 2026-07-29)
+
+```
+services.browser_service  --(scroll)-->  services.page_runtime     # input_pipeline.scroll
+services.browser_service  --(screenshot)-->  services.page_runtime # input_pipeline.screenshot
+services.browser_service  --(wait)-->  services.page_runtime       # input_pipeline.wait
+services.browser_service  --(evaluate)-->  services.page_runtime   # input_pipeline.evaluate
+services.browser_service  --(upload)-->  services.page_runtime     # input_pipeline.upload
+services.browser_service  --(select)-->  services.page_runtime     # input_pipeline.select
+shell.bin_entry  --(auto-start)-->  shell.daemon                 # when no daemon exists
+shell.bin_entry  --(find)-->  shell.config                       # daemon_finder scans ~/.camo/daemon
+
+# Note: commands.builtins sends through transports.client (one edge),
+# the daemon-side browser_service layer dispatches each cmd to input_pipeline.
+# No per-command edges from commands.builtins to page_runtime exist.
+
+shell.cli  --(unknown cmd)-->  { exit 2, kind:usage }
+bin_entry  --(kind:usage)-->  { exit 2, stdout usage }
+```

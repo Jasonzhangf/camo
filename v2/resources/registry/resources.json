@@ -199,14 +199,42 @@
       "truth_owner": "v2/services/page_runtime",
       "truth_store": "memory_per_session",
       "read_paths": [
-        "v2/services/page_runtime/input_pipeline.mjs::status"
+        "v2/services/page_runtime/input_pipeline.mjs::status",
+        "v2/services/page_runtime/input_pipeline.mjs::goto",
+        "v2/services/page_runtime/input_pipeline.mjs::click",
+        "v2/services/page_runtime/input_pipeline.mjs::type",
+        "v2/services/page_runtime/input_pipeline.mjs::scroll",
+        "v2/services/page_runtime/input_pipeline.mjs::screenshot",
+        "v2/services/page_runtime/input_pipeline.mjs::snapshot",
+        "v2/services/page_runtime/input_pipeline.mjs::wait",
+        "v2/services/page_runtime/input_pipeline.mjs::evaluate",
+        "v2/services/page_runtime/input_pipeline.mjs::upload",
+        "v2/services/page_runtime/input_pipeline.mjs::select"
       ],
       "write_paths": [
-        "v2/services/page_runtime/input_pipeline.mjs::run"
+        "v2/services/page_runtime/input_pipeline.mjs::goto",
+        "v2/services/page_runtime/input_pipeline.mjs::click",
+        "v2/services/page_runtime/input_pipeline.mjs::type",
+        "v2/services/page_runtime/input_pipeline.mjs::scroll",
+        "v2/services/page_runtime/input_pipeline.mjs::screenshot",
+        "v2/services/page_runtime/input_pipeline.mjs::snapshot",
+        "v2/services/page_runtime/input_pipeline.mjs::wait",
+        "v2/services/page_runtime/input_pipeline.mjs::evaluate",
+        "v2/services/page_runtime/input_pipeline.mjs::upload",
+        "v2/services/page_runtime/input_pipeline.mjs::select"
       ],
       "indirect_paths": [],
       "forbidden_paths": [
-        "v2/services/page_runtime/input_ops.mjs::run",
+        "v2/services/page_runtime/operations/page_ops.mjs::goto",
+        "v2/services/page_runtime/operations/page_ops.mjs::click",
+        "v2/services/page_runtime/operations/page_ops.mjs::type",
+        "v2/services/page_runtime/operations/page_ops.mjs::scroll",
+        "v2/services/page_runtime/operations/page_ops.mjs::screenshot",
+        "v2/services/page_runtime/operations/page_ops.mjs::snapshot",
+        "v2/services/page_runtime/operations/page_ops.mjs::wait",
+        "v2/services/page_runtime/operations/page_ops.mjs::evaluate",
+        "v2/services/page_runtime/operations/page_ops.mjs::upload",
+        "v2/services/page_runtime/operations/page_ops.mjs::select",
         "v2/core/actions.mjs::run"
       ],
       "verification_gate": "registry.resources.input_pipeline",
@@ -224,16 +252,14 @@
         "v2/runtime/page_scripts/bootstrap.mjs::load",
         "v2/services/page_runtime/injector.mjs::inject"
       ],
-      "write_paths": [
-        "v2/runtime/page_scripts/bootstrap.mjs::register"
-      ],
+      "write_paths": [],
       "indirect_paths": [],
       "forbidden_paths": [
         "v2/services/browser_service/internal/page_runtime/runtime.js::write"
       ],
       "verification_gate": "registry.resources.page_runtime",
       "policy_id": "small-files",
-      "status": "active"
+      "status": "design"
     },
     {
       "resource_id": "display_metrics",

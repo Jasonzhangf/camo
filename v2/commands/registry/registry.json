@@ -13,9 +13,23 @@
       "module": "commands/builtins/start.mjs",
       "args_schema": {
         "named": {
-          "profile":       { "type": "string",  "pattern": "^[a-zA-Z0-9._-]+$", "required": false, "doc": "profile id (defaults to $CAMO_PROFILE or 'default')" },
-          "url":           { "type": "string",  "pattern": "^https?://",         "required": false, "doc": "initial url to open" },
-          "headless":      { "type": "boolean", "required": false,                "doc": "run without foreground window" }
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id (defaults to $CAMO_PROFILE or 'default')"
+          },
+          "url": {
+            "type": "string",
+            "pattern": "^https?://",
+            "required": false,
+            "doc": "initial url to open"
+          },
+          "headless": {
+            "type": "boolean",
+            "required": false,
+            "doc": "run without foreground window"
+          }
         },
         "positional": []
       },
@@ -26,7 +40,12 @@
       "module": "commands/builtins/stop.mjs",
       "args_schema": {
         "named": {
-          "profile": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "required": false, "doc": "profile id to stop" }
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id to stop"
+          }
         },
         "positional": []
       },
@@ -37,11 +56,31 @@
       "module": "commands/builtins/goto.mjs",
       "args_schema": {
         "named": {
-          "profile": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "required": false, "doc": "profile id" },
-          "waitUntil": { "type": "enum", "values": ["load", "domcontentloaded", "networkidle"], "required": false, "doc": "page wait condition" }
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "waitUntil": {
+            "type": "enum",
+            "values": [
+              "load",
+              "domcontentloaded",
+              "networkidle"
+            ],
+            "required": false,
+            "doc": "page wait condition"
+          }
         },
         "positional": [
-          { "name": "url", "type": "string", "pattern": "^https?://", "required": true, "doc": "absolute http(s) url" }
+          {
+            "name": "url",
+            "type": "string",
+            "pattern": "^https?://",
+            "required": true,
+            "doc": "absolute http(s) url"
+          }
         ]
       },
       "docstring": "commands/docstrings/goto.md"
@@ -51,10 +90,34 @@
       "module": "commands/builtins/click.mjs",
       "args_schema": {
         "named": {
-          "profile": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "required": false, "doc": "profile id" },
-          "selector": { "type": "string", "min_len": 1, "required": false, "doc": "CSS selector for the target element" },
-          "text":     { "type": "string", "min_len": 1, "required": false, "doc": "text-based locator" },
-          "button":   { "type": "enum", "values": ["left", "middle", "right"], "required": false, "doc": "mouse button" }
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "selector": {
+            "type": "string",
+            "min_len": 1,
+            "required": false,
+            "doc": "CSS selector for the target element"
+          },
+          "text": {
+            "type": "string",
+            "min_len": 1,
+            "required": false,
+            "doc": "text-based locator"
+          },
+          "button": {
+            "type": "enum",
+            "values": [
+              "left",
+              "middle",
+              "right"
+            ],
+            "required": false,
+            "doc": "mouse button"
+          }
         },
         "positional": []
       },
@@ -65,12 +128,33 @@
       "module": "commands/builtins/type.mjs",
       "args_schema": {
         "named": {
-          "profile": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "required": false, "doc": "profile id" },
-          "selector": { "type": "string", "min_len": 1, "required": false, "doc": "CSS selector for the input element" },
-          "delay":    { "type": "integer", "min": 0, "max": 5000, "required": false, "doc": "ms between keystrokes" }
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "selector": {
+            "type": "string",
+            "min_len": 1,
+            "required": false,
+            "doc": "CSS selector for the input element"
+          },
+          "delay": {
+            "type": "integer",
+            "min": 0,
+            "max": 5000,
+            "required": false,
+            "doc": "ms between keystrokes"
+          }
         },
         "positional": [
-          { "name": "text", "type": "string", "required": true, "doc": "text to type" }
+          {
+            "name": "text",
+            "type": "string",
+            "required": true,
+            "doc": "text to type"
+          }
         ]
       },
       "docstring": "commands/docstrings/type.md"
@@ -80,12 +164,568 @@
       "module": "commands/builtins/snapshot.mjs",
       "args_schema": {
         "named": {
-          "profile": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "required": false, "doc": "profile id" },
-          "format":  { "type": "enum", "values": ["json", "yaml"], "required": false, "doc": "output format" }
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "format": {
+            "type": "enum",
+            "values": [
+              "json",
+              "yaml"
+            ],
+            "required": false,
+            "doc": "output format"
+          }
         },
         "positional": []
       },
       "docstring": "commands/docstrings/snapshot.md"
+    },
+    {
+      "cmd": "scroll",
+      "module": "commands/builtins/scroll.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "x": {
+            "type": "integer",
+            "required": false,
+            "doc": "horizontal scroll delta in pixels"
+          },
+          "y": {
+            "type": "integer",
+            "required": false,
+            "doc": "vertical scroll delta in pixels"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/scroll.md"
+    },
+    {
+      "cmd": "screenshot",
+      "module": "commands/builtins/screenshot.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "path": {
+            "type": "string",
+            "required": false,
+            "doc": "output file path (defaults to temp dir)"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/screenshot.md"
+    },
+    {
+      "cmd": "wait",
+      "module": "commands/builtins/wait.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "for": {
+            "type": "enum",
+            "values": [
+              "load",
+              "domcontentloaded",
+              "networkidle",
+              "selector",
+              "text",
+              "url"
+            ],
+            "required": false,
+            "doc": "wait condition"
+          },
+          "timeout": {
+            "type": "integer",
+            "min": 0,
+            "required": false,
+            "doc": "timeout in ms (default 30000)"
+          },
+          "target": {
+            "type": "string",
+            "required": false,
+            "doc": "target for selector/text/url conditions"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/wait.md"
+    },
+    {
+      "cmd": "evaluate",
+      "module": "commands/builtins/evaluate.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "script": {
+            "type": "string",
+            "min_len": 1,
+            "required": true,
+            "doc": "JavaScript to execute in page context"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/evaluate.md"
+    },
+    {
+      "cmd": "upload",
+      "module": "commands/builtins/upload.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "selector": {
+            "type": "string",
+            "min_len": 1,
+            "required": true,
+            "doc": "CSS selector for input[type=file]"
+          },
+          "file": {
+            "type": "string",
+            "min_len": 1,
+            "required": true,
+            "doc": "path to file to upload"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/upload.md"
+    },
+    {
+      "cmd": "select",
+      "module": "commands/builtins/select.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "selector": {
+            "type": "string",
+            "min_len": 1,
+            "required": true,
+            "doc": "CSS selector for <select> element"
+          },
+          "value": {
+            "type": "string",
+            "required": true,
+            "doc": "option value to select"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/select.md"
+    },
+    {
+      "cmd": "daemon",
+      "module": "commands/builtins/daemon.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "ephemeral": {
+            "type": "boolean",
+            "required": false,
+            "doc": "daemon runs in ephemeral mode"
+          }
+        },
+        "positional": [
+          {
+            "name": "subcommand",
+            "type": "string",
+            "pattern": "^(start|stop|status)$",
+            "required": true,
+            "doc": "one of start|stop|status"
+          }
+        ]
+      },
+      "docstring": "commands/docstrings/daemon.md"
+    },
+    {
+      "cmd": "hover",
+      "module": "commands/builtins/hover.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "selector": {
+            "type": "string",
+            "min_len": 1,
+            "required": false,
+            "doc": "CSS selector for hover target"
+          },
+          "text": {
+            "type": "string",
+            "min_len": 1,
+            "required": false,
+            "doc": "text-based locator"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/hover.md"
+    },
+    {
+      "cmd": "get-text",
+      "module": "commands/builtins/getText.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "selector": {
+            "type": "string",
+            "min_len": 1,
+            "required": false,
+            "doc": "CSS selector (omit for full page text)"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/get-text.md"
+    },
+    {
+      "cmd": "get-page-info",
+      "module": "commands/builtins/getPageInfo.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/get-page-info.md"
+    },
+    {
+      "cmd": "find-elements",
+      "module": "commands/builtins/findElements.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "selector": {
+            "type": "string",
+            "min_len": 1,
+            "required": false,
+            "doc": "CSS selector"
+          },
+          "text": {
+            "type": "string",
+            "min_len": 1,
+            "required": false,
+            "doc": "text to find"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/find-elements.md"
+    },
+    {
+      "cmd": "get-readable",
+      "module": "commands/builtins/getReadable.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "maxLength": {
+            "type": "number",
+            "min": 100,
+            "required": false,
+            "doc": "max text length (default 50000)"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/get-readable.md"
+    },
+    {
+      "cmd": "new-tab",
+      "module": "commands/builtins/newTab.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "url": {
+            "type": "string",
+            "pattern": "^https?://",
+            "required": false,
+            "doc": "initial url"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/new-tab.md"
+    },
+    {
+      "cmd": "close-tab",
+      "module": "commands/builtins/closeTab.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "tabId": {
+            "type": "number",
+            "min": 0,
+            "required": true,
+            "doc": "tab index to close"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/close-tab.md"
+    },
+    {
+      "cmd": "list-tabs",
+      "module": "commands/builtins/listTabs.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/list-tabs.md"
+    },
+    {
+      "cmd": "get-cookies",
+      "module": "commands/builtins/getCookies.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/get-cookies.md"
+    },
+    {
+      "cmd": "set-cookies",
+      "module": "commands/builtins/setCookies.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "cookies": {
+            "type": "string",
+            "min_len": 1,
+            "required": true,
+            "doc": "JSON array of cookie objects"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/set-cookies.md"
+    },
+    {
+      "cmd": "set-user-agent",
+      "module": "commands/builtins/setUserAgent.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "ua": {
+            "type": "string",
+            "min_len": 10,
+            "required": true,
+            "doc": "user agent string"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/set-user-agent.md"
+    },
+    {
+      "cmd": "set-viewport",
+      "module": "commands/builtins/setViewport.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "width": {
+            "type": "number",
+            "min": 320,
+            "required": true,
+            "doc": "viewport width in px"
+          },
+          "height": {
+            "type": "number",
+            "min": 240,
+            "required": true,
+            "doc": "viewport height in px"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/set-viewport.md"
+    },
+    {
+      "cmd": "wait-dom-stable",
+      "module": "commands/builtins/waitDomStable.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "timeout": {
+            "type": "number",
+            "min": 100,
+            "required": false,
+            "doc": "timeout ms (default 5000)"
+          },
+          "poll": {
+            "type": "number",
+            "min": 100,
+            "required": false,
+            "doc": "poll interval ms (default 500)"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/wait-dom-stable.md"
+    },
+    {
+      "cmd": "scroll-and-collect",
+      "module": "commands/builtins/scrollAndCollect.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "scrollCount": {
+            "type": "number",
+            "min": 1,
+            "required": false,
+            "doc": "number of scrolls (default 5)"
+          },
+          "delay": {
+            "type": "number",
+            "min": 100,
+            "required": false,
+            "doc": "delay between scrolls ms (default 1000)"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/scroll-and-collect.md"
+    },
+    {
+      "cmd": "fetch-page",
+      "module": "commands/builtins/fetchPage.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "timeout": {
+            "type": "number",
+            "min": 1000,
+            "required": false,
+            "doc": "timeout ms (default 30000)"
+          }
+        },
+        "positional": [
+          {
+            "name": "url",
+            "type": "string",
+            "pattern": "^https?://",
+            "required": true,
+            "doc": "absolute http(s) url"
+          }
+        ]
+      },
+      "docstring": "commands/docstrings/fetch-page.md"
     }
   ]
 }

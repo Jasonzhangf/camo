@@ -55,7 +55,9 @@ function ensureParent(file) {
 function buildRecord(input) {
   return {
     ts: nowIso(),
-    runId: safeId(input.runId, 'runId'),
+    // runId defaults to 'anonymous' if not provided. Callers should pass
+    // a real runId when possible for proper event correlation.
+    runId: input.runId ? safeId(input.runId, 'runId') : 'anonymous',
     profileId: input.profileId || null,
     source: String(input.source || '').trim() || 'unspecified',
     mode: String(input.mode || 'normal').trim().toLowerCase(),

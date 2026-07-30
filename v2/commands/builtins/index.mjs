@@ -17,8 +17,32 @@ import * as stop from './stop.mjs';
 import * as goto from './goto.mjs';
 import * as click from './click.mjs';
 import * as type from './type.mjs';
+import * as snapshot from './snapshot.mjs';
+import * as scroll from './scroll.mjs';
+import * as screenshot from './screenshot.mjs';
+import * as wait from './wait.mjs';
+import * as evaluate from './evaluate.mjs';
+import * as upload from './upload.mjs';
+import * as daemon from './daemon.mjs';
+import * as select from './select.mjs';
+import * as hover from './hover.mjs';
+import * as getText from './getText.mjs';
+import * as getPageInfo from './getPageInfo.mjs';
+import * as findElements from './findElements.mjs';
+import * as getReadable from './getReadable.mjs';
+import * as newTab from './newTab.mjs';
+import * as closeTab from './closeTab.mjs';
+import * as listTabs from './listTabs.mjs';
+import * as getCookies from './getCookies.mjs';
+import * as setCookies from './setCookies.mjs';
+import * as setUserAgent from './setUserAgent.mjs';
+import * as setViewport from './setViewport.mjs';
+import * as waitDomStable from './waitDomStable.mjs';
+import * as scrollAndCollect from './scrollAndCollect.mjs';
+import * as fetchPage from './fetchPage.mjs';
 
-const BUILTINS = { start, stop, goto, click, type };
+
+const BUILTINS = { start, stop, goto, click, type, snapshot, scroll, screenshot, wait, evaluate, upload, select, daemon, hover, getText, getPageInfo, findElements, getReadable, newTab, closeTab, listTabs, getCookies, setCookies, setUserAgent, setViewport, waitDomStable, scrollAndCollect, fetchPage };
 
 export function list() {
   return Object.keys(BUILTINS).sort();

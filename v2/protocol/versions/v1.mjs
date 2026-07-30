@@ -35,6 +35,7 @@ export const HTTP_KINDS = Object.freeze({
 // owns the full table; this list is a closed set of well-known ids.
 export const COMMAND_IDS = Object.freeze([
   'start', 'stop', 'goto', 'click', 'type', 'snapshot',
+  'scroll', 'screenshot', 'wait', 'evaluate', 'upload', 'select',
 ]);
 
 export function isCommandId(id) {

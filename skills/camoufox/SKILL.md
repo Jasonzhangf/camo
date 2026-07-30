@@ -1,141 +1,91 @@
 ---
 name: camoufox
-description: Use camo CLI for Camoufox automation with layered observe, operate, orchestrate, and recover flows.
+description: Use camo v2 CLI for headless Playwright browser automation. 28 commands, daemon-based architecture, ephemeral/persistent session modes, OpenMinis-aligned action set.
 ---
 
-# Camoufox (`camo`) Skill
+# Camoufox (`camo`) Skill — v2
 
-`camo` only. Keep this skill short and operational.
+`camo` only. No v1 commands exist. Keep this skill short and operational.
+
+## Architecture (v2)
+
+- **Daemon process**: `camo daemon start|stop|status` manages a long-lived daemon
+- **Ephemeral mode**: default, no profile needed, auto-cleanup after command
+- **Persistent mode**: `--profile <name>`, browser stays until `camo daemon stop`
+- **28 commands**: click, daemon, evaluate, goto, screenshot, scroll, select, snapshot, start, stop, type, upload, wait, hover, get-text, get-page-info, find-elements, get-readable, new-tab, close-tab, list-tabs, get-cookies, set-cookies, set-user-agent, set-viewport, wait-dom-stable, scroll-and-collect, fetch-page
+- **Port 0 dynamic**: daemon auto-assigns free ports, registers at `~/.camo/daemon/<id>.json`
+- **Profile lock**: prevents concurrent daemons on same profile
+- **No fallback, no fake transport, no silent retry**
 
 ## Hard Constraint
 
 Allowed execution surface:
-- `camo ...`
+- `camo --help` or `camo <cmd> --help` to explore
+- `camo daemon start --profile <name>` — start daemon first
+- `camo <cmd> [--profile <name>] [args]` — send command via WS
+- `camo daemon stop --profile <name>` — stop daemon
 
-Disallowed execution surface:
-- direct `curl` to browser/unified APIs
-- direct `node scripts/...` for browser control
-- direct controllerAction / custom wrappers when an equivalent `camo` command exists
+Disallowed:
+- Starting browser without a daemon
+- Using v1 commands that no longer exist (`container`, `autoscript`, `events`, `devtools`, `profile create`, `init`, etc.)
 
 If a required action is unclear or missing, run:
-
 ```bash
 camo --help
-camo <command> --help
+camo <cmd> --help
 ```
-
 Then report capability gap instead of switching control surface.
-
-## Capability Map (L1)
-
-1) Observe / Debug  
-- DOM + visible filtering: `container filter/list/watch`  
-- URL / page context: `status`, `list-pages`, `devtools eval`  
-- Console capture: `devtools logs`
-
-2) User-like Operations  
-- Click / type / scroll / key / mouse / tab / viewport / window  
-- Optional operation highlighting: `highlight-mode`, `--highlight`
-
-3) Orchestration  
-- Subscription sets: `container init/register/targets/watch`  
-- Scripted flow: `autoscript validate/explain/run/resume/mock-run`
-
-4) Progress / Recovery
-- Real-time and replay events: `events serve/tail/recent/emit`
-- Lifecycle and cleanup: `sessions/status/cleanup/force-stop/shutdown`
-
-Session isolation hard rule:
-- Treat `profileId` as the only lifecycle primary key.
-- `cleanup` and `force-stop` must always use direct `profileId`; never translate from alias / instance id.
-- `stop --id` / `stop --alias` are stop-only shortcuts and should not be generalized to other lifecycle commands.
-
-## Trigger Conditions
-
-- User asks for any camo CLI browser/session/profile workflow.
-- User asks for DOM probing or visible-only element filtering.
-- User asks for devtools-style eval/console debugging.
-- User asks for simulated user actions (click/type/scroll/keyboard/tab).
-- User asks for subscription/autoscript orchestration or runtime recovery.
 
 ## Standard Execution Order
 
-1. Check command surface
-   - `which camo`
-   - `camo --help`
-2. Prepare profile/session
-   - `camo profile create ...` / `camo profile default ...`
-3. Start/reuse browser
-   - `camo start ...` / `camo status ...`
-4. Execute by layer
-   - Observe/Debug or User Ops or Orchestration
-5. Collect evidence
-   - `camo status`, `camo sessions`, `camo screenshot ...`
-   - `camo events recent` / `camo events tail ...`
-6. Cleanup if needed
-   - `camo cleanup ...`, `camo force-stop ...`, `camo shutdown`
+1. Start daemon: `camo daemon start --profile <name>`
+2. Wait for session: `camo start --profile <name>`
+3. Execute: `camo goto --profile <name> <url>`, `camo click ...`, `camo snapshot ...`
+4. Collect evidence: `camo screenshot --profile <name>`
+5. Stop session: `camo stop --profile <name>`
+6. Stop daemon: `camo daemon stop --profile <name>`
 
-## Core Commands (Compact)
+## 28 Commands (OpenMinis-aligned)
 
-- Profile management: `profiles`, `profile list/create/delete/default`
-- Initialization/config: `init`, `init geoip`, `init list`, `create fingerprint`, `create profile`, `config repo-root`
-- Browser/session lifecycle: `start`, `stop`, `status`, `list`, `sessions`, `cleanup`, `force-stop`, `lock`, `unlock`
-- Browser actions: `goto`, `back`, `scroll`, `click`, `type`, `screenshot`, `highlight`, `clear-highlight`, `viewport`, `window`, `mouse`
-- Pages/tabs: `new-page`, `close-page`, `switch-page`, `list-pages`
-- Debug: `devtools eval/logs/clear`
-- Cookies/system: `cookies ...`, `system display`, `shutdown`
-- Container subscription layer: `container init/sets/register/targets/filter/watch/list`
-- Autoscript strategy layer: `autoscript scaffold/validate/explain/snapshot/replay/run/resume/mock-run`
-- Progress events: `events serve/tail/recent/emit` (non-events commands auto-start daemon)
+| Command | Args | Description |
+|---------|------|-------------|
+| daemon | start\|stop\|status [--profile] | Daemon lifecycle |
+| start | [--profile] [--url] [--headless] | Start browser session |
+| stop | [--profile] | Stop browser session |
+| goto | <url> [--waitUntil] | Navigate to URL |
+| click | [--selector\|--text] [--button] | Click element |
+| type | <text> [--selector] [--delay] | Type text |
+| scroll | [--x] [--y] | Scroll page |
+| screenshot | [--path] [--full-page] | Take screenshot |
+| snapshot | [--format json\|yaml] | DOM snapshot |
+| wait | [--ms] | Wait ms |
+| evaluate | --script <js> | Run JS in page |
+| upload | --selector <css> --file <path> | Upload file |
+| select | --selector <css> --value <v> | Select option |
+| hover | --selector\|--text | Hover over element |
+| get-text | [--selector] | Get page/element text |
+| get-page-info | | Get page title, URL, dimensions |
+| find-elements | --selector\|--text | Find DOM elements |
+| get-readable | [--max-length] | Extract readable article content |
+| new-tab | [--url] | Create new browser tab |
+| close-tab | --tab-id <n> | Close tab by index |
+| list-tabs | | List all open tabs |
+| get-cookies | | Get browser cookies |
+| set-cookies | --cookies <json> | Set browser cookies |
+| set-user-agent | --ua <string> | Set user agent |
+| set-viewport | --width --height | Set viewport size |
+| wait-dom-stable | [--timeout] [--poll] | Wait for DOM stability |
+| scroll-and-collect | [--scroll-count] [--delay] | Scroll and collect text |
+| fetch-page | <url> [--timeout] | Fetch page content via browser |
 
 ## Environment Variables
 
-- `CAMO_INPUT_MODE` — Input mode: `playwright` (default) or `cdp`. CDP mode bypasses OS input system, does not require window foreground. Recommended for Windows automation.
-- `CAMO_BROWSER_URL` (default `http://127.0.0.1:7704`)
-- `CAMO_REPO_ROOT` (optional explicit repo root)
-- `CAMO_PROGRESS_EVENTS_FILE` (optional progress JSONL path)
-- `CAMO_PROGRESS_WS_HOST` / `CAMO_PROGRESS_WS_PORT` (progress ws daemon host/port)
-
-## CDP Input Mode
-
-Use CDP mode when:
-- Running on Windows where `ensureInputReady` can hang for 30s
-- Window may not be in foreground (minimized, background, multi-tasking)
-- Headless automation without bringing window to front
-
-Enable:
-```bash
-export CAMO_INPUT_MODE=cdp
-camo start xhs-qa-1 --url https://www.xiaohongshu.com
-```
-
-Behavior:
-- Uses `Input.dispatchMouseEvent` via Chrome DevTools Protocol
-- Skips `ensureInputReady` and `bringToFront` checks
-- Fast fail on errors (no 30s timeout hangs)
-- Caller must ensure target element is in viewport
-
-## Quick Verification
-
-Run after skill changes:
-
-```bash
-camo --help
-camo devtools --help
-camo container --help
-camo autoscript --help
-camo events --help
-```
-
-For autoscript path:
-
-```bash
-camo autoscript scaffold xhs-unified --output /tmp/xhs-unified.sample.json
-camo autoscript validate /tmp/xhs-unified.sample.json
-camo autoscript explain /tmp/xhs-unified.sample.json
-```
+- `CAMO_WS_PORT` / `CAMO_HTTP_PORT` — daemon ports (default 0 = auto)
+- `CAMO_PROFILE` — default profile id
+- `CAMO_HEADLESS=1` — headless mode
 
 ## References
 
-- `references/camo-cli-usage.md`
-- `references/browser-service-capabilities.md`
+- `v2/PLAN.md` — architecture plan
+- `v2/README.md` — v2 readme
+- `v2/GOAL.md` — rebuild goal

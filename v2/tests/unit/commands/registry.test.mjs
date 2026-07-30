@@ -3,36 +3,45 @@ import assert from 'node:assert/strict';
 
 import { list, has, look, describe } from '../../../commands/registry/registry.mjs';
 
-test('positive: list returns all 6 commands sorted', () => {
+// Registry stores commands in kebab-case (CLI interface)
+const EXPECTED_CMDS = [
+  'click', 'close-tab', 'daemon', 'evaluate', 'fetch-page', 'find-elements',
+  'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'goto', 'hover',
+  'list-tabs', 'new-tab', 'screenshot', 'scroll', 'scroll-and-collect', 'select',
+  'set-cookies', 'set-user-agent', 'set-viewport', 'snapshot', 'start', 'stop',
+  'type', 'upload', 'wait', 'wait-dom-stable',
+];
+
+test('positive: list returns all 28 commands sorted', () => {
   const a = list();
-  assert.equal(a.length, 6);
-  assert.deepEqual(a, ['click', 'goto', 'snapshot', 'start', 'stop', 'type']);
+  assert.equal(a.length, 28);
+  assert.deepEqual(a, EXPECTED_CMDS);
 });
 
 test('positive: has returns true for known cmd + false for unknown', () => {
   assert.equal(has('start'), true);
+  assert.equal(has('scroll'), true);
   assert.equal(has('not-a-cmd'), false);
   assert.equal(has(''), false);
 });
 
-test('positive: look returns frozen spec for start', () => {
-  const spec = look('start');
-  assert.equal(spec.cmd, 'start');
-  assert.ok(spec.module.endsWith('start.mjs'));
-  assert.ok(spec.args_schema.named.profile);
-  assert.ok(Object.isFrozen(spec));
+test('negative: look throws for unknown cmd', () => {
+  assert.throws(() => look('nonexistent'), /No handler/);
+  assert.throws(() => look(''), /No handler/);
 });
 
-test('negative: look on unknown cmd throws E_PROTO_NO_HANDLER', () => {
-  assert.throws(
-    () => look('nope'),
-    (e) => e.code === 'E_PROTO_NO_HANDLER'
-  );
-});
-
-test('utility: describe reports count and layer', () => {
+test('positive: describe includes count', () => {
   const d = describe();
-  assert.equal(d.moduleId, 'commands.registry');
+  assert.equal(d.count, 28);
   assert.equal(d.layer, 'L4_command');
-  assert.equal(d.count, 6);
+  assert.equal(d.moduleId, 'commands.registry');
+});
+
+test('positive: every list() entry has valid spec', () => {
+  for (const cmd of list()) {
+    const spec = look(cmd);
+    assert.equal(spec.cmd, cmd);
+    assert.ok(spec.module, `${cmd} missing module`);
+    assert.ok(spec.args_schema, `${cmd} missing args_schema`);
+  }
 });

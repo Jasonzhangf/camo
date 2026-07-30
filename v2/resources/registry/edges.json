@@ -206,6 +206,18 @@
       "to": "transports.daemon",
       "kind": "call",
       "reason": "fan out ws subscribers"
+    },
+    {
+      "from": "shell.bin_entry",
+      "to": "shell.config",
+      "kind": "call",
+      "reason": "load config + find existing daemon before dispatch"
+    },
+    {
+      "from": "shell.cli",
+      "to": "shell.config",
+      "kind": "call",
+      "reason": "read profile defaults for commands"
     }
   ],
   "forbidden_edges": [

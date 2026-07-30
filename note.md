@@ -406,6 +406,37 @@ registry (16 with per-resource gates, +registry integrity).
 - legacy-app repo (per AGENTS.md section 5) is unaffected by these
   changes; camo only ships v2/.
 
+## 2026-07-29 Stage 6 review — blocking findings
+
+Review scope: `0b5b85b`, `ba14f85`, `88a355f`.
+
+- Packed artifact is broken: `package.json#files` omits `v2/`. `npm pack`
+  contains 0 v2 files; running packed `bin/camo.mjs --help` fails with
+  `MODULE_NOT_FOUND` for `v2/shell/bin_entry/index.mjs`.
+- Source-tree CLI is not a browser runtime. `shell/cli/dispatch.mjs` always
+  uses `fakeTransport()` unless an in-process caller injects another transport.
+  Real replay: `camo start` exits 0 with `sessionId:null`; `camo goto` exits 0
+  with `navigated:false`. Browser-service bootstrap only returns
+  `dryRun:true`; no real daemon/browser wiring exists.
+- Command registry and executable builtins disagree: registry/help list
+  `snapshot`, but `commands/builtins/index.mjs` omits it. Real replay exits 2
+  with `E_PROTO_NO_HANDLER`.
+- Removed v1 commands fail open: `status`, `autoscript`, and other unknown
+  commands return `{kind:"usage"}` with exit 0. Existing automation can treat
+  missing behavior as success.
+- Active registry is not implementation truth. Strict per-resource gates only
+  check that mapped v1 shadows are absent. Active `page_runtime` paths point to
+  missing `bootstrap.mjs` and `injector.mjs`; active
+  `autoscript_action` points to missing `contracts/operations/registry.json`.
+  Multiple active modules contain README only. Registry docs/wiki/test map
+  still say design/pending.
+- Local strict registry gate, build, and file-size checks pass despite these
+  defects. Tests pass 199/199 only with writable temporary HOME; default
+  sandbox HOME run fails command-log test because it writes `~/.camo`.
+
+Review verdict: FAIL. Stage 6 cannot be published or treated as production
+baseline.
+
 ## 2026-07-29 codex review gate (hard guard 36)
 
 Tried to run `codex --profile tcm review -` with the review-prompt.md

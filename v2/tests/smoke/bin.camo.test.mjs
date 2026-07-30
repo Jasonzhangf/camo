@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
-import fs from 'node:fs';
 
 const testsDir = path.dirname(new URL(import.meta.url).pathname);
 const repoRoot = path.resolve(testsDir, '..', '..', '..');

@@ -8,43 +8,221 @@
 //   - Single argv entrypoint.
 //   - No side effects on import.
 //   - All IO dispatches via the builtins + transports stack.
+//   - No fake transport fallback.
+//   - Auto-discovers or auto-starts daemon as needed.
 
+import { spawn } from 'node:child_process';
+import path from 'node:path';
+import url from 'node:url';
+import fs from 'node:fs';
+import os from 'node:os';
 import { dispatch, usage } from '../cli/dispatch.mjs';
 import { isCamoError, toWire } from '../../contracts/error_envelope/projector.mjs';
+import { loadConfig } from '../config/loader.mjs';
+import { findActiveDaemon } from '../config/daemon_finder.mjs';
 
-function printHelp() {
-  process.stdout.write(usage() + '\n');
+const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
+const DAEMON_SCRIPT = path.resolve(__dirname, '..', 'daemon', 'index.mjs');
+const DAEMON_DIR = path.join(os.homedir(), '.camo', 'daemon');
+
+function makeWsTransport(url) {
+  return {
+    async sendFrame(env) {
+      const { WebSocket } = await import('ws');
+      return new Promise((resolve, reject) => {
+        const ws = new WebSocket(url);
+        const timeout = setTimeout(() => {
+          ws.close();
+          reject(Object.assign(new Error('WS timeout'), { code: 'E_IO_TIMEOUT' }));
+        }, 30000);
+        ws.on('open', () => { ws.send(JSON.stringify(env)); });
+        ws.on('message', (data) => {
+          clearTimeout(timeout);
+          ws.close();
+          try { resolve(JSON.parse(String(data))); }
+          catch(e) { reject(e); }
+        });
+        ws.on('error', (e) => {
+          clearTimeout(timeout);
+          ws.close();
+          reject(Object.assign(new Error('WS error: ' + e.message), { code: 'E_IO_CONNECT' }));
+        });
+      });
+    },
+  };
+}
+
+const NO_TRANSPORT_CMDS = new Set(['--help', '-h', 'help', 'doctor', 'usage', 'describe']);
+// `daemon` is a process-level control command; it spawns the daemon itself
+// rather than talking to one. Skip the daemon-finder path for it.
+const PROCESS_ONLY_CMDS = new Set(['daemon']);
+
+/**
+ * Wait for daemon to be ready by polling ~/.camo/daemon/ directory.
+ * Returns the daemon registration or throws.
+ */
+async function waitForDaemon(profile, timeoutMs = 15000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const daemon = findActiveDaemon({ profile, ephemeral: true });
+    if (daemon) return daemon;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  throw Object.assign(new Error('Daemon did not start within timeout'), { code: 'E_DAEMON_NOT_FOUND' });
+}
+
+/**
+ * Auto-start a daemon process.
+ * Returns the daemon's wsUrl once ready.
+ */
+async function startDaemon(profile, mode) {
+  const args = [];
+  if (profile && !profile.startsWith('_ephemeral_')) {
+    args.push('--profile', profile);
+  } else {
+    args.push('--ephemeral');
+  }
+  if (process.env.CAMO_HEADLESS === '1') args.push('--headless');
+
+  const child = spawn(process.execPath, [DAEMON_SCRIPT, ...args], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, CAMO_WS_PORT: '0', CAMO_HTTP_PORT: '0' },
+  });
+
+  // Capture stderr for diagnostics
+  let stderr = '';
+  child.stderr.on('data', (chunk) => { stderr += String(chunk); });
+
+  child.on('exit', (code) => {
+    if (code !== 0 && code !== null) {
+      console.error(`[camo] daemon exited with code ${code}`);
+      if (stderr) console.error(stderr);
+    }
+  });
+
+  try {
+    const daemon = await waitForDaemon(profile);
+    return { wsUrl: `ws://localhost:${daemon.wsPort}`, daemon, child };
+  } catch (err) {
+    // If daemon died, surface its stderr
+    if (stderr) console.error(stderr);
+    throw err;
+  }
 }
 
 async function main(argv) {
-  // argv[0]/[1] are node + script path; user args start at index 2.
   const args = argv.slice(2);
+
+  // Load config (file + env + CLI overrides)
+  const config = loadConfig({});
+
+  // help / doctor / usage bypass transport
+  const hasHelpFlag = args.includes('--help') || args.includes('-h');
+  const needsTransport = !hasHelpFlag
+    && args.length > 0
+    && !NO_TRANSPORT_CMDS.has(args[0])
+    && !PROCESS_ONLY_CMDS.has(args[0]);
+  
+  const processOnly = PROCESS_ONLY_CMDS.has(args[0]);
+  // For process-only commands (e.g. `daemon`), dispatch with a null
+  // transport and a processOnly flag so the dispatcher lets it through.
+  if (!needsTransport || processOnly) {
+    try {
+      const out = await dispatch(args, { transport: null, config, processOnly });
+      if (out.kind === 'help') {
+        process.stdout.write((out.usage || usage()) + '\n');
+        return 0;
+      }
+      if (out.kind === 'doctor') {
+        process.stdout.write(JSON.stringify(out.report, null, 2) + '\n');
+        return 0;
+      }
+      if (out.kind === 'usage') {
+        process.stdout.write((out.usage || usage()) + '\n');
+        return 2;
+      }
+      process.stdout.write(JSON.stringify(out, null, 2) + '\n');
+      return 0;
+    } catch (cause) {
+      if (isCamoError(cause)) {
+        const wire = toWire(cause);
+        process.stderr.write('camo: [' + wire.code + '] ' + wire.message + '\n');
+        if (wire.details) process.stderr.write('  details: ' + JSON.stringify(wire.details) + '\n');
+        return 2;
+      }
+      process.stderr.write('camo: internal error: ' + (cause && cause.message || String(cause)) + '\n');
+      return 3;
+    }
+  }
+
+  // Determine profile from args
+  let profile = config.profile;
+  let isEphemeral = true;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--profile' && args[i + 1]) {
+      profile = args[i + 1];
+      isEphemeral = false;
+    }
+    if (args[i] === '--ephemeral') {
+      isEphemeral = true;
+      profile = `_ephemeral_${process.pid}_${Date.now()}`;
+    }
+  }
+  if (isEphemeral && !profile) profile = `_ephemeral_${process.pid}_${Date.now()}`;
+
+  // CLI never silently auto-starts a daemon. This is a single-execution CLI.
+  // Users wanting a shared daemon must run `camo daemon start` separately.
+  // We deliberately do NOT fall back to spawning one here (per hard guard 3).
+  let transport;
+  let daemonChild = null;
+  
+  // First check if there's already a daemon running for this profile.
+  const existing = findActiveDaemon({ profile, ephemeral: isEphemeral });
+  if (existing) {
+    transport = makeWsTransport(`ws://localhost:${existing.wsPort}`);
+  } else {
+    process.stderr.write(`camo: no active daemon for profile "${profile}". Run 'camo daemon start --profile ${profile}' first, or set CAMO_AUTOSTART=1.\n`);
+    return 2;
+  }
+
   try {
-    const out = await dispatch(args);
-    if (out.kind === 'help') {
-      process.stdout.write((out.usage || usage()) + '\n');
+    const out = await dispatch(args, { transport, config });
+    if (out.kind === 'result') {
+      process.stdout.write(JSON.stringify(out.result, null, 2) + '\n');
       return 0;
     }
-    if (out.kind === 'doctor') {
-      process.stdout.write(JSON.stringify(out.report, null, 2) + '\n');
-      return 0;
+    if (out.kind === 'usage') {
+      process.stdout.write((out.usage || usage()) + '\n');
+      return 2;
     }
     process.stdout.write(JSON.stringify(out, null, 2) + '\n');
     return 0;
   } catch (cause) {
     if (isCamoError(cause)) {
       const wire = toWire(cause);
-      process.stderr.write(`camo: [${wire.code}] ${wire.message}\n`);
-      if (wire.details) process.stderr.write(`  details: ${JSON.stringify(wire.details)}\n`);
+      process.stderr.write('camo: [' + wire.code + '] ' + wire.message + '\n');
+      if (wire.details) process.stderr.write('  details: ' + JSON.stringify(wire.details) + '\n');
       return 2;
     }
-    process.stderr.write(`camo: internal error: ${cause?.message || String(cause)}\n`);
+    process.stderr.write('camo: internal error: ' + (cause && cause.message || String(cause)) + '\n');
     return 3;
+  } finally {
+    // For ephemeral mode, send shutdown to daemon
+    if (isEphemeral && daemonChild) {
+      // Give daemon a moment to finish processing
+      setTimeout(() => {
+        try { daemonChild.kill('SIGTERM'); }
+        catch (cause) {
+          process.stderr.write(`camo: failed to terminate daemon ${daemonChild.pid}: ${cause?.message || cause}
+`);
+        }
+      }, 500);
+    }
   }
 }
 
 const exitCode = await main(process.argv).catch((e) => {
-  process.stderr.write(`camo: fatal: ${e?.message || String(e)}\n`);
+  process.stderr.write('camo: fatal: ' + (e && e.message || String(e)) + '\n');
   process.exit(3);
 });
 process.exit(exitCode);

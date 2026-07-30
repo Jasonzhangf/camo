@@ -267,6 +267,38 @@
         "v2/shell/doctor/**"
       ],
       "status": "active"
+    },
+    {
+      "id": "shell.config",
+      "layer": "L5_shell",
+      "owned_paths": [
+        "v2/shell/config/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "shell.logging",
+      "layer": "L5_shell",
+      "owned_paths": [
+        "v2/shell/logging/**"
+      ],
+      "status": "design"
+    },
+    {
+      "id": "shell.tracer",
+      "layer": "L5_shell",
+      "owned_paths": [
+        "v2/shell/tracer/**"
+      ],
+      "status": "design"
+    },
+    {
+      "id": "shell.repl",
+      "layer": "L5_shell",
+      "owned_paths": [
+        "v2/shell/repl/**"
+      ],
+      "status": "design"
     }
   ]
 }

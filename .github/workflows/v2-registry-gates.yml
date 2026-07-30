@@ -42,6 +42,19 @@ jobs:
         # Any failure exits non-zero and red-flags this job.
         run: node --test 'tests/unit/**/*.test.mjs'
 
+      - name: v2 smoke tests
+        working-directory: v2
+        run: node --test 'tests/smoke/**/*.test.mjs'
+
+      - name: v2 integration tests
+        working-directory: v2
+        run: node --test 'tests/integration/**/*.test.mjs'
+
+      - name: v2 e2e lifecycle tests
+        working-directory: v2
+        # Spawns real daemon subprocesses; verifies lifecycle / multi-profile / cleanup.
+        run: node --test 'tests/e2e/**/*.test.mjs'
+
       - name: v1 src/ untouched by this workflow
         # Stage 6 deletes v1 src/ entirely. This step is informational:
         # Sanity check: the v2 rebuild must not touch v1 paths in this

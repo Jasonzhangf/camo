@@ -16,7 +16,7 @@ import { sendRequest as httpSendRequest } from '../http/client.mjs';
 let _enabled = false;
 export function __enableTestRoot() { _enabled = true; }
 
-const ALLOWED_CMDS = new Set(['start', 'stop', 'goto', 'click', 'type', 'snapshot']);
+const ALLOWED_CMDS = new Set(['start', 'stop', 'goto', 'click', 'type', 'snapshot', 'scroll', 'screenshot', 'wait', 'evaluate', 'upload', 'select']);
 
 function assertCmd(cmd) {
   if (!ALLOWED_CMDS.has(String(cmd || ''))) {

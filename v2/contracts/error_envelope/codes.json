@@ -10,25 +10,110 @@
     "internal": "E_INTERNAL_*"
   },
   "codes": [
-    {"code": "E_INPUT_INVALID",        "category": "input",    "default_user_message": "Invalid input."},
-    {"code": "E_INPUT_MISSING_FIELD",  "category": "input",    "default_user_message": "Required field is missing."},
-    {"code": "E_INPUT_OUT_OF_RANGE",   "category": "input",    "default_user_message": "Value is out of range."},
-
-    {"code": "E_STATE_NOT_FOUND",      "category": "state",    "default_user_message": "Resource not found."},
-    {"code": "E_STATE_DUPLICATE",      "category": "state",    "default_user_message": "Resource already exists."},
-    {"code": "E_STATE_LOCKED",         "category": "state",    "default_user_message": "Operation cannot proceed: resource is locked."},
-    {"code": "E_STATE_TERMINAL",       "category": "state",    "default_user_message": "Cannot transition a terminal resource."},
-    {"code": "E_STATE_NONTERMINAL",    "category": "state",    "default_user_message": "Cannot transition: still in progress."},
-
-    {"code": "E_IO_TIMEOUT",           "category": "io",       "default_user_message": "Operation timed out."},
-    {"code": "E_IO_CONNECT",           "category": "io",       "default_user_message": "Cannot connect."},
-    {"code": "E_IO_DISCONNECT",        "category": "io",       "default_user_message": "Connection lost."},
-    {"code": "E_IO_FILESYSTEM",        "category": "io",       "default_user_message": "Filesystem operation failed."},
-
-    {"code": "E_PROTO_BAD_VERSION",    "category": "protocol", "default_user_message": "Unsupported envelope version."},
-    {"code": "E_PROTO_BAD_ENVELOPE",   "category": "protocol", "default_user_message": "Malformed envelope."},
-    {"code": "E_PROTO_NO_HANDLER",     "category": "protocol", "default_user_message": "No handler for action."},
-
-    {"code": "E_INTERNAL_UNEXPECTED",  "category": "internal", "default_user_message": "Unexpected internal error."}
+    {
+      "code": "E_INPUT_INVALID",
+      "category": "input",
+      "default_user_message": "Invalid input."
+    },
+    {
+      "code": "E_INPUT_MISSING_FIELD",
+      "category": "input",
+      "default_user_message": "Required field is missing."
+    },
+    {
+      "code": "E_INPUT_OUT_OF_RANGE",
+      "category": "input",
+      "default_user_message": "Value is out of range."
+    },
+    {
+      "code": "E_STATE_NOT_FOUND",
+      "category": "state",
+      "default_user_message": "Resource not found."
+    },
+    {
+      "code": "E_STATE_DUPLICATE",
+      "category": "state",
+      "default_user_message": "Resource already exists."
+    },
+    {
+      "code": "E_STATE_LOCKED",
+      "category": "state",
+      "default_user_message": "Operation cannot proceed: resource is locked."
+    },
+    {
+      "code": "E_STATE_TERMINAL",
+      "category": "state",
+      "default_user_message": "Cannot transition a terminal resource."
+    },
+    {
+      "code": "E_STATE_NONTERMINAL",
+      "category": "state",
+      "default_user_message": "Cannot transition: still in progress."
+    },
+    {
+      "code": "E_IO_TIMEOUT",
+      "category": "io",
+      "default_user_message": "Operation timed out."
+    },
+    {
+      "code": "E_IO_CONNECT",
+      "category": "io",
+      "default_user_message": "Cannot connect."
+    },
+    {
+      "code": "E_IO_DISCONNECT",
+      "category": "io",
+      "default_user_message": "Connection lost."
+    },
+    {
+      "code": "E_IO_FILESYSTEM",
+      "category": "io",
+      "default_user_message": "Filesystem operation failed."
+    },
+    {
+      "code": "E_PROTO_BAD_VERSION",
+      "category": "protocol",
+      "default_user_message": "Unsupported envelope version."
+    },
+    {
+      "code": "E_PROTO_BAD_ENVELOPE",
+      "category": "protocol",
+      "default_user_message": "Malformed envelope."
+    },
+    {
+      "code": "E_PROTO_NO_HANDLER",
+      "category": "protocol",
+      "default_user_message": "No handler for action."
+    },
+    {
+      "code": "E_INTERNAL_UNEXPECTED",
+      "category": "internal",
+      "default_user_message": "Unexpected internal error."
+    },
+    {
+      "code": "E_STATE_NO_TRANSPORT",
+      "category": "state",
+      "default_user_message": "No transport configured. Use daemon mode or inject a transport."
+    },
+    {
+      "code": "E_BROWSER_LAUNCH_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to launch browser."
+    },
+    {
+      "code": "E_CONFIG_INVALID",
+      "category": "input",
+      "default_user_message": "Invalid configuration."
+    },
+    {
+      "code": "E_DAEMON_NOT_FOUND",
+      "category": "state",
+      "default_user_message": "Daemon not running."
+    },
+    {
+      "code": "E_DAEMON_START_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to start daemon."
+    }
   ]
 }
