@@ -19,6 +19,11 @@ import { infer as inferCmd, parse as parseFlags } from '../../commands/parsers/f
 import { list as registryList } from '../../commands/registry/registry.mjs';
 import { run as runBuiltin } from '../../commands/builtins/index.mjs';
 
+// Convert kebab-case CLI command to camelCase builtin name
+function toCamelCase(s) {
+  return s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+}
+
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const DOC_DIR = path.resolve(__dirname, '../../commands/docstrings');
 
@@ -71,6 +76,7 @@ export async function dispatch(argv, opts = {}) {
   }
 
   const ctx = { traceId: opts.traceId || 'cli-' + Date.now() };
+  // CLI uses kebab-case, builtins handles conversion internally
   const result = await runBuiltin(cmd, opts.transport, parsed, ctx);
   return { kind: 'result', cmd, result };
 }

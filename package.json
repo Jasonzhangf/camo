@@ -1,11 +1,11 @@
 {
   "name": "@web-auto/camo",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "Camoufox Browser CLI - Cross-platform browser automation",
   "type": "module",
   "bin": {
-    "camo": "./bin/camo.mjs",
-    "camo-bash": "./bin/camo"
+    "camo": "bin/camo.mjs",
+    "camo-bash": "bin/camo"
   },
   "files": [
     "bin/",

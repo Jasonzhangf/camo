@@ -180,6 +180,10 @@ async function main(argv) {
   const existing = findActiveDaemon({ profile, ephemeral: isEphemeral });
   if (existing) {
     transport = makeWsTransport(`ws://localhost:${existing.wsPort}`);
+  } else if (process.env.CAMO_AUTOSTART === '1') {
+    // Auto-start daemon if CAMO_AUTOSTART is set
+    const daemon = await startDaemon(profile, isEphemeral ? 'ephemeral' : 'persistent');
+    transport = makeWsTransport(daemon.wsUrl);
   } else {
     process.stderr.write(`camo: no active daemon for profile "${profile}". Run 'camo daemon start --profile ${profile}' first, or set CAMO_AUTOSTART=1.\n`);
     return 2;

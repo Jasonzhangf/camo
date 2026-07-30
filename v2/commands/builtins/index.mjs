@@ -52,15 +52,23 @@ export function isBuiltin(cmd) {
   return Object.prototype.hasOwnProperty.call(BUILTINS, String(cmd || ''));
 }
 
+// Convert kebab-case to camelCase
+function toCamel(s) {
+  return s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+}
+
 export async function run(cmd, transport, parsed = {}, ctx = {}) {
   const c = String(cmd || '');
-  const spec = registryLook(c); // throws on unknown
-  if (!isBuiltin(c)) {
-    throw new CamoError({ code: 'E_PROTO_NO_HANDLER', details: { resource: 'builtin', cmd: c } });
+  // CLI sends kebab-case, builtins BUILTINS uses camelCase
+  const camelCmd = c.includes('-') ? toCamel(c) : c;
+  // Registry stores kebab-case commands
+  const spec = registryLook(c); // throws on unknown (uses kebab-case)
+  if (!isBuiltin(camelCmd)) {
+    throw new CamoError({ code: 'E_PROTO_NO_HANDLER', details: { resource: 'builtin', cmd: camelCmd } });
   }
-  const mod = BUILTINS[c];
+  const mod = BUILTINS[camelCmd];
   if (typeof mod.run !== 'function') {
-    throw new CamoError({ code: 'E_INTERNAL_UNEXPECTED', details: { op: 'builtins.run', cmd: c, reason: 'no run() export' } });
+    throw new CamoError({ code: 'E_INTERNAL_UNEXPECTED', details: { op: 'builtins.run', cmd: camelCmd, reason: 'no run() export' } });
   }
   return await mod.run(transport, parsed, ctx);
 }

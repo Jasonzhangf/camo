@@ -16,7 +16,14 @@ import { sendRequest as httpSendRequest } from '../http/client.mjs';
 let _enabled = false;
 export function __enableTestRoot() { _enabled = true; }
 
-const ALLOWED_CMDS = new Set(['start', 'stop', 'goto', 'click', 'type', 'snapshot', 'scroll', 'screenshot', 'wait', 'evaluate', 'upload', 'select']);
+// All 28 commands supported by camo v2 (kebab-case)
+const ALLOWED_CMDS = new Set([
+  'click', 'close-tab', 'daemon', 'evaluate', 'fetch-page', 'find-elements',
+  'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'goto', 'hover',
+  'list-tabs', 'new-tab', 'screenshot', 'scroll', 'scroll-and-collect', 'select',
+  'set-cookies', 'set-user-agent', 'set-viewport', 'snapshot', 'start', 'stop',
+  'type', 'upload', 'wait', 'wait-dom-stable'
+]);
 
 function assertCmd(cmd) {
   if (!ALLOWED_CMDS.has(String(cmd || ''))) {
