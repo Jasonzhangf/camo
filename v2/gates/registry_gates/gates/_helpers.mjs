@@ -28,12 +28,8 @@ export function getResource(resource_id) {
   return r;
 }
 
-// Returns array of absolute v1 paths that shadow this forbidden path.
-// Each `forbidden_path` may contain a `::verb` suffix or `**` glob that
-// we strip before lookup. Returns null entries for entries we cannot
-// resolve to a single v1 file (e.g. category globs).
 export function v1Shadows(forbiddenPath) {
-  const bare = forbiddenPath.split('::')[0]; // drop ::verb suffix
+  const bare = forbiddenPath.split('::')[0];
   const mapping = {
     'v2/lifecycle/session_registry.mjs':                  'src/lifecycle/session-registry.mjs',
     'v2/lifecycle/lock.mjs':                              'src/lifecycle/lock.mjs',
@@ -63,4 +59,153 @@ export function checkForbiddenGone(resource_id) {
     }
   }
   return { ok: hits.length === 0, hits, resource: r };
+}
+
+export function executeProhibitions(resource_id) {
+    const { ok, hits, resource } = checkForbiddenGone(resource_id);
+    return { ok, violations: hits, resource };
+}
+
+// Import analysis utilities
+export function extractImportSpecifiers(text) {
+    const results = [];
+    const seen = new Set();
+
+    // Match all forms: import x from 'y', import * as x from 'y', export {x} from 'y', export * from 'y'
+    const staticImportPattern = /(?:import|export)\s+(?:(\*)|(\{[^}]*\}|[^;{]+?))\s*(?:as\s+\w+\s*)?from\s+['"`]([^'"`]+)['"`]/g;
+    // Match dynamic import with single/double quotes only (NOT backticks)
+    const dynamicImportPattern = /(?:await\s+)?import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+    // Match template literal dynamic import: import(`x`)
+    const templateImportPattern = /(?:await\s+)?import\s*\(\s*`([^`]+)`\s*\)/g;
+
+    let m;
+    while ((m = staticImportPattern.exec(text)) !== null) {
+        const [, isNamespace, namedPart, specifier] = m;
+        if (isNamespace) {
+            results.push({ specifier, type: 'namespace' });
+        } else if (namedPart?.includes('{')) {
+            const names = namedPart.replace(/[{}]/g, '').split(',').map((n) => n.trim()).filter(Boolean);
+            for (const name of names) {
+                const baseName = name.split(/\s+as\s+/)[0].trim();
+                results.push({ specifier, type: 'named', name: baseName });
+            }
+        } else if (namedPart) {
+            results.push({ specifier, type: 'default', name: namedPart.trim() });
+        }
+    }
+
+    while ((m = dynamicImportPattern.exec(text)) !== null) {
+        results.push({ specifier: m[1], type: 'dynamic' });
+    }
+    while ((m = templateImportPattern.exec(text)) !== null) {
+        results.push({ specifier: m[1], type: 'dynamic-template' });
+    }
+
+    return results;
+}
+
+export function prohibitedImportSymbols(opts) {
+    const { text, sourcePath, targetPath, symbols } = opts;
+    const detected = new Set();
+    const specs = extractImportSpecifiers(text);
+    const targetBasename = targetPath.split('/').pop();
+
+    // Find variable declarations from dynamic imports: const x = await import('...');
+    const varImportPattern = /(?:const|let|var)\s+(\w+)\s*=\s*(?:await\s+)?import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+    const varNames = new Map();
+    let m;
+    while ((m = varImportPattern.exec(text)) !== null) {
+        varNames.set(m[1], m[2]);
+    }
+
+    function matchesTarget(bare) {
+        return bare === targetPath || bare === targetBasename || bare.endsWith('/' + targetBasename) || targetPath.includes(bare);
+    }
+
+    // Check each static import specifier
+    for (const { specifier, type, name } of specs) {
+        if (!specifier) continue;
+        const bare = specifier.split('?')[0].split('#')[0];
+        if (!matchesTarget(bare)) continue;
+        if (type === 'namespace' || type === 'dynamic' || type === 'dynamic-template') {
+            detected.add('*');
+        } else if (type === 'named' && name) {
+            if (symbols.includes(name)) detected.add(name);
+        }
+    }
+
+    // Check variable-assigned dynamic imports for symbol access
+    for (const [varName, specifier] of varNames) {
+        const bare = specifier.split('?')[0].split('#')[0];
+        if (matchesTarget(bare)) {
+            for (const sym of symbols) {
+                if (text.includes(varName + '.' + sym + '(')) {
+                    detected.add('*');
+                    break;
+                }
+            }
+        }
+    }
+
+    // Detect variable-based dynamic imports without literal specifier
+    // e.g. const target = 'path'; await import(target);
+    const variableImportPattern = /(?:await\s+)?import\s*\(\s*(\w+)\s*\)/g;
+    while ((m = variableImportPattern.exec(text)) !== null) {
+        const varName = m[1];
+        // Check if this variable was assigned a target-matching value
+        const varAssignPattern = /(?:const|let|var)\s+\w+\s*=\s*['"]([^'"]+)['"]/;
+        for (const line of text.split('\n')) {
+            const match = line.match(varAssignPattern);
+            if (match && match[1] === varName) {
+                continue; // skip self-assignment
+            }
+            if (match) {
+                const bare = match[1].split('?')[0].split('#')[0];
+                if (matchesTarget(bare)) {
+                    detected.add('*');
+                }
+            }
+        }
+    }
+
+    return [...detected].sort();
+}
+
+export function prohibitedImportModules(opts) {
+    const { text, moduleName } = opts;
+    const detected = new Set();
+    const specs = extractImportSpecifiers(text);
+
+    for (const { specifier, type } of specs) {
+        if (!specifier) continue;
+        const bare = specifier.split('?')[0].split('#')[0];
+        if (bare === moduleName || bare.startsWith(moduleName + '/')) {
+            if (type === 'dynamic' || type === 'dynamic-template') {
+                detected.add(specifier);
+            } else if (type === 'namespace') {
+                // Namespace import of exact match or subpath
+                detected.add('*');
+            } else {
+                if (bare === moduleName) {
+                    detected.add(moduleName);
+                } else {
+                    detected.add(bare);
+                }
+            }
+        }
+    }
+
+    // Variable-assigned dynamic imports
+    const lines = text.split('\n');
+    for (const line of lines) {
+        const match = line.match(/(?:const|let|var)\s+\w+\s*=\s*(?:await\s+)?import\s*\(\s*['"]([^'"]+)['"]\s*\)/);
+        if (match) {
+            const importedBare = match[1].split('?')[0].split('#')[0];
+            if (importedBare === moduleName || importedBare.startsWith(moduleName + '/')) {
+                detected.add('<dynamic>');
+            }
+        }
+    }
+
+    return [...detected].sort();
 }

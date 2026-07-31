@@ -148,6 +148,14 @@
       "status": "active"
     },
     {
+      "id": "services.daemon_registration",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/services/daemon_registration/**"
+      ],
+      "status": "active"
+    },
+    {
       "id": "services.progress_event",
       "layer": "L2_service",
       "owned_paths": [
@@ -160,6 +168,14 @@
       "layer": "L2_service",
       "owned_paths": [
         "v2/services/command_log/**"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "services.browser_service.internal",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/services/browser_service/internal/**"
       ],
       "status": "active"
     },

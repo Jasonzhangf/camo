@@ -465,11 +465,6 @@ async function handleCommand(env) {
     return { kind: 'result', payload: { cmd, ...result } };
     
   } catch (cause) {
-    if (profile.startsWith('_ephemeral_') || opts.mode === 'ephemeral') {
-      try { await releaseBrowser(true); }
-      catch (cleanupErr) { emit('ephemeral.cleanup_failed', { error: String(cleanupErr?.message || cleanupErr) }); }
-    }
-    
     const proj = cause instanceof CamoError ? cause : new CamoError({ 
       code: 'E_INTERNAL_UNEXPECTED', 
       message: cause?.message || String(cause), 

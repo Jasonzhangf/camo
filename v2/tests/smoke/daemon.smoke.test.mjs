@@ -17,8 +17,8 @@ test('smoke: daemon module loads', async () => {
   assert.ok(fs.existsSync(daemonPath), 'daemon entry must exist');
 });
 
-test('smoke: playwright_bridge loads', async () => {
-  const pw = await import('../../services/browser_service/internal/playwright_bridge.mjs');
+test('smoke: camoufox_bridge loads', async () => {
+  const pw = await import('../../services/browser_service/internal/camoufox_bridge.mjs');
   assert.ok(typeof pw.launchBrowser === 'function');
   assert.ok(typeof pw.closeBrowser === 'function');
   assert.ok(typeof pw.getPage === 'function');

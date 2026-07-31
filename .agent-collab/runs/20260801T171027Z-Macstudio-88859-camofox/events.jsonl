@@ -1,0 +1,1 @@
+{"ts":"2026-07-31T17:10:27Z","event":"baseline.start","run_id":"20260801T171027Z-Macstudio-88859-camofox","objective":"remove direct Playwright path, enforce Camoufox-only registry gates, validate and commit"}

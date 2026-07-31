@@ -9,7 +9,7 @@
 //   - No v1 imports.
 
 import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
-import { getPage } from '../../browser_service/internal/playwright_bridge.mjs';
+import { getPage } from '../../browser_service/internal/camoufox_bridge.mjs';
 import { append as appendProgress } from '../../progress_event/log.mjs';
 
 function safeId(id, field) {
@@ -583,7 +583,7 @@ export async function getReadable({ profileId, maxLength }) {
  */
 export async function newTab({ profileId, url }) {
   const pid = safeId(profileId, 'profileId');
-  const { getBrowser } = await import('../../browser_service/internal/playwright_bridge.mjs');
+  const { getBrowser } = await import('../../browser_service/internal/camoufox_bridge.mjs');
   const record = getBrowser(pid);
   if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
   emit(pid, 'newTab.start', { url });
@@ -606,7 +606,7 @@ export async function newTab({ profileId, url }) {
  */
 export async function closeTab({ profileId, tabId }) {
   const pid = safeId(profileId, 'profileId');
-  const { getBrowser } = await import('../../browser_service/internal/playwright_bridge.mjs');
+  const { getBrowser } = await import('../../browser_service/internal/camoufox_bridge.mjs');
   const record = getBrowser(pid);
   if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
   emit(pid, 'closeTab.start', { tabId });
@@ -631,7 +631,7 @@ export async function closeTab({ profileId, tabId }) {
  */
 export async function listTabs({ profileId }) {
   const pid = safeId(profileId, 'profileId');
-  const { getBrowser } = await import('../../browser_service/internal/playwright_bridge.mjs');
+  const { getBrowser } = await import('../../browser_service/internal/camoufox_bridge.mjs');
   const record = getBrowser(pid);
   if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
   emit(pid, 'listTabs.start', {});
@@ -656,7 +656,7 @@ export async function listTabs({ profileId }) {
  */
 export async function getCookies({ profileId }) {
   const pid = safeId(profileId, 'profileId');
-  const { getBrowser } = await import('../../browser_service/internal/playwright_bridge.mjs');
+  const { getBrowser } = await import('../../browser_service/internal/camoufox_bridge.mjs');
   const record = getBrowser(pid);
   if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
   emit(pid, 'getCookies.start', {});
@@ -676,7 +676,7 @@ export async function getCookies({ profileId }) {
  */
 export async function setCookies({ profileId, cookies }) {
   const pid = safeId(profileId, 'profileId');
-  const { getBrowser } = await import('../../browser_service/internal/playwright_bridge.mjs');
+  const { getBrowser } = await import('../../browser_service/internal/camoufox_bridge.mjs');
   const record = getBrowser(pid);
   if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
   if (!Array.isArray(cookies) || cookies.length === 0) {
@@ -699,7 +699,7 @@ export async function setCookies({ profileId, cookies }) {
  */
 export async function setUserAgent({ profileId, userAgent }) {
   const pid = safeId(profileId, 'profileId');
-  const { getBrowser } = await import('../../browser_service/internal/playwright_bridge.mjs');
+  const { getBrowser } = await import('../../browser_service/internal/camoufox_bridge.mjs');
   const record = getBrowser(pid);
   if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
   if (!userAgent || typeof userAgent !== 'string') {

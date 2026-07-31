@@ -1,0 +1,9 @@
+{"ts":"2026-07-30T16:48:35Z","event":"claim.acquired","semantic_id":"camo_release_0_3_6"}
+{"ts":"2026-07-30T18:14:56Z","event":"release.verification.complete","artifact_sha256":"4464659984ed37c6a2327c7dfdf7f6c74ac9e9d99810addafd31e551a9dc5383","installed_version":"0.3.6"}
+{"ts":"2026-07-30T22:19:30Z","event":"review.remediation.complete","review_round":3,"artifact_sha256":"90b8c19b75a14e247da0f6eb1a114447737b9ca6d9538152dc3a804801d7e546","installed_version":"0.3.6"}
+{"ts":"2026-07-30T22:48:38Z","event":"review.remediation.complete","review_round":4,"artifact_sha256":"eac7d3c23fa051590e56f643d13c84387d833e9da788bc3d70338e5f541a4e42","installed_version":"0.3.6"}
+{"ts":"2026-07-30T23:12:46Z","event":"review.remediation.complete","review_round":5,"artifact_sha256":"2c705b47259f9b9a77588dbc421c2fef3c1f42f2b2af242a326bb0d1408f6689","installed_version":"0.3.6"}
+{"ts":"2026-07-30T23:30:00Z","event":"review.failed","review_round":6,"p1_count":2,"root_owner":"v2/gates/registry_gates/gates/_helpers.mjs"}
+{"ts":"2026-07-30T23:32:19Z","event":"review.remediation.complete","review_round":6,"artifact_sha256":"4a16180b032c44955a1d356b306162c9784e86920f5e62b45795dbb3df43e509","installed_version":"0.3.6"}
+{"ts":"2026-07-31T14:26:17Z","event":"review.remediation.complete","review_round":7,"artifact_sha256":"8af9a413a8da8acc2c24d365563512321374796d74847b2d33fe54d928638745","installed_version":"0.3.6"}
+{"ts":"2026-07-31T14:52:28Z","type":"phase","phase":"review9_verified_global_install_pending_review"}

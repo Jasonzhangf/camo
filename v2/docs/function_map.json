@@ -1,0 +1,255 @@
+{
+  "schema_version": "1.1.0",
+  "features": [
+    {
+      "id": "cli.version",
+      "status": "active",
+      "owner_module": "shell.bin_entry",
+      "entry_symbols": [
+        {
+          "path": "v2/shell/bin_entry/index.mjs",
+          "symbol": "main"
+        }
+      ]
+    },
+    {
+      "id": "daemon.registration.read",
+      "status": "active",
+      "owner_module": "services.daemon_registration",
+      "entry_symbols": [
+        {
+          "path": "v2/services/daemon_registration/registry.mjs",
+          "symbol": "isProcessAlive"
+        },
+        {
+          "path": "v2/services/daemon_registration/registry.mjs",
+          "symbol": "getProcessIdentity"
+        },
+        {
+          "path": "v2/services/daemon_registration/registry.mjs",
+          "symbol": "findActiveDaemon"
+        },
+        {
+          "path": "v2/services/daemon_registration/registry.mjs",
+          "symbol": "listRegistrations"
+        }
+      ]
+    },
+    {
+      "id": "daemon.registration.write",
+      "status": "active",
+      "owner_module": "services.daemon_registration",
+      "entry_symbols": [
+        {
+          "path": "v2/services/daemon_registration/registry.mjs",
+          "symbol": "claimDaemonSlot"
+        },
+        {
+          "path": "v2/services/daemon_registration/registry.mjs",
+          "symbol": "registerDaemon"
+        },
+        {
+          "path": "v2/services/daemon_registration/registry.mjs",
+          "symbol": "unregisterDaemon"
+        },
+        {
+          "path": "v2/services/daemon_registration/registry.mjs",
+          "symbol": "releaseDaemonSlot"
+        }
+      ]
+    },
+    {
+      "id": "daemon.shutdown.orchestrate",
+      "status": "active",
+      "owner_module": "transports.daemon",
+      "entry_symbols": [
+        {
+          "path": "v2/shell/daemon/index.mjs",
+          "symbol": "shutdown"
+        },
+        {
+          "path": "v2/shell/daemon/shutdown_policy.mjs",
+          "symbol": "shutdownDaemonResources"
+        },
+        {
+          "path": "v2/shell/daemon/index.mjs",
+          "symbol": "closeProtocolServers"
+        }
+      ]
+    },
+    {
+      "id": "browser.lifecycle.ephemeral",
+      "status": "active",
+      "owner_module": "services.browser_service",
+      "entry_symbols": [
+        {
+          "path": "v2/services/browser_service/bootstrap.mjs",
+          "symbol": "startSession"
+        },
+        {
+          "path": "v2/services/browser_service/bootstrap.mjs",
+          "symbol": "stopSession"
+        }
+      ]
+    },
+    {
+      "id": "browser.lifecycle.persistent",
+      "status": "active",
+      "owner_module": "services.browser_service",
+      "entry_symbols": [
+        {
+          "path": "v2/services/browser_service/bootstrap.mjs",
+          "symbol": "startSession"
+        },
+        {
+          "path": "v2/services/browser_service/bootstrap.mjs",
+          "symbol": "stopSession"
+        }
+      ]
+    },
+    {
+      "id": "browser.runtime.ownership",
+      "status": "active",
+      "owner_module": "services.browser_runtime",
+      "entry_symbols": [
+        {
+          "path": "v2/services/browser_service/internal/playwright_bridge.mjs",
+          "symbol": "launchBrowser"
+        },
+        {
+          "path": "v2/services/browser_service/internal/playwright_bridge.mjs",
+          "symbol": "closeBrowser"
+        }
+      ]
+    },
+    {
+      "id": "browser.lifecycle.shutdown",
+      "status": "active",
+      "owner_module": "services.browser_service",
+      "entry_symbols": [
+        {
+          "path": "v2/services/browser_service/bootstrap.mjs",
+          "symbol": "shutdown"
+        }
+      ]
+    },
+    {
+      "id": "cmd.start.request",
+      "status": "active",
+      "owner_module": "commands.builtins",
+      "entry_symbols": [
+        {
+          "path": "v2/commands/builtins/start.mjs",
+          "symbol": "run"
+        }
+      ]
+    },
+    {
+      "id": "cmd.start.navigate",
+      "status": "active",
+      "owner_module": "services.page_runtime",
+      "entry_symbols": [
+        {
+          "path": "v2/services/page_runtime/input_pipeline.mjs",
+          "symbol": "goto"
+        }
+      ]
+    },
+    {
+      "id": "cmd.screenshot.path",
+      "status": "active",
+      "owner_module": "commands.builtins",
+      "entry_symbols": [
+        {
+          "path": "v2/commands/builtins/screenshot.mjs",
+          "symbol": "run"
+        }
+      ]
+    },
+    {
+      "id": "cmd.screenshot.write",
+      "status": "active",
+      "owner_module": "services.page_runtime",
+      "entry_symbols": [
+        {
+          "path": "v2/services/page_runtime/operations/page_ops.mjs",
+          "symbol": "screenshot"
+        }
+      ]
+    },
+    {
+      "id": "cmd.get_page_info.response",
+      "status": "active",
+      "owner_module": "commands.builtins",
+      "entry_symbols": [
+        {
+          "path": "v2/commands/builtins/getPageInfo.mjs",
+          "symbol": "run"
+        }
+      ]
+    },
+    {
+      "id": "cmd.get_page_info.create",
+      "status": "active",
+      "owner_module": "services.page_runtime",
+      "entry_symbols": [
+        {
+          "path": "v2/services/page_runtime/operations/page_ops.mjs",
+          "symbol": "getPageInfo"
+        }
+      ]
+    },
+    {
+      "id": "cmd.scroll.request",
+      "status": "active",
+      "owner_module": "commands.builtins",
+      "entry_symbols": [
+        {
+          "path": "v2/commands/builtins/scroll.mjs",
+          "symbol": "run"
+        }
+      ]
+    },
+    {
+      "id": "cmd.scroll.execute",
+      "status": "active",
+      "owner_module": "services.page_runtime",
+      "entry_symbols": [
+        {
+          "path": "v2/services/page_runtime/input_pipeline.mjs",
+          "symbol": "scroll"
+        },
+        {
+          "path": "v2/services/page_runtime/operations/page_ops.mjs",
+          "symbol": "scroll"
+        }
+      ]
+    },
+    {
+      "id": "cmd.scroll_and_collect.request",
+      "status": "active",
+      "owner_module": "commands.builtins",
+      "entry_symbols": [
+        {
+          "path": "v2/commands/builtins/scrollAndCollect.mjs",
+          "symbol": "run"
+        }
+      ]
+    },
+    {
+      "id": "cmd.scroll_and_collect.execute",
+      "status": "active",
+      "owner_module": "services.page_runtime",
+      "entry_symbols": [
+        {
+          "path": "v2/services/page_runtime/input_pipeline.mjs",
+          "symbol": "scrollAndCollect"
+        },
+        {
+          "path": "v2/services/page_runtime/operations/page_ops.mjs",
+          "symbol": "scrollAndCollect"
+        }
+      ]
+    }
+  ]
+}

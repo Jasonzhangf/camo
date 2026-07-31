@@ -1,0 +1,595 @@
+{
+  "schema_version": "1.1.0",
+  "edges": [
+    {
+      "feature_id": "daemon.registration.read",
+      "from": "shell.bin_entry",
+      "to": "services.daemon_registration",
+      "caller": {
+        "path": "v2/shell/bin_entry/index.mjs",
+        "symbol": "main"
+      },
+      "callee": {
+        "path": "v2/services/daemon_registration/registry.mjs",
+        "symbol": "findActiveDaemon",
+        "local_symbol": "findActiveDaemon"
+      },
+      "semantic_io": "active shared endpoint or null"
+    },
+    {
+      "feature_id": "daemon.registration.read",
+      "from": "commands.builtins",
+      "to": "services.daemon_registration",
+      "caller": {
+        "path": "v2/commands/builtins/daemon.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/services/daemon_registration/registry.mjs",
+        "symbol": "findActiveDaemon",
+        "local_symbol": "findActiveDaemon"
+      },
+      "semantic_io": "process command to active shared daemon endpoint"
+    },
+    {
+      "feature_id": "daemon.registration.read",
+      "from": "commands.builtins",
+      "to": "services.daemon_registration",
+      "caller": {
+        "path": "v2/commands/builtins/daemon.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/services/daemon_registration/registry.mjs",
+        "symbol": "listRegistrations",
+        "local_symbol": "listRegistrations"
+      },
+      "semantic_io": "registration cleanup verification"
+    },
+    {
+      "feature_id": "daemon.registration.write",
+      "from": "transports.daemon",
+      "to": "services.daemon_registration",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "main"
+      },
+      "callee": {
+        "path": "v2/services/daemon_registration/registry.mjs",
+        "symbol": "claimDaemonSlot",
+        "local_symbol": "claimDaemonSlot"
+      },
+      "semantic_io": "daemon process identity to atomic shared startup claim"
+    },
+    {
+      "feature_id": "daemon.registration.write",
+      "from": "transports.daemon",
+      "to": "services.daemon_registration",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "main"
+      },
+      "callee": {
+        "path": "v2/services/daemon_registration/registry.mjs",
+        "symbol": "registerDaemon",
+        "local_symbol": "registerDaemon"
+      },
+      "semantic_io": "listening ports to shared registration"
+    },
+    {
+      "feature_id": "daemon.registration.write",
+      "from": "transports.daemon",
+      "to": "services.daemon_registration",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "shutdown"
+      },
+      "callee": {
+        "path": "v2/services/daemon_registration/registry.mjs",
+        "symbol": "unregisterDaemon",
+        "local_symbol": "unregisterDaemon"
+      },
+      "semantic_io": "daemon identity removal after shutdown"
+    },
+    {
+      "feature_id": "daemon.registration.write",
+      "from": "transports.daemon",
+      "to": "services.daemon_registration",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "shutdown"
+      },
+      "callee": {
+        "path": "v2/services/daemon_registration/registry.mjs",
+        "symbol": "releaseDaemonSlot",
+        "local_symbol": "releaseDaemonSlot"
+      },
+      "semantic_io": "uncommitted daemon startup claim removal after shutdown failure"
+    },
+    {
+      "feature_id": "daemon.shutdown.orchestrate",
+      "from": "transports.daemon",
+      "to": "transports.daemon",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "shutdown"
+      },
+      "callee": {
+        "path": "v2/shell/daemon/shutdown_policy.mjs",
+        "symbol": "shutdownDaemonResources",
+        "local_symbol": "shutdownDaemonResources"
+      },
+      "semantic_io": "shutdown signal to ordered browser, server, and registration teardown"
+    },
+    {
+      "feature_id": "daemon.shutdown.orchestrate",
+      "from": "transports.daemon",
+      "to": "transports.daemon",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "shutdown"
+      },
+      "callee": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "closeProtocolServers",
+        "local_symbol": "closeProtocolServers"
+      },
+      "invocation": {
+        "kind": "callback_argument",
+        "orchestrator_local_symbol": "shutdownDaemonResources",
+        "parameter": "closeServers"
+      },
+      "semantic_io": "daemon shutdown to deterministic protocol client and listener teardown"
+    },
+    {
+      "feature_id": "browser.lifecycle.shutdown",
+      "from": "transports.daemon",
+      "to": "services.browser_service",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "shutdown"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "shutdown",
+        "local_symbol": "shutdownBrowserService"
+      },
+      "invocation": {
+        "kind": "callback_argument",
+        "orchestrator_local_symbol": "shutdownDaemonResources",
+        "parameter": "shutdownBrowsers"
+      },
+      "semantic_io": "daemon shutdown to complete profile browser teardown"
+    },
+    {
+      "feature_id": "browser.lifecycle.ephemeral",
+      "from": "transports.daemon",
+      "to": "services.browser_service",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "releaseBrowser"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "stopSession",
+        "local_symbol": "stopSession"
+      },
+      "semantic_io": "ephemeral profile teardown and deletion"
+    },
+    {
+      "feature_id": "browser.lifecycle.ephemeral",
+      "from": "transports.daemon",
+      "to": "services.browser_service",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "stopSession",
+        "local_symbol": "stopSession"
+      },
+      "semantic_io": "explicit stop command to ephemeral profile teardown"
+    },
+    {
+      "feature_id": "browser.lifecycle.persistent",
+      "from": "transports.daemon",
+      "to": "services.browser_service",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "ensureBrowser"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "startSession",
+        "local_symbol": "startSession"
+      },
+      "semantic_io": "named profile to isolated browser session"
+    },
+    {
+      "feature_id": "browser.lifecycle.persistent",
+      "from": "transports.daemon",
+      "to": "services.browser_service",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "stopSession",
+        "local_symbol": "stopSession"
+      },
+      "semantic_io": "explicit stop command to named profile teardown"
+    },
+    {
+      "feature_id": "browser.runtime.ownership",
+      "from": "services.browser_service",
+      "to": "services.browser_runtime",
+      "caller": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "startSession"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/internal/playwright_bridge.mjs",
+        "symbol": "launchBrowser",
+        "local_symbol": "launchBrowser"
+      },
+      "semantic_io": "profile launch request to owned Playwright handles"
+    },
+    {
+      "feature_id": "browser.runtime.ownership",
+      "from": "services.browser_service",
+      "to": "services.browser_runtime",
+      "caller": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "startSession"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/internal/playwright_bridge.mjs",
+        "symbol": "closeBrowser",
+        "local_symbol": "closeBrowser"
+      },
+      "semantic_io": "failed launch cleanup to confirmed Playwright handle closure"
+    },
+    {
+      "feature_id": "browser.runtime.ownership",
+      "from": "services.browser_service",
+      "to": "services.browser_runtime",
+      "caller": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "stopSession"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/internal/playwright_bridge.mjs",
+        "symbol": "closeBrowser",
+        "local_symbol": "closeBrowser"
+      },
+      "semantic_io": "profile stop request to confirmed Playwright handle closure"
+    },
+    {
+      "feature_id": "cmd.start.request",
+      "from": "shell.cli",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/shell/cli/dispatch.mjs",
+        "symbol": "dispatch"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run",
+        "local_symbol": "runBuiltin"
+      },
+      "semantic_io": "profile and optional initial URL to start builtin"
+    },
+    {
+      "feature_id": "cmd.start.request",
+      "from": "commands.builtins",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/start.mjs",
+        "symbol": "run",
+        "local_symbol": "start.run"
+      },
+      "invocation": {
+        "kind": "registry_dispatch",
+        "registry_object": "BUILTINS",
+        "command_id": "start",
+        "builtin_namespace": "start",
+        "dispatch_local_symbol": "mod",
+        "method": "run"
+      },
+      "semantic_io": "registry-selected start command to concrete builtin owner"
+    },
+    {
+      "feature_id": "cmd.start.navigate",
+      "from": "transports.daemon",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "goto",
+        "local_symbol": "goto"
+      },
+      "semantic_io": "optional start URL to serialized initial navigation"
+    },
+    {
+      "feature_id": "cmd.screenshot.path",
+      "from": "shell.cli",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/shell/cli/dispatch.mjs",
+        "symbol": "dispatch"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run",
+        "local_symbol": "runBuiltin"
+      },
+      "semantic_io": "parsed screenshot path to builtin dispatch"
+    },
+    {
+      "feature_id": "cmd.screenshot.path",
+      "from": "commands.builtins",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/screenshot.mjs",
+        "symbol": "run",
+        "local_symbol": "screenshot.run"
+      },
+      "invocation": {
+        "kind": "registry_dispatch",
+        "registry_object": "BUILTINS",
+        "command_id": "screenshot",
+        "builtin_namespace": "screenshot",
+        "dispatch_local_symbol": "mod",
+        "method": "run"
+      },
+      "semantic_io": "registry-selected screenshot command to concrete builtin owner"
+    },
+    {
+      "feature_id": "cmd.screenshot.write",
+      "from": "transports.daemon",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "screenshot",
+        "local_symbol": "screenshot"
+      },
+      "semantic_io": "canonical path to serialized screenshot operation"
+    },
+    {
+      "feature_id": "cmd.screenshot.write",
+      "from": "services.page_runtime",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "screenshot"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/operations/page_ops.mjs",
+        "symbol": "screenshot",
+        "local_symbol": "pageOps.screenshot"
+      },
+      "semantic_io": "serialized screenshot request to Playwright page operation"
+    },
+    {
+      "feature_id": "cmd.get_page_info.response",
+      "from": "shell.cli",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/shell/cli/dispatch.mjs",
+        "symbol": "dispatch"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run",
+        "local_symbol": "runBuiltin"
+      },
+      "semantic_io": "page-info command to validating builtin"
+    },
+    {
+      "feature_id": "cmd.get_page_info.response",
+      "from": "commands.builtins",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/getPageInfo.mjs",
+        "symbol": "run",
+        "local_symbol": "getPageInfo.run"
+      },
+      "invocation": {
+        "kind": "registry_dispatch",
+        "registry_object": "BUILTINS",
+        "command_id": "get-page-info",
+        "builtin_namespace": "getPageInfo",
+        "dispatch_local_symbol": "mod",
+        "method": "run"
+      },
+      "semantic_io": "registry-selected get-page-info command to concrete builtin owner"
+    },
+    {
+      "feature_id": "cmd.get_page_info.create",
+      "from": "transports.daemon",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "getPageInfo",
+        "local_symbol": "getPageInfo"
+      },
+      "semantic_io": "profile to serialized page-info projection"
+    },
+    {
+      "feature_id": "cmd.get_page_info.create",
+      "from": "services.page_runtime",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "getPageInfo"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/operations/page_ops.mjs",
+        "symbol": "getPageInfo",
+        "local_symbol": "pageOps.getPageInfo"
+      },
+      "semantic_io": "serialized page-info request to Playwright page projection"
+    },
+    {
+      "feature_id": "cmd.scroll.request",
+      "from": "shell.cli",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/shell/cli/dispatch.mjs",
+        "symbol": "dispatch"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run",
+        "local_symbol": "runBuiltin"
+      },
+      "semantic_io": "validated wheel deltas to builtin dispatch"
+    },
+    {
+      "feature_id": "cmd.scroll.request",
+      "from": "commands.builtins",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/scroll.mjs",
+        "symbol": "run",
+        "local_symbol": "scroll.run"
+      },
+      "invocation": {
+        "kind": "registry_dispatch",
+        "registry_object": "BUILTINS",
+        "command_id": "scroll",
+        "builtin_namespace": "scroll",
+        "dispatch_local_symbol": "mod",
+        "method": "run"
+      },
+      "semantic_io": "registry-selected scroll command to concrete builtin owner"
+    },
+    {
+      "feature_id": "cmd.scroll.execute",
+      "from": "transports.daemon",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "scroll",
+        "local_symbol": "scroll"
+      },
+      "semantic_io": "profile-scoped wheel deltas to serialized input"
+    },
+    {
+      "feature_id": "cmd.scroll.execute",
+      "from": "services.page_runtime",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "scroll"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/operations/page_ops.mjs",
+        "symbol": "scroll",
+        "local_symbol": "pageOps.scroll"
+      },
+      "semantic_io": "serialized wheel deltas to Playwright mouse input"
+    },
+    {
+      "feature_id": "cmd.scroll_and_collect.request",
+      "from": "shell.cli",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/shell/cli/dispatch.mjs",
+        "symbol": "dispatch"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run",
+        "local_symbol": "runBuiltin"
+      },
+      "semantic_io": "validated collection options to builtin dispatch"
+    },
+    {
+      "feature_id": "cmd.scroll_and_collect.request",
+      "from": "commands.builtins",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/scrollAndCollect.mjs",
+        "symbol": "run",
+        "local_symbol": "scrollAndCollect.run"
+      },
+      "invocation": {
+        "kind": "registry_dispatch",
+        "registry_object": "BUILTINS",
+        "command_id": "scroll-and-collect",
+        "builtin_namespace": "scrollAndCollect",
+        "dispatch_local_symbol": "mod",
+        "method": "run"
+      },
+      "semantic_io": "registry-selected scroll-and-collect command to concrete builtin owner"
+    },
+    {
+      "feature_id": "cmd.scroll_and_collect.execute",
+      "from": "transports.daemon",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "scrollAndCollect",
+        "local_symbol": "scrollAndCollect"
+      },
+      "semantic_io": "profile collection request to serialized input"
+    },
+    {
+      "feature_id": "cmd.scroll_and_collect.execute",
+      "from": "services.page_runtime",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "scrollAndCollect"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/operations/page_ops.mjs",
+        "symbol": "scrollAndCollect",
+        "local_symbol": "pageOps.scrollAndCollect"
+      },
+      "semantic_io": "serialized collection loop to Playwright mouse input"
+    }
+  ]
+}
