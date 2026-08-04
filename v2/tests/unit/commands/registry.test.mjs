@@ -7,20 +7,21 @@ import { list, has, look, describe } from '../../../commands/registry/registry.m
 const EXPECTED_CMDS = [
   'click', 'close-tab', 'daemon', 'evaluate', 'fetch-page', 'find-elements',
   'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'goto', 'hover',
-  'list-tabs', 'new-tab', 'screenshot', 'scroll', 'scroll-and-collect', 'select',
+  'list-tabs', 'new-tab', 'screenshot', 'scroll', 'scroll-and-collect', 'search', 'select',
   'set-cookies', 'set-user-agent', 'set-viewport', 'snapshot', 'start', 'stop',
   'type', 'upload', 'wait', 'wait-dom-stable',
 ];
 
-test('positive: list returns all 28 commands sorted', () => {
+test('positive: list returns all 29 commands sorted', () => {
   const a = list();
-  assert.equal(a.length, 28);
+  assert.equal(a.length, 29);
   assert.deepEqual(a, EXPECTED_CMDS);
 });
 
 test('positive: has returns true for known cmd + false for unknown', () => {
   assert.equal(has('start'), true);
   assert.equal(has('scroll'), true);
+  assert.equal(has('search'), true);
   assert.equal(has('not-a-cmd'), false);
   assert.equal(has(''), false);
 });
@@ -32,7 +33,7 @@ test('negative: look throws for unknown cmd', () => {
 
 test('positive: describe includes count', () => {
   const d = describe();
-  assert.equal(d.count, 28);
+  assert.equal(d.count, 29);
   assert.equal(d.layer, 'L4_command');
   assert.equal(d.moduleId, 'commands.registry');
 });

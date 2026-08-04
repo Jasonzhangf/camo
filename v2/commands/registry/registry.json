@@ -670,6 +670,46 @@
       "docstring": "commands/docstrings/wait-dom-stable.md"
     },
     {
+      "cmd": "search",
+      "module": "commands/builtins/search/index.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "cookies": {
+            "type": "string",
+            "required": false,
+            "doc": "path to cookie file"
+          },
+          "max-results": {
+            "type": "number",
+            "min": 1,
+            "required": false,
+            "doc": "max results to return"
+          }
+        },
+        "positional": [
+          {
+            "name": "platform",
+            "type": "string",
+            "required": true,
+            "doc": "search platform (xhs, douyin, etc)"
+          },
+          {
+            "name": "query",
+            "type": "string",
+            "required": true,
+            "doc": "search query"
+          }
+        ]
+      },
+      "docstring": "commands/docstrings/search.md"
+    },
+    {
       "cmd": "scroll-and-collect",
       "module": "commands/builtins/scrollAndCollect.mjs",
       "args_schema": {

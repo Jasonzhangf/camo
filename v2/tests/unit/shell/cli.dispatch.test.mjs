@@ -11,7 +11,7 @@ test('positive: --help returns help kind (no transport needed)', async () => {
 
 test('positive: usage lists all 12 commands', () => {
   const u = usage();
-  for (const c of ['start', 'stop', 'goto', 'click', 'type', 'snapshot', 'scroll', 'screenshot', 'wait', 'evaluate', 'upload', 'select']) {
+  for (const c of ['start', 'stop', 'goto', 'click', 'type', 'snapshot', 'scroll', 'screenshot', 'wait', 'evaluate', 'upload', 'select', 'search']) {
     assert.match(u, new RegExp(`\\b${c}\\b`));
   }
 });

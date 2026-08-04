@@ -12,7 +12,7 @@ describe('builtins.new-commands.index', () => {
     assert.equal(cmds.includes('evaluate'), true, 'evaluate missing');
     assert.equal(cmds.includes('upload'), true, 'upload missing');
     assert.equal(cmds.includes('select'), true, 'select missing');
-    assert.equal(cmds.length, 28, `expected 13 builtins, got ${cmds.length}`);
+    assert.equal(cmds.length, 29, `expected 29 builtins, got ${cmds.length}`);
   });
 
   test('isBuiltin returns true for all new commands', () => {

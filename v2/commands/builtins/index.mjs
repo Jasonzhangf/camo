@@ -3,11 +3,6 @@
 // Single entry that the shell layer uses. Loads every builtin
 // dynamically by `cmd` and exposes a uniform `run(cmd, transport, args, ctx)`
 // plus the static lookup table.
-//
-// Hard guards:
-//   - No fallback for unknown cmd. registry.json is the source of truth.
-//   - Each builtin returns a Promise that resolves to a plain payload;
-//     transports wrap it with build() and the WS layer adds the envelope.
 
 import { CamoError } from '../../contracts/error_envelope/projector.mjs';
 import { look as registryLook } from '../registry/registry.mjs';
@@ -40,45 +35,57 @@ import * as setViewport from './setViewport.mjs';
 import * as waitDomStable from './waitDomStable.mjs';
 import * as scrollAndCollect from './scrollAndCollect.mjs';
 import * as fetchPage from './fetchPage.mjs';
+import * as search from './search/index.mjs';
 
+const BUILTINS = { start, stop, goto, search, click, type, snapshot, scroll, screenshot, wait, evaluate, upload, select, daemon, hover, getText, getPageInfo, findElements, getReadable, newTab, closeTab, listTabs, getCookies, setCookies, setUserAgent, setViewport, waitDomStable, scrollAndCollect, fetchPage };
 
-const BUILTINS = { start, stop, goto, click, type, snapshot, scroll, screenshot, wait, evaluate, upload, select, daemon, hover, getText, getPageInfo, findElements, getReadable, newTab, closeTab, listTabs, getCookies, setCookies, setUserAgent, setViewport, waitDomStable, scrollAndCollect, fetchPage };
+// Convert camelCase to kebab-case
+const toKebab = (s) => s.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
 
 export function list() {
-  return Object.keys(BUILTINS).sort();
+  // Return kebab-case names to match registry convention
+  return Object.keys(BUILTINS)
+    .map(k => {
+      const mod = BUILTINS[k];
+      return mod.cmd ? toKebab(mod.cmd) : toKebab(k);
+    })
+    .sort();
 }
 
 export function isBuiltin(cmd) {
-  return Object.prototype.hasOwnProperty.call(BUILTINS, String(cmd || ''));
-}
-
-// Convert kebab-case to camelCase
-function toCamel(s) {
-  return s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-}
-
-export async function run(cmd, transport, parsed = {}, ctx = {}) {
-  const c = String(cmd || '');
-  // CLI sends kebab-case, builtins BUILTINS uses camelCase
-  const camelCmd = c.includes('-') ? toCamel(c) : c;
-  // Registry stores kebab-case commands
-  const spec = registryLook(c); // throws on unknown (uses kebab-case)
-  if (!isBuiltin(camelCmd)) {
-    throw new CamoError({ code: 'E_PROTO_NO_HANDLER', details: { resource: 'builtin', cmd: camelCmd } });
-  }
-  const mod = BUILTINS[camelCmd];
-  if (typeof mod.run !== 'function') {
-    throw new CamoError({ code: 'E_INTERNAL_UNEXPECTED', details: { op: 'builtins.run', cmd: camelCmd, reason: 'no run() export' } });
-  }
-  return await mod.run(transport, parsed, ctx);
+  if (!cmd) return false;
+  const camelCmd = cmd.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  return Object.prototype.hasOwnProperty.call(BUILTINS, camelCmd);
 }
 
 export function describe() {
   return {
     moduleId: 'commands.builtins',
     layer: 'L4_command',
-    count: list().length,
-    cmds: list(),
+    count: Object.keys(BUILTINS).length,
     modules: Object.fromEntries(Object.entries(BUILTINS).map(([k, m]) => [k, m.cmd])),
   };
 }
+
+export async function run(cmd, transport, args, ctx) {
+  if (!cmd) {
+    throw new CamoError({ code: 'E_PROTO_NO_CMD', details: { reason: 'cmd is required' } });
+  }
+  const camelCmd = cmd.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  if (!isBuiltin(camelCmd)) {
+    throw new CamoError({
+      code: 'E_PROTO_NO_HANDLER',
+      details: { cmd, known: list() },
+    });
+  }
+  const mod = BUILTINS[camelCmd];
+  if (!mod.run) {
+    throw new CamoError({
+      code: 'E_IMPL_MISSING',
+      details: { cmd, missing: 'run function' },
+    });
+  }
+  return await mod.run(transport, args, ctx);
+}
+
+export { BUILTINS };
