@@ -67,7 +67,7 @@ export class SearchEngine {
       return { success: false, results: [], totalCount: 0, pageURL: '', error: `Unknown platform: ${options.platform}` };
     }
     
-    const platform = new Platform({ profile: 'mobile_safari' });
+    const platform = new Platform({ profile: options.profile || 'default' });
     
     try {
       await platform.createBrowser();

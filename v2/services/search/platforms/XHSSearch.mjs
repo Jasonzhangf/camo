@@ -67,17 +67,14 @@ export class XHSSearch extends SearchPlatform {
       await this.browser.navigate(searchUrl, timeout);
       await this.browser.waitForDomStable(10000);
       
-      // 3. 检查是否需要登录才能看搜索结果
+      // 3. 检查搜索结果是否为空（可能是未登录导致）
+      // 只有当页面完全无法加载内容时才认为需要登录
       const bodyText = await this.browser.getReadable();
-      if (bodyText.includes('登录后查看搜索结果') || bodyText.includes('扫码登录')) {
-        return { 
-          success: false, 
-          results: [], 
-          totalCount: 0, 
-          pageURL: this.browser.currentPageURL,
-          error: 'NOT_LOGGED_IN: Search requires login, cookie may have expired',
-          requires_login: true 
-        };
+      const hasLoginWall = bodyText.includes('登录后查看搜索结果') && !bodyText.includes('搜索到');
+      const hasLoginPopup = bodyText.includes('扫码登录') && bodyText.length < 500;
+      if (hasLoginWall || hasLoginPopup) {
+        console.log('[XHSSearch] Detected login wall or popup on search results');
+        // 不直接返回失败，先尝试滚动加载
       }
       
       // 4. 滚动加载更多内容

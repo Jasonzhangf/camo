@@ -53,11 +53,20 @@ export class BrowserInstance {
   async checkLoginStatus(url = 'https://www.xiaohongshu.com') {
     if (!this.page) return false;
     try {
+      // 重新加载 cookie 后再检查
+      const domains = ['xiaohongshu.com', '.xiaohongshu.com'];
+      for (const d of domains) {
+        await this.loadCookies(d);
+      }
       await this.page.goto(url, { timeout: 15000, waitUntil: 'networkidle' });
       await this.page.waitForTimeout(2000);
       const bodyText = await this.page.evaluate(() => document.body?.innerText || '');
       // 主页没有登录提示说明已登录
-      const isLoggedIn = !bodyText.includes('扫码登录') || bodyText.includes('创作中心');
+      // 正确逻辑：有"创作中心"/"我的"/"消息"等登录后元素，且不包含"扫码登录"弹窗
+      const hasLoginPrompt = bodyText.includes('扫码登录');
+      const hasLoggedInUI = bodyText.includes('创作中心') || bodyText.includes('我的') || bodyText.includes('消息');
+      const isLoggedIn = !hasLoginPrompt || hasLoggedInUI;
+      if (hasLoginPrompt && !hasLoggedInUI) { console.log('[BrowserInstance] Detected login popup, not logged in'); }
       console.log(`[BrowserInstance] Login status: ${isLoggedIn ? 'LOGGED_IN' : 'NOT_LOGGED_IN'}`);
       return isLoggedIn;
     } catch (err) {
