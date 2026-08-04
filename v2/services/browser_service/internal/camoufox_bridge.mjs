@@ -167,6 +167,17 @@ export function getContext(profileId) {
     return record ? record.context : null;
 }
 
+export function __setBrowserForTest(profileId, record) {
+    if (!_enabled) {
+        throw new CamoError({ code: 'E_INTERNAL_UNEXPECTED', details: { op: '__setBrowserForTest', reason: 'not in writable scope' } });
+    }
+    const pid = String(profileId || '').trim();
+    if (!pid) {
+        throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'profileId' } });
+    }
+    _records.set(pid, { profileId: pid, ...record });
+}
+
 /**
  * List all active profile IDs.
  */

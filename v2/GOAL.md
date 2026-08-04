@@ -2,7 +2,7 @@
 
 ## 总体目标
 
-完成 camo v2 从"架构骨架 + registry 门禁"到"生产可用 CLI 工具"的剩余工程。核心交付物：`camo <cmd>` 从 CLI 启动 daemon（或找到已有 daemon），通过 WS 发送命令，daemon 驱动真实 Playwright 浏览器，返回结果，优雅释放资源。
+完成 camo v2 从"架构骨架 + registry 门禁"到"生产可用 CLI 工具"的剩余工程。核心交付物：`camo <cmd>` 从 CLI 启动 daemon（或找到已有 daemon），通过 WS 发送命令，daemon 驱动真实 Camoufox 浏览器，返回结果，优雅释放资源。
 
 ## 硬约束
 
@@ -81,7 +81,7 @@
 
 - 不需要 profile 参数
 - profileId 自动生成 `_ephemeral_<pid>_<timestamp>`
-- 不使用 userDataDir（`playwright_bridge.mjs` 已支持）
+- 临时会话不使用持久 profile 目录；持久 profile 由 `camoufox_bridge.mjs` 统一管理
 - 浏览器启动后执行命令，命令完成后关闭浏览器
 - Daemon 在最后一个 ephemeral 命令完成后自动退出
 - 临时浏览器数据目录在 daemon 退出时清理
@@ -121,7 +121,7 @@
 
 - SIGTERM/SIGINT 处理：
   1. 停止接受新连接
-  2. 关闭所有浏览器（`playwright_bridge.closeAll()`）
+  2. 关闭所有浏览器（`camoufox_bridge.closeAll()`）
   3. 释放所有 profile lock
   4. 清理 ephemeral 临时数据目录
   5. 删除 daemon 注册文件（`~/.camo/daemon/<id>.json`）

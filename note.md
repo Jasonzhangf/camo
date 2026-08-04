@@ -454,3 +454,4 @@ recovers from the in-flight app-server process shown by
 `pgrep -fl codex`). This note is the explicit report the SKILL
 mandates. The local gates (registry strict + npm test + check-file-size)
 are all green and verifiable independently of codex.
+Stage 8: dynamic ports and daemon discovery are present in source but live CLI verification remains pending. Stage 9 ephemeral/persistent behavior must be verified against the current daemon and browser lifecycle. Next: root-cause audit and test design before edits.

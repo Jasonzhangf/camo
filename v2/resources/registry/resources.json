@@ -63,13 +63,16 @@
         "v2/services/browser_service/internal/camoufox_bridge.mjs::closeAll"
       ],
       "indirect_paths": [
+        "v2/services/browser_service/bootstrap.mjs::startSession->launchBrowser",
+        "v2/services/browser_service/bootstrap.mjs::startSession->closeBrowser",
+        "v2/services/browser_service/bootstrap.mjs::stopSession->closeBrowser",
         "v2/services/browser_service/internal/engine-manager.mjs::launchEngineContext",
         "v2/services/browser_service/internal/fingerprint.mjs::loadOrGenerateFingerprint",
         "v2/services/browser_service/internal/ProfileLock.mjs::acquire"
       ],
       "forbidden_paths": [
         "v2/services/browser_service/internal/engine_manager.js::launch",
-        "v2/services/browser_service/internal/playwright_bridge.mjs::launch",
+        "v2/services/browser_service/internal/camoufox_bridge.mjs::launch",
         "v2/services/browser_service/internal/browser_session/input_ops.js::mouseClick"
       ],
       "verification_gate": "registry.resources.browser_instance",
@@ -492,6 +495,245 @@
       "verification_gate": "registry.resources.error_envelope",
       "policy_id": "single-truth+code-required",
       "status": "active"
+    },
+    {
+      "resource_id": "pipeline_state",
+      "display_name": "Input pipeline state management",
+      "layer": "L2_service",
+      "truth_owner": "services.page_runtime",
+      "truth_store": "memory_in_owner_process",
+      "read_paths": [
+        "v2/services/page_runtime/input_pipeline.mjs::status",
+        "v2/services/page_runtime/input_pipeline.mjs::wrapOperation"
+      ],
+      "write_paths": [
+        "v2/services/page_runtime/_pipeline_state.mjs::wrapOperation",
+        "v2/services/page_runtime/_pipeline_state.mjs::__resetForTest"
+      ],
+      "indirect_paths": [],
+      "forbidden_paths": [],
+      "verification_gate": "registry.resources.input_pipeline",
+      "policy_id": "single-truth",
+      "status": "active"
+    },
+    {
+      "resource_id": "daemon.command_handlers",
+      "display_name": "Daemon command dispatch",
+      "layer": "L5_shell",
+      "truth_owner": "shell.daemon.command_handlers",
+      "truth_store": "no_persistence",
+      "read_paths": [
+        "v2/shell/daemon/index.mjs::handleCommand"
+      ],
+      "write_paths": [],
+      "indirect_paths": [],
+      "forbidden_paths": [
+        "v2/services/**::write"
+      ],
+      "verification_gate": "registry.resources.daemon",
+      "policy_id": "single-truth",
+      "status": "active"
+    },
+    {
+      "resource_id": "page_ops",
+      "display_name": "Page operations (all sub-modules)",
+      "layer": "L2_service",
+      "truth_owner": "services.page_runtime.operations",
+      "truth_store": "no_persistence",
+      "read_paths": [
+        "v2/services/page_runtime/input_pipeline.mjs::goto",
+        "v2/services/page_runtime/input_pipeline.mjs::newTab",
+        "v2/services/page_runtime/input_pipeline.mjs::closeTab",
+        "v2/services/page_runtime/input_pipeline.mjs::listTabs",
+        "v2/services/page_runtime/input_pipeline.mjs::click",
+        "v2/services/page_runtime/input_pipeline.mjs::hover",
+        "v2/services/page_runtime/input_pipeline.mjs::type",
+        "v2/services/page_runtime/input_pipeline.mjs::scroll",
+        "v2/services/page_runtime/input_pipeline.mjs::upload",
+        "v2/services/page_runtime/input_pipeline.mjs::select",
+        "v2/services/page_runtime/input_pipeline.mjs::screenshot",
+        "v2/services/page_runtime/input_pipeline.mjs::snapshot",
+        "v2/services/page_runtime/input_pipeline.mjs::getText",
+        "v2/services/page_runtime/input_pipeline.mjs::getPageInfo",
+        "v2/services/page_runtime/input_pipeline.mjs::findElements",
+        "v2/services/page_runtime/input_pipeline.mjs::getReadable",
+        "v2/services/page_runtime/input_pipeline.mjs::getCookies",
+        "v2/services/page_runtime/input_pipeline.mjs::setCookies",
+        "v2/services/page_runtime/input_pipeline.mjs::setUserAgent",
+        "v2/services/page_runtime/input_pipeline.mjs::setViewport",
+        "v2/services/page_runtime/input_pipeline.mjs::wait",
+        "v2/services/page_runtime/input_pipeline.mjs::waitForDomStable",
+        "v2/services/page_runtime/input_pipeline.mjs::evaluate",
+        "v2/services/page_runtime/input_pipeline.mjs::scrollAndCollect",
+        "v2/services/page_runtime/input_pipeline.mjs::fetch"
+      ],
+      "write_paths": [],
+      "indirect_paths": [],
+      "forbidden_paths": [
+        "v2/services/browser_service/**::launch",
+        "v2/shell/daemon/**::write"
+      ],
+      "verification_gate": "registry.resources.page_ops",
+      "policy_id": "single-truth",
+      "status": "active"
+    }
+  ],
+  "edges": [
+    {
+      "caller": "daemon",
+      "callee": "daemon.command_handlers",
+      "feature": "daemon_commands",
+      "line": 1
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 30
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 31
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 32
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 33
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 34
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 35
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 36
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 37
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 38
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 39
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 40
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 41
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 42
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 43
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 44
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 45
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 46
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 47
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 48
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 49
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 50
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 51
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 52
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 53
+    },
+    {
+      "caller": "input_pipeline",
+      "callee": "page_ops",
+      "feature": "browser_ops",
+      "line": 54
     }
   ]
 }

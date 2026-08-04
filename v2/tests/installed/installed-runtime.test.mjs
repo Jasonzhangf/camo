@@ -37,14 +37,11 @@ test('installed package: pack, global install, version, ephemeral cleanup', { ti
   const packDir = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-pack-'));
   const installPrefix = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-prefix-'));
   const runtimeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-installed-home-'));
-  const playwrightBrowsersPath = process.env.PLAYWRIGHT_BROWSERS_PATH
-    || path.join(os.homedir(), process.platform === 'darwin' ? 'Library/Caches/ms-playwright' : '.cache/ms-playwright');
   let callerDir = null;
   let installedCamoBin = null;
   const installedProfile = `installed-start-${process.pid}`;
   const runtimeEnv = {
     HOME: runtimeHome,
-    PLAYWRIGHT_BROWSERS_PATH: playwrightBrowsersPath,
     CAMO_AUTOSTART: '1',
     CAMO_HEADLESS: '1',
   };
@@ -68,9 +65,6 @@ test('installed package: pack, global install, version, ephemeral cleanup', { ti
     : path.join(installPrefix, 'bin', 'camo');
   installedCamoBin = camoBin;
   assert.equal(fs.existsSync(camoBin), true, 'temporary prefix must contain the packed camo binary');
-  expectOk(run('npx', ['playwright', 'install', 'chromium'], {
-    env: { HOME: runtimeHome, PLAYWRIGHT_BROWSERS_PATH: playwrightBrowsersPath },
-  }), 'playwright install chromium');
   expectOk(run(camoBin, ['--version'], { env: { HOME: runtimeHome, CAMO_AUTOSTART: '0' } }), 'installed camo --version');
 
   const started = readJson(run(camoBin, ['start', '--profile', installedProfile, '--url', 'https://example.com'], {

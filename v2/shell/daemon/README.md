@@ -1,4 +1,10 @@
-# shell/daemon
+# shell.daemon
 
-Process entrypoint for the shared camo daemon. It owns TCP listener startup,
-daemon registration, command routing, and shutdown orchestration.
+Daemon lifecycle manager for camo v2.
+
+## Entry Point
+- `index.mjs` - daemon main entry
+
+## Modules
+- `command_handlers.mjs` - command dispatch
+

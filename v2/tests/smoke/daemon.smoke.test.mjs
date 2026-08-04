@@ -1,4 +1,4 @@
-// Smoke test: verify daemon can start (or fail gracefully without Playwright browser).
+// Smoke test: verify daemon modules load for the Camoufox runtime.
 // This test does NOT actually launch a browser - it just verifies module loading.
 
 import test from 'node:test';

@@ -40,7 +40,6 @@ test('negative: failed ephemeral launch releases lock and temporary profile', ()
       env: {
         ...process.env,
         HOME: home,
-        PLAYWRIGHT_BROWSERS_PATH: path.join(home, 'missing-playwright-browsers'),
       },
       encoding: 'utf8',
       timeout: 30_000,

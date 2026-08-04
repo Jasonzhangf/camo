@@ -1,0 +1,159 @@
+// Interaction operations. truth_owner: page_runtime.
+//
+// Interaction: click, hover, type, scroll, upload, select.
+
+import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
+import { safeId, getPageOrThrow, emit, resolveLocator } from './_page_helpers.mjs';
+
+/**
+ * Click an element.
+ * @param {Object} opts
+ * @param {string} opts.profileId
+ * @param {string} [opts.selector] - CSS selector
+ * @param {string} [opts.text] - Text content to find and click
+ * @param {string} [opts.button] - 'left'|'right'|'middle'
+ * @returns {Object} click result
+ */
+export async function click({ profileId, selector, text, button = 'left' }) {
+  const pid = safeId(profileId, 'profileId');
+  const page = getPageOrThrow(pid);
+  const { locator, hasSelector, hasText } = resolveLocator(page, selector, text);
+  if (!locator) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'selector or text' } });
+  const allowedButtons = new Set(['left', 'right', 'middle']);
+  const btn = allowedButtons.has(button) ? button : 'left';
+  emit(pid, 'click.start', { selector, text, button: btn });
+  try {
+    await locator.click({ button: btn, timeout: 10000 });
+    const result = { profileId: pid, clicked: true, selector: hasSelector ? selector : null, text: hasText ? text : null, button: btn };
+    emit(pid, 'click.done', result);
+    return result;
+  } catch (cause) {
+    emit(pid, 'click.error', { selector, text, error: cause?.message });
+    throw new CamoError({ code: 'E_BROWSER_CLICK_FAILED', details: { profileId: pid, selector, text, reason: cause?.message }, cause });
+  }
+}
+
+/**
+ * Hover over an element.
+ * @param {Object} opts
+ * @param {string} opts.profileId
+ * @param {string} [opts.selector] - CSS selector
+ * @param {string} [opts.text] - Text to find and hover
+ * @returns {Object} hover result
+ */
+export async function hover({ profileId, selector, text }) {
+  const pid = safeId(profileId, 'profileId');
+  const page = getPageOrThrow(pid);
+  const { locator, hasSelector, hasText } = resolveLocator(page, selector, text);
+  if (!locator) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'selector or text' } });
+  emit(pid, 'hover.start', { selector, text });
+  try {
+    await locator.hover({ timeout: 10000 });
+    const result = { profileId: pid, hovered: true, selector: hasSelector ? selector : null, text: hasText ? text : null };
+    emit(pid, 'hover.done', result);
+    return result;
+  } catch (cause) {
+    emit(pid, 'hover.error', { selector, text, error: cause?.message });
+    throw new CamoError({ code: 'E_BROWSER_HOVER_FAILED', details: { profileId: pid, selector, text, reason: cause?.message }, cause });
+  }
+}
+
+/**
+ * Type text using keyboard.
+ * @param {Object} opts
+ * @param {string} opts.profileId
+ * @param {string} opts.text - Text to type
+ * @param {number} [opts.delay] - Delay between keystrokes in ms
+ * @returns {Object} type result
+ */
+export async function type({ profileId, text, delay }) {
+  const pid = safeId(profileId, 'profileId');
+  const page = getPageOrThrow(pid);
+  if (!text || typeof text !== 'string') throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'text' } });
+  const delayMs = typeof delay === 'number' && delay >= 0 ? delay : 0;
+  emit(pid, 'type.start', { length: text.length, delay: delayMs });
+  try {
+    await page.keyboard.type(text, { delay: delayMs });
+    const result = { profileId: pid, typed: true, length: text.length, delay: delayMs };
+    emit(pid, 'type.done', result);
+    return result;
+  } catch (cause) {
+    emit(pid, 'type.error', { length: text.length, error: cause?.message });
+    throw new CamoError({ code: 'E_BROWSER_TYPE_FAILED', details: { profileId: pid, reason: cause?.message }, cause });
+  }
+}
+
+/**
+ * Scroll the page by offset.
+ * @param {Object} opts
+ * @param {string} opts.profileId
+ * @param {number} [opts.x] - X offset
+ * @param {number} [opts.y] - Y offset
+ * @returns {Object} scroll result
+ */
+export async function scroll({ profileId, x = 0, y = 0 }) {
+  const pid = safeId(profileId, 'profileId');
+  const page = getPageOrThrow(pid);
+  const scrollX = typeof x === 'number' ? x : 0;
+  const scrollY = typeof y === 'number' ? y : 0;
+  emit(pid, 'scroll.start', { x: scrollX, y: scrollY });
+  try {
+    await page.evaluate(({ scrollX, scrollY }) => window.scrollTo({ top: scrollY, left: scrollX, behavior: 'smooth' }), { scrollX, scrollY });
+    const result = { profileId: pid, scrolled: true, x: scrollX, y: scrollY };
+    emit(pid, 'scroll.done', result);
+    return result;
+  } catch (cause) {
+    emit(pid, 'scroll.error', { x: scrollX, y: scrollY, error: cause?.message });
+    throw new CamoError({ code: 'E_BROWSER_SCROLL_FAILED', details: { profileId: pid, reason: cause?.message }, cause });
+  }
+}
+
+/**
+ * Upload files to a file input.
+ * @param {Object} opts
+ * @param {string} opts.profileId
+ * @param {string} opts.selector - File input selector
+ * @param {string[]} opts.files - Array of file paths
+ * @returns {Object} upload result
+ */
+export async function upload({ profileId, selector, files }) {
+  const pid = safeId(profileId, 'profileId');
+  const page = getPageOrThrow(pid);
+  if (!selector || typeof selector !== 'string') throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'selector' } });
+  if (!Array.isArray(files) || files.length === 0) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'files' } });
+  emit(pid, 'upload.start', { selector, fileCount: files.length });
+  try {
+    await page.locator(selector).setInputFiles(files);
+    const result = { profileId: pid, uploaded: true, selector, fileCount: files.length };
+    emit(pid, 'upload.done', result);
+    return result;
+  } catch (cause) {
+    emit(pid, 'upload.error', { selector, error: cause?.message });
+    throw new CamoError({ code: 'E_BROWSER_UPLOAD_FAILED', details: { profileId: pid, selector, reason: cause?.message }, cause });
+  }
+}
+
+/**
+ * Select option in a dropdown.
+ * @param {Object} opts
+ * @param {string} opts.profileId
+ * @param {string} opts.selector - Select element selector
+ * @param {string} opts.value - Value to select
+ * @returns {Object} select result
+ */
+export async function select({ profileId, selector, value }) {
+  const pid = safeId(profileId, 'profileId');
+  const page = getPageOrThrow(pid);
+  if (!selector || typeof selector !== 'string') throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'selector' } });
+  if (!value || typeof value !== 'string') throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'value' } });
+  emit(pid, 'select.start', { selector, value });
+  try {
+    await page.locator(selector).selectOption(value);
+    const result = { profileId: pid, selected: true, selector, value };
+    emit(pid, 'select.done', result);
+    return result;
+  } catch (cause) {
+    emit(pid, 'select.error', { selector, value, error: cause?.message });
+    throw new CamoError({ code: 'E_BROWSER_SELECT_FAILED', details: { profileId: pid, selector, value, reason: cause?.message }, cause });
+  }
+}

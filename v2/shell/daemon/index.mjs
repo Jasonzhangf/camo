@@ -32,6 +32,7 @@ import {
   enableAllOwners as enableAllBrowserOwners
 } from '../../services/browser_service/bootstrap.mjs';
 import { cleanupStaleRegistrations, unregisterByPid } from '../config/daemon_finder.mjs';
+import { handleCommand as dispatchCommand } from './command_handlers.mjs';
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 
@@ -227,7 +228,7 @@ async function releaseBrowser(forceClose) {
   }
 }
 
-// --- Command handlers ---
+// --- Command dispatch ---
 async function handleCommand(env) {
   const { cmd, args = {} } = env.payload || {};
   const profile = args.profile || opts.profile;
@@ -237,238 +238,34 @@ async function handleCommand(env) {
   emit('command.start', { cmd, args, profile, ephemeral: isEphemeral });
 
   try {
-    let result;
-    let closeAfter = false;
+    const browserState = { currentBrowserProfile, browserRefCount };
+    const result = await dispatchCommand(cmd, args, {
+      profile,
+      isEphemeral,
+      opts,
+      ensureBrowser,
+      releaseBrowser,
+      browserState,
+    });
 
-    const browserCmds = ['goto', 'click', 'type', 'scroll', 'screenshot', 'snapshot', 'wait', 'evaluate', 'upload', 'select'];
-    
-    if (browserCmds.includes(cmd)) {
-      await ensureBrowser(profile, false);
-      closeAfter = isEphemeral;
-    }
+    // Sync back browser state changes
+    currentBrowserProfile = browserState.currentBrowserProfile;
+    browserRefCount = browserState.browserRefCount;
 
-    switch (cmd) {
-      case 'start': {
-        const session = await startSession({ 
-          profileId: profile, 
-          headless: opts.mode === 'headless' 
-        });
-        result = { ok: true, sessionId: session.sessionId, profile: session.profileId };
-        currentBrowserProfile = profile;
-        browserRefCount = 1;
-        break;
-      }
-      
-      case 'stop': {
-        await stopSession(profile);
-        result = { ok: true, stopped: true, profile };
-        if (currentBrowserProfile === profile) {
-          currentBrowserProfile = null;
-          browserRefCount = 0;
-        }
-        break;
-      }
-      
-      case 'goto': {
-        const { goto } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await goto({ profileId: profile, url: args.url, waitUntil: args.waitUntil || 'load' });
-        result = { ok: true, navigated: true, url: args.url, finalUrl: r.finalUrl, statusCode: r.statusCode };
-        break;
-      }
-      
-      case 'click': {
-        const { click } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await click({ profileId: profile, selector: args.selector, text: args.text, button: args.button || 'left' });
-        result = { ok: true, clicked: true };
-        break;
-      }
-      
-      case 'type': {
-        const { type } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await type({ profileId: profile, text: args.text, delay: args.delay });
-        result = { ok: true, typed: true, length: r.length };
-        break;
-      }
-      
-      case 'scroll': {
-        const { scroll } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await scroll({ profileId: profile, x: args.x || 0, y: args.y || 0 });
-        result = { ok: true, scrolled: true };
-        break;
-      }
-      
-      case 'screenshot': {
-        const { screenshot } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await screenshot({ profileId: profile, fullPage: args.fullPage === true });
-        result = { ok: true, screenshot: true, format: r.format, size: r.size };
-        break;
-      }
-      
-      case 'snapshot': {
-        const { snapshot } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await snapshot({ profileId: profile });
-        result = { ok: true, snapshot: true, url: r.url, htmlLength: r.htmlLength };
-        break;
-      }
-      
-      case 'wait': {
-        const { wait } = await import('../../services/page_runtime/input_pipeline.mjs');
-        await wait({ profileId: profile, ms: args.ms || 1000 });
-        result = { ok: true, waited: true, ms: args.ms || 1000 };
-        break;
-      }
-      
-      case 'evaluate': {
-        const { evaluate } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await evaluate({ profileId: profile, script: args.script });
-        result = { ok: true, evaluated: true, result: r.result };
-        break;
-      }
-      
-      case 'upload': {
-        const { upload } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await upload({ profileId: profile, selector: args.selector, files: args.files });
-        result = { ok: true, uploaded: true, fileCount: r.fileCount };
-        break;
-      }
-      
-      case 'select': {
-        const { select } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await select({ profileId: profile, selector: args.selector, value: args.value });
-        result = { ok: true, selected: true };
-        break;
-      }
-
-      case 'close-tab': {
-        const { closeTab } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await closeTab({ profileId: profile, tabId: args.tabId });
-        result = { ok: true, closedTab: true };
-        break;
-      }
-      
-      case 'daemon': {
-        result = { ok: true, daemonId: opts.daemonId, mode: opts.mode, profile: opts.profile };
-        break;
-      }
-      
-      case 'fetch-page': {
-        const { fetch } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await fetch({ profileId: profile, url: args.url, timeout: args.timeout });
-        result = { ok: true, fetched: true, statusCode: r.statusCode, headers: r.headers, body: r.body };
-        break;
-      }
-      
-      case 'find-elements': {
-        const { findElements } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await findElements({ profileId: profile, selector: args.selector, text: args.text });
-        result = { ok: true, found: true, count: r.count, elements: r.elements };
-        break;
-      }
-      
-      case 'get-cookies': {
-        const { getCookies } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await getCookies({ profileId: profile });
-        result = { ok: true, cookies: r.cookies };
-        break;
-      }
-      
-      case 'get-page-info': {
-        const { getPageInfo } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await getPageInfo({ profileId: profile });
-        result = { ok: true, url: r.url, title: r.title, viewport: r.viewport };
-        break;
-      }
-      
-      case 'get-readable': {
-        const { getReadable } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await getReadable({ profileId: profile, maxLength: args.maxLength });
-        result = { ok: true, content: r.content, textLength: r.textLength };
-        break;
-      }
-      
-      case 'get-text': {
-        const { getText } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await getText({ profileId: profile, selector: args.selector });
-        result = { ok: true, text: r.text };
-        break;
-      }
-      
-      case 'hover': {
-        const { hover } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await hover({ profileId: profile, selector: args.selector, text: args.text });
-        result = { ok: true, hovered: true };
-        break;
-      }
-      
-      case 'list-tabs': {
-        const { listTabs } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await listTabs({ profileId: profile });
-        result = { ok: true, tabs: r.tabs };
-        break;
-      }
-      
-      case 'new-tab': {
-        const { newTab } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await newTab({ profileId: profile, url: args.url });
-        result = { ok: true, newTab: true, tabId: r.tabId };
-        break;
-      }
-      
-      case 'scroll-and-collect': {
-        const { scrollAndCollect } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await scrollAndCollect({ profileId: profile, scrollCount: args.scrollCount, scrollDelay: args.scrollDelay });
-        result = { ok: true, scrolled: true, collected: r.collected };
-        break;
-      }
-      
-      case 'set-cookies': {
-        const { setCookies } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await setCookies({ profileId: profile, cookies: args.cookies });
-        result = { ok: true, cookiesSet: true, count: r.count };
-        break;
-      }
-      
-      case 'set-user-agent': {
-        const { setUserAgent } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await setUserAgent({ profileId: profile, userAgent: args.userAgent });
-        result = { ok: true, userAgentSet: true };
-        break;
-      }
-      
-      case 'set-viewport': {
-        const { setViewport } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await setViewport({ profileId: profile, width: args.width, height: args.height });
-        result = { ok: true, viewportSet: true };
-        break;
-      }
-      
-      case 'wait-dom-stable': {
-        const { waitForDomStable } = await import('../../services/page_runtime/input_pipeline.mjs');
-        const r = await waitForDomStable({ profileId: profile, timeout: args.timeout, pollInterval: args.pollInterval });
-        result = { ok: true, stable: true, durationMs: r.durationMs };
-        break;
-      }
-
-      
-      default:
-        throw new CamoError({ 
-          code: 'E_PROTO_NO_HANDLER', 
-          details: { cmd, known: ['start','stop','goto','click','type','scroll','screenshot','snapshot','wait','evaluate','upload','select'] 
-        }});
-    }
-
-    if (closeAfter) {
+    // Close ephemeral browser after command
+    const browserCmds = new Set(['goto', 'click', 'type', 'scroll', 'screenshot', 'snapshot', 'wait', 'evaluate', 'upload', 'select']);
+    if (isEphemeral && browserCmds.has(cmd)) {
       await releaseBrowser(true);
     }
 
     emit('command.done', { cmd, profile, durationMs: Date.now() - startedAt });
     return { kind: 'result', payload: { cmd, ...result } };
-    
+
   } catch (cause) {
-    const proj = cause instanceof CamoError ? cause : new CamoError({ 
-      code: 'E_INTERNAL_UNEXPECTED', 
-      message: cause?.message || String(cause), 
-      cause 
+    const proj = cause instanceof CamoError ? cause : new CamoError({
+      code: 'E_INTERNAL_UNEXPECTED',
+      message: cause?.message || String(cause),
+      cause
     });
     const projected = projectError(proj);
     emit('command.error', { cmd, profile, error: projected });

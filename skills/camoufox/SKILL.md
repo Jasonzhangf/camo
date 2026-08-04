@@ -1,6 +1,6 @@
 ---
 name: camoufox
-description: Use camo v2 CLI for headless Playwright browser automation. 28 commands, daemon-based architecture, ephemeral/persistent session modes, OpenMinis-aligned action set.
+description: Use camo v2 CLI for Camoufox browser automation. 28 commands, daemon-based architecture, ephemeral/persistent session modes, OpenMinis-aligned action set.
 ---
 
 # Camoufox (`camo`) Skill — v2
@@ -10,6 +10,7 @@ description: Use camo v2 CLI for headless Playwright browser automation. 28 comm
 ## Architecture (v2)
 
 - **Daemon process**: `camo daemon start|stop|status` manages a long-lived daemon
+- **Browser engine**: Camoufox only. The CLI does not expose a Playwright browser launcher.
 - **Ephemeral mode**: default, no profile needed, auto-cleanup after command
 - **Persistent mode**: `--profile <name>`, browser stays until `camo daemon stop`
 - **28 commands**: click, daemon, evaluate, goto, screenshot, scroll, select, snapshot, start, stop, type, upload, wait, hover, get-text, get-page-info, find-elements, get-readable, new-tab, close-tab, list-tabs, get-cookies, set-cookies, set-user-agent, set-viewport, wait-dom-stable, scroll-and-collect, fetch-page
@@ -24,6 +25,7 @@ Allowed execution surface:
 - `camo daemon start --profile <name>` — start daemon first
 - `camo <cmd> [--profile <name>] [args]` — send command via WS
 - `camo daemon stop --profile <name>` — stop daemon
+- Do not run `playwright`, `npx playwright install`, direct browser scripts, or direct browser-service imports.
 
 Disallowed:
 - Starting browser without a daemon
@@ -39,7 +41,7 @@ Then report capability gap instead of switching control surface.
 ## Standard Execution Order
 
 1. Start daemon: `camo daemon start --profile <name>`
-2. Wait for session: `camo start --profile <name>`
+2. Start browser session: `camo start --profile <name> --headless`
 3. Execute: `camo goto --profile <name> <url>`, `camo click ...`, `camo snapshot ...`
 4. Collect evidence: `camo screenshot --profile <name>`
 5. Stop session: `camo stop --profile <name>`

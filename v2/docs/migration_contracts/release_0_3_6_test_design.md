@@ -30,7 +30,7 @@ for one command and fully removed after that command.
   against partially mutated browser/session/lock truth.
 - A child daemon signal or non-zero exit makes the CLI fail.
 - Browser locks and input state are keyed by profile.
-- Complete and partial Playwright handles remain owned until close succeeds.
+- Complete and partial Camoufox handles remain owned until close succeeds.
 - Shutdown and explicit stop wait for every in-flight profile start; a browser
   that finishes launching during teardown is closed before teardown succeeds.
 - Same-profile actions serialize; different profiles do not share state.

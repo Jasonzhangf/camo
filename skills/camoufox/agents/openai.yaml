@@ -1,7 +1,7 @@
 interface:
   display_name: "Camoufox camo CLI"
   short_description: "camo-only layered runbook: observe/debug, user ops, orchestration, recovery"
-  default_prompt: "Use $camoufox and only run camo CLI commands. Execute by layers: observe/debug (DOM visible filter, devtools), user-like ops (click/type/scroll/tab), orchestration (container/autoscript), and progress/recovery (events/cleanup)."
+  default_prompt: "Use $camoufox and only run camo CLI commands. Use the Camoufox-only daemon runtime. Execute by layers: observe (snapshot/get-text/get-page-info/find-elements), user-like ops (click/type/scroll/tab), and lifecycle cleanup (stop/daemon stop). Never use Playwright commands or direct browser scripts."
 
 policy:
   allow_implicit_invocation: true

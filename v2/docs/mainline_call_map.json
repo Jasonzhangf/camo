@@ -230,11 +230,11 @@
         "symbol": "startSession"
       },
       "callee": {
-        "path": "v2/services/browser_service/internal/playwright_bridge.mjs",
+        "path": "v2/services/browser_service/internal/camoufox_bridge.mjs",
         "symbol": "launchBrowser",
         "local_symbol": "launchBrowser"
       },
-      "semantic_io": "profile launch request to owned Playwright handles"
+        "semantic_io": "profile launch request to owned Camoufox handles"
     },
     {
       "feature_id": "browser.runtime.ownership",
@@ -245,11 +245,11 @@
         "symbol": "startSession"
       },
       "callee": {
-        "path": "v2/services/browser_service/internal/playwright_bridge.mjs",
+        "path": "v2/services/browser_service/internal/camoufox_bridge.mjs",
         "symbol": "closeBrowser",
         "local_symbol": "closeBrowser"
       },
-      "semantic_io": "failed launch cleanup to confirmed Playwright handle closure"
+        "semantic_io": "failed launch cleanup to confirmed Camoufox handle closure"
     },
     {
       "feature_id": "browser.runtime.ownership",
@@ -260,11 +260,11 @@
         "symbol": "stopSession"
       },
       "callee": {
-        "path": "v2/services/browser_service/internal/playwright_bridge.mjs",
+        "path": "v2/services/browser_service/internal/camoufox_bridge.mjs",
         "symbol": "closeBrowser",
         "local_symbol": "closeBrowser"
       },
-      "semantic_io": "profile stop request to confirmed Playwright handle closure"
+        "semantic_io": "profile stop request to confirmed Camoufox handle closure"
     },
     {
       "feature_id": "cmd.start.request",
@@ -385,7 +385,7 @@
         "symbol": "screenshot",
         "local_symbol": "pageOps.screenshot"
       },
-      "semantic_io": "serialized screenshot request to Playwright page operation"
+      "semantic_io": "serialized screenshot request to Camoufox page operation"
     },
     {
       "feature_id": "cmd.get_page_info.response",
@@ -453,7 +453,7 @@
         "symbol": "getPageInfo",
         "local_symbol": "pageOps.getPageInfo"
       },
-      "semantic_io": "serialized page-info request to Playwright page projection"
+      "semantic_io": "serialized page-info request to Camoufox page projection"
     },
     {
       "feature_id": "cmd.scroll.request",
@@ -521,7 +521,7 @@
         "symbol": "scroll",
         "local_symbol": "pageOps.scroll"
       },
-      "semantic_io": "serialized wheel deltas to Playwright mouse input"
+      "semantic_io": "serialized wheel deltas to Camoufox page input"
     },
     {
       "feature_id": "cmd.scroll_and_collect.request",
@@ -589,7 +589,7 @@
         "symbol": "scrollAndCollect",
         "local_symbol": "pageOps.scrollAndCollect"
       },
-      "semantic_io": "serialized collection loop to Playwright mouse input"
+      "semantic_io": "serialized collection loop to Camoufox page input"
     }
   ]
 }

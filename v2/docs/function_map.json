@@ -113,11 +113,11 @@
       "owner_module": "services.browser_runtime",
       "entry_symbols": [
         {
-          "path": "v2/services/browser_service/internal/playwright_bridge.mjs",
+          "path": "v2/services/browser_service/internal/camoufox_bridge.mjs",
           "symbol": "launchBrowser"
         },
         {
-          "path": "v2/services/browser_service/internal/playwright_bridge.mjs",
+          "path": "v2/services/browser_service/internal/camoufox_bridge.mjs",
           "symbol": "closeBrowser"
         }
       ]

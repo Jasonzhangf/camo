@@ -32,8 +32,7 @@
     "browser",
     "automation",
     "camoufox",
-    "cli",
-    "playwright"
+    "cli"
   ],
   "license": "MIT",
   "engines": {
@@ -47,7 +46,6 @@
   },
   "dependencies": {
     "jsqr": "^1.4.0",
-    "playwright": "^1.58.2",
     "pngjs": "^7.0.0",
     "ws": "^8.19.0"
   }

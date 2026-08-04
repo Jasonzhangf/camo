@@ -7,14 +7,14 @@ import path from 'node:path';
 
 const ROOT = path.resolve(new URL('../../../', import.meta.url).pathname);
 
-test('scroll operations use Playwright mouse input and expose failures', () => {
+test('scroll operations use Camoufox page input and expose failures', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-scroll-input-home-'));
   try {
     const script = `
       import {
         __enableTestRoot,
         __setBrowserForTest,
-      } from './v2/services/browser_service/internal/playwright_bridge.mjs';
+      } from './v2/services/browser_service/internal/camoufox_bridge.mjs';
       import {
         scroll,
         scrollAndCollect,

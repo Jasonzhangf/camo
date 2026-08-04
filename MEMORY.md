@@ -171,3 +171,24 @@ Tags: camo, v2, stage-6-review, false-green-gate, package-artifact, fake-transpo
 - package.json files 数组修复
 
 Tags: camo, v2, stage-7, browser-runtime, playwright, daemon
+
+## 2026-08-01: Camoufox Migration Test Fixes (commit 853e7e2)
+
+### 8 Test Failures Resolved
+
+| # | Test | Root Cause | Fix |
+|---|------|-----------|-----|
+| 63/64 | generated_maps | `resources.json` missing indirect_paths | Add daemon call edges to input_pipeline + daemon_registration |
+| 68 | registry_prohibitions | No detection for variable-based dynamic imports | Add pattern for `const x = 'path'; await import(x);` |
+| 71 | registry_prohibitions | `extractImportSpecifiers` duplicates template imports | Separate single-quote/double-quote pattern from backtick pattern |
+| 72 | registry_prohibitions | `prohibitedImportModules` wrong order | Sort results, fix namespace handling for subpaths |
+| 18 | camoufox_bridge.test | Import path too deep (4 levels) | Use 3 levels: `../../../services/` |
+| 201 | shutdown_policy | Duplicate `releaseBrowser` in catch block | Remove catch block cleanup (normal path handles it) |
+| smoke | playwright_bridge loads | Renamed to camoufox_bridge | Update smoke test import |
+
+### Key Lessons
+- `indirect_paths` in resources.json must match ALL call edges from call map
+- `write_paths` must include ALL write symbols (not just register/unregister)
+- Dynamic import detection must handle: literal `import('x')`, template `import(\`x\`)`, variable `import(variable)`
+- Test import paths: `v2/tests/unit/` needs `../../../services/` (3 levels)
+- ephemeral cleanup: single call site in success path, no catch retry
