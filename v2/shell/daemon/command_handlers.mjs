@@ -213,6 +213,7 @@ export async function handleCommand(cmd, args, ctx) {
     default:
       throw new CamoError({
         code: 'E_PROTO_NO_HANDLER',
-        details: { cmd, known: [...browserCmds, 'start', 'stop', 'close-tab', 'daemon', 'fetch-page', 'find-elements', 'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'hover', 'list-tabs', 'new-tab', 'scroll-and-collect', 'set-cookies', 'set-user-agent', 'set-viewport', 'wait-dom-stable'] });
+        details: { cmd, known: ['start', 'stop', 'close-tab', 'daemon', 'fetch-page', 'find-elements', 'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'hover', 'list-tabs', 'new-tab', 'scroll-and-collect', 'set-cookies', 'set-user-agent', 'set-viewport', 'wait-dom-stable', ...browserCmds] }
+      });
   }
 }
