@@ -1,0 +1,30 @@
+{
+  "name": "@web-auto/camo",
+  "version": "0.4.0",
+  "type": "module",
+  "description": "Camo v2 - Browser automation with Camoufox",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./browser": "./dist/core/browser/index.js",
+    "./resources": "./dist/resources/browser/index.js",
+    "./search": "./dist/services/search/index.js",
+    "./runtime": "./dist/runtime/index.js",
+    "./monitoring": "./dist/monitoring/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "camoufox": "^0.1.19"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  }
+}

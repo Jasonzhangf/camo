@@ -204,6 +204,22 @@ export async function handleCommand(cmd, args, ctx) {
       return { ok: true, viewportSet: true };
     }
 
+    case 'search': {
+      const { getSearchEngine } = await import('../../services/search/SearchEngine.js');
+      const { XHSSearch } = await import('../../services/search/platforms/XHSSearch.js');
+      const engine = getSearchEngine();
+      engine.registerPlatform('xhs', XHSSearch);
+      const result = await engine.search({
+        platform: args.platform || 'xhs',
+        query: args.query,
+        cookies: args.cookies,
+        profile: profile,
+        maxResults: args.maxResults,
+        timeout: args.timeout,
+      });
+      return { ok: result.success, searched: true, results: result.results, totalCount: result.totalCount, pageURL: result.pageURL, error: result.error };
+    }
+
     case 'wait-dom-stable': {
       const waitForDomStable = await importOp('waitForDomStable');
       const r = await waitForDomStable({ profileId: profile, timeout: args.timeout, pollInterval: args.pollInterval });
@@ -213,7 +229,7 @@ export async function handleCommand(cmd, args, ctx) {
     default:
       throw new CamoError({
         code: 'E_PROTO_NO_HANDLER',
-        details: { cmd, known: ['start', 'stop', 'close-tab', 'daemon', 'fetch-page', 'find-elements', 'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'hover', 'list-tabs', 'new-tab', 'scroll-and-collect', 'set-cookies', 'set-user-agent', 'set-viewport', 'wait-dom-stable', ...browserCmds] }
+        details: { cmd, known: ['start', 'stop', 'close-tab', 'daemon', 'fetch-page', 'find-elements', 'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'hover', 'list-tabs', 'new-tab', 'scroll-and-collect', 'set-cookies', 'set-user-agent', 'set-viewport', 'wait-dom-stable', ...browserCmds, '''search'''] }
       });
   }
 }
