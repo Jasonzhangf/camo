@@ -54,7 +54,11 @@ function makeWsTransport(url) {
   };
 }
 
-const NO_TRANSPORT_CMDS = new Set(['--help', '-h', 'help', 'doctor', 'usage', 'describe']);
+const NO_TRANSPORT_CMDS = new Set([
+    '--help', '-h', 'help', 'doctor', 'usage', 'describe',
+    '--version', 'version', 'daemon', 'stop', 'start',
+    'list-profiles', 'remove-profile', 'clean', 'init',
+  ]);
 // `daemon` is a process-level control command; it spawns the daemon itself
 // rather than talking to one. Skip the daemon-finder path for it.
 const PROCESS_ONLY_CMDS = new Set(['daemon']);
