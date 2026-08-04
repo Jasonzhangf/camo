@@ -48,6 +48,8 @@ export async function dispatch(argv, opts = {}) {
   }
 
   // Parse input before checking transport (input errors take priority).
+  const STANDALONE_CMDS = new Set(['search']);
+
   const cmd = inferCmd(argv, null);
   if (!cmd) {
     return { kind: 'usage', usage: usage() };
@@ -72,12 +74,12 @@ export async function dispatch(argv, opts = {}) {
 
   // Transport required for actual command execution.
   if (!opts.transport && !opts.processOnly) {
-    throw new CamoError({ code: 'E_STATE_NO_TRANSPORT', details: { reason: 'dispatch requires opts.transport; no fallback' } });
+    if (!opts.transport && !opts.processOnly && !STANDALONE_CMDS.has(cmd)) throw new CamoError({ code: 'E_STATE_NO_TRANSPORT', details: { reason: 'dispatch requires opts.transport; no fallback' } });
   }
 
   const ctx = { traceId: opts.traceId || 'cli-' + Date.now() };
   // CLI uses kebab-case, builtins handles conversion internally
-  const result = await runBuiltin(cmd, opts.transport, parsed, ctx);
+  const result = await runBuiltin(cmd, opts.transport || null, parsed, ctx);
   return { kind: 'result', cmd, result };
 }
 

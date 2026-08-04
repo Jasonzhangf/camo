@@ -1,10 +1,18 @@
-// Browser Instance - Camoufox 封装层
+// Browser Instance - 使用 Firefox (通过 Camoufox 路径)
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { firefox } = require('playwright-core');
+const { getLaunchPath } = require('camoufox');
 
 export class BrowserInstance {
-  constructor(config) {
-    this.config = { profile: 'mobile_safari', headless: true, ...config };
+  constructor(config = {}) {
+    this.config = {
+      profile: 'mobile_safari',
+      headless: true,
+      ...config
+    };
     this._browser = null;
-    this.context = null;
+    this._context = null;
     this.page = null;
     this._isLoading = false;
     this._currentURL = '';
@@ -21,28 +29,31 @@ export class BrowserInstance {
     return UAs[this.config.profile] || UAs.mobile_safari;
   }
   
-  getViewport() {
-    if (this.config.viewportWidth && this.config.viewportHeight) {
-      return { width: this.config.viewportWidth, height: this.config.viewportHeight };
-    }
-    return this.config.profile === 'desktop_safari' ? { width: 1280, height: 800 } : { width: 390, height: 844 };
-  }
-  
   async launch() {
     if (this._browser || this.closed) return;
-    const { Camoufox } = await import('camoufox');
-    const viewport = this.getViewport();
-    const options = { headless: this.config.headless ?? true, locale: 'zh-CN' };
-    this._browser = await Camoufox(options);
-    this.context = await this._browser.newContext({ viewport, userAgent: this.getUserAgent() });
-    this.page = await this.context.newPage();
+    
+    const executablePath = getLaunchPath();
+    
+    this._browser = await firefox.launch({
+      headless: this.config.headless ?? true,
+      executablePath,
+    });
+    
+    this.page = await this._browser.newPage();
     this.setupHandlers();
   }
   
   setupHandlers() {
     if (!this.page) return;
     this.page.on('load', () => { this._isLoading = false; });
-    this.page.on('framenavigated', (frame) => { if (!frame.parentFrame()) this._currentURL = frame.url(); });
+    this.page.on('framenavigated', (frame) => {
+      if (!frame.parentFrame()) this._currentURL = frame.url();
+    });
+    this.page.on('close', () => { this.closed = true; });
+    this.page.on('console', (msg) => {
+      // 转发 console 到 Node.js
+      console.log('[Browser]', msg.type(), msg.text());
+    });
   }
   
   async navigate(url, timeout = 30000) {
@@ -51,7 +62,10 @@ export class BrowserInstance {
     try {
       await this.page.goto(url, { timeout, waitUntil: 'domcontentloaded' });
       this._currentURL = url;
-    } catch (err) { this._isLoading = false; throw err; }
+    } catch (err) {
+      this._isLoading = false;
+      throw err;
+    }
   }
   
   async screenshot(fullPage = false) {
@@ -60,9 +74,20 @@ export class BrowserInstance {
     return buffer.toString('base64');
   }
   
-  async click(selector) { await this.ensureReady(); await this.page.locator(selector).click({ timeout: 10000 }); }
-  async clickAt(x, y) { await this.ensureReady(); await this.page.mouse.click(x, y); }
-  async type(selector, text) { await this.ensureReady(); await this.page.locator(selector).fill(text, { timeout: 10000 }); }
+  async click(selector) {
+    await this.ensureReady();
+    await this.page.locator(selector).click({ timeout: 10000 });
+  }
+  
+  async clickAt(x, y) {
+    await this.ensureReady();
+    await this.page.mouse.click(x, y);
+  }
+  
+  async type(selector, text) {
+    await this.ensureReady();
+    await this.page.locator(selector).fill(text, { timeout: 10000 });
+  }
   
   async getText(selector) {
     await this.ensureReady();
@@ -76,19 +101,29 @@ export class BrowserInstance {
     await this.page.evaluate((dy) => { window.scrollBy(0, dy); }, deltaY);
   }
   
-  async executeJS(script) { await this.ensureReady(); return await this.page.evaluate(script); }
-  
-  async getPageInfo() {
-    return { url: this._currentURL || this.page.url(), title: this._pageTitle || await this.page.title(), isLoading: this._isLoading };
+  async executeJS(script) {
+    await this.ensureReady();
+    // 使用 page.evaluate 直接返回结果，不捕获错误
+    return await this.page.evaluate(script);
   }
   
-  async getCookies() { await this.ensureReady(); return await this.context.cookies(); }
+  async getPageInfo() {
+    return {
+      url: this._currentURL || this.page.url(),
+      title: this._pageTitle || await this.page.title(),
+      isLoading: this._isLoading
+    };
+  }
+  
+  async getCookies() {
+    await this.ensureReady();
+    return await this.page.context().cookies();
+  }
   
   async setCookies(cookies) {
     await this.ensureReady();
-    for (const cookie of cookies) {
-      const domain = cookie.domain || new URL(this._currentURL || 'https://example.com').hostname;
-      await this.context.addCookies([{ name: cookie.name, value: cookie.value, domain, path: cookie.path || '/', secure: cookie.secure ?? true }]);
+    if (cookies) {
+      await this.page.context().addCookies(cookies);
     }
   }
   
@@ -111,7 +146,10 @@ export class BrowserInstance {
     return results;
   }
   
-  async hover(selector) { await this.ensureReady(); await this.page.locator(selector).hover(); }
+  async hover(selector) {
+    await this.ensureReady();
+    await this.page.locator(selector).hover();
+  }
   
   async waitForDomStable(timeout = 5000) {
     await this.ensureReady();
@@ -119,8 +157,12 @@ export class BrowserInstance {
     const start = Date.now();
     while (Date.now() - start < timeout) {
       const height = await this.page.evaluate(() => document.body.scrollHeight);
-      if (height === lastHeight) { if (++stableCount >= 3) return true; }
-      else { stableCount = 0; lastHeight = height; }
+      if (height === lastHeight) {
+        if (++stableCount >= 3) return true;
+      } else {
+        stableCount = 0;
+        lastHeight = height;
+      }
       await this.page.waitForTimeout(500);
     }
     return false;
@@ -138,8 +180,8 @@ export class BrowserInstance {
   async close() {
     this.closed = true;
     if (this.page) try { await this.page.close(); } catch {}
-    if (this.context) try { await this.context.close(); } catch {}
     if (this._browser) try { await this._browser.close(); } catch {}
-    this.page = null; this.context = null; this._browser = null;
+    this.page = null;
+    this._browser = null;
   }
 }
