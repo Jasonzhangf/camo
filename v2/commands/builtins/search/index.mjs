@@ -1,5 +1,5 @@
 // search builtin command. Module id=commands.builtins.search.
-// Platform-agnostic search interface aligned with OpenMinis pattern.
+// Platform-agnostic search interface with login check.
 
 import { getSearchEngine } from '../../../services/search/SearchEngine.mjs';
 import { XHSSearch } from '../../../services/search/platforms/XHSSearch.mjs';
@@ -10,16 +10,12 @@ import path from 'node:path';
 export const cmd = 'search';
 
 export async function run(transport, parsed = {}, ctx = {}) {
-  // Support both kebab and camel case profile
   const profile = parsed.profile || parsed.named?.profile || ctx.profile || 'default';
-  
-  // Extract positional args
   const platform = parsed.positional?.[0];
   const query = parsed.positional?.slice(1).join(' ') || parsed.named?.query || '';
-  
-  // Named options
   const cookieFile = parsed.named?.cookies;
   const maxResults = parsed.named?.['max-results'] || parsed.named?.maxResults || 20;
+  const headless = parsed.named?.headless !== undefined ? parsed.named.headless : false;
   
   if (!platform) {
     throw new CamoError({
@@ -35,7 +31,8 @@ export async function run(transport, parsed = {}, ctx = {}) {
     });
   }
   
-  let cookies;
+  // 读取 Cookie 文件（如果有）
+  let cookies = null;
   if (cookieFile) {
     const cookiePath = path.resolve(cookieFile);
     if (fs.existsSync(cookiePath)) {
@@ -52,8 +49,25 @@ export async function run(transport, parsed = {}, ctx = {}) {
     cookies,
     profile,
     maxResults,
+    headless,  // 传递 headless 选项
     timeout: 60000,
   });
+  
+  // 处理登录错误
+  if (result.error && result.error.includes('NOT_LOGGED_IN')) {
+    return {
+      cmd: 'search',
+      searched: false,
+      platform,
+      query,
+      success: false,
+      totalCount: 0,
+      results: [],
+      error: result.error,
+      requires_login: true,
+      message: 'Please login using: camo login --platform ' + platform + ' --profile ' + profile,
+    };
+  }
   
   return {
     cmd: 'search',
