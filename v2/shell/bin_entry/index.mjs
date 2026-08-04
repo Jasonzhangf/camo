@@ -20,6 +20,8 @@ import { dispatch, usage } from '../cli/dispatch.mjs';
 import { isCamoError, toWire } from '../../contracts/error_envelope/projector.mjs';
 import { loadConfig } from '../config/loader.mjs';
 import { findActiveDaemon } from '../config/daemon_finder.mjs';
+import { checkCamoufoxHealth, ensureCamoufox } from '../camoufox_health.mjs';
+
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const DAEMON_SCRIPT = path.resolve(__dirname, '..', 'daemon', 'index.mjs');
@@ -118,6 +120,27 @@ async function main(argv) {
 
   // help / doctor / usage bypass transport
   const hasHelpFlag = args.includes('--help') || args.includes('-h');
+  const isBrowserCmd = args.length > 0 && !hasHelpFlag && (
+    ['goto', 'click', 'type', 'scroll', 'screenshot', 'get-page-info', 'get-cookies', 
+     'set-cookies', 'evaluate', 'find-elements', 'wait', 'hover', 'select', 'upload',
+     'fetch-page', 'snapshot', 'scroll-and-collect', 'get-readable', 'get-text',
+     'new-tab', 'close-tab', 'list-tabs', 'set-viewport', 'set-user-agent', 'start'].includes(args[0])
+  );
+  
+  // Auto-check Camoufox for browser commands
+  if (isBrowserCmd) {
+    const health = await checkCamoufoxHealth();
+    if (!health.ok) {
+      if (health.error?.includes('not found')) {
+        console.error('Camoufox not found, downloading...');
+        await ensureCamoufox();
+      } else {
+        process.stderr.write('Camoufox error: ' + (health.error || 'unknown') + '\n');
+        return 2;
+      }
+    }
+  }
+
   const needsTransport = !hasHelpFlag
     && args.length > 0
     && !NO_TRANSPORT_CMDS.has(args[0])
