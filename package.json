@@ -26,7 +26,8 @@
     "version:bump": "node scripts/bump-version.mjs",
     "install:global": "npm run build && npm install -g .",
     "uninstall:global": "npm uninstall -g @web-auto/camo",
-    "build:global": "npm run build && npm test && npm install -g ."
+    "build:global": "npm run build && npm test && npm install -g .",
+    "postinstall": "node scripts/postinstall-camoufox.mjs"
   },
   "keywords": [
     "browser",
