@@ -64,9 +64,10 @@ export abstract class SearchPlatform {
   
   async injectCookies(netscapeText: string): Promise<void> {
     if (!this.browser) return;
-    const cookieStore = getCookieStore();
+    // 使用 profile 隔离的 CookieStore，与 BrowserInstance 的 cookie 目录一致
+    const cookieStore = getCookieStore(this.config.profile);
     const imported = cookieStore.importNetscape(netscapeText);
-    console.log(`[SearchEngine] Imported ${imported} cookies`);
+    console.log(`[SearchEngine] Imported ${imported} cookies for profile=${this.config.profile || 'default'}`);
     const domains = cookieStore.getBackupDomains();
     for (const domain of domains) {
       const cookies = cookieStore.loadCookies(domain);
@@ -93,7 +94,7 @@ export class SearchEngine {
       return { success: false, results: [], totalCount: 0, pageURL: '', error: `Unknown platform: ${options.platform}` };
     }
     
-    const platform = new Platform({ profile: 'mobile_safari' as any });
+    const platform = new Platform({ profile: options.profile || 'default' });
     
     try {
       await platform.createBrowser();

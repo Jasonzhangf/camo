@@ -210,7 +210,12 @@ export class CookieStore {
     
     let imported = 0;
     for (const [domain, domainCookies] of byDomain) {
-      this.saveCookies(domain, domainCookies);
+      // 与已有 cookie 合并（按 domain+path+name 去重，Netscape 唯一键）
+      const existing = this.loadCookies(domain);
+      const key = (c: CookieEntry) => `${c.domain}|${c.path || '/'}|${c.name}`;
+      const merged = new Map(existing.map(c => [key(c), c]));
+      for (const c of domainCookies) merged.set(key(c), c);
+      this.saveCookies(domain, [...merged.values()]);
       imported += domainCookies.length;
     }
     
@@ -219,10 +224,29 @@ export class CookieStore {
 }
 
 let globalCookieStore: CookieStore | null = null;
+const profileStores = new Map<string, CookieStore>();
 
-export function getCookieStore(): CookieStore {
-  if (!globalCookieStore) {
-    globalCookieStore = new CookieStore();
+/**
+ * 获取 CookieStore 实例。
+ * @param profile - 传入时使用 profile 隔离的存储目录（~/.camo/cookies/<profile>/），
+ *   与 BrowserInstance 的 cookie 目录保持一致；不传时返回全局共享实例（向后兼容）。
+ */
+export function getCookieStore(profile?: string): CookieStore {
+  const pid = String(profile || '').trim();
+  if (!pid) {
+    if (!globalCookieStore) {
+      globalCookieStore = new CookieStore();
+    }
+    return globalCookieStore;
   }
-  return globalCookieStore;
+  // 与 BrowserInstance 一致的 profile 白名单校验：拒绝路径穿越/绝对路径
+  if (!/^[a-zA-Z0-9_-]+$/.test(pid)) {
+    throw new Error(`E_INVALID_PROFILE: profile must match ^[a-zA-Z0-9_-]+$, got "${pid}"`);
+  }
+  let store = profileStores.get(pid);
+  if (!store) {
+    store = new CookieStore({ storageDir: path.join(os.homedir(), '.camo', 'cookies', pid) });
+    profileStores.set(pid, store);
+  }
+  return store;
 }

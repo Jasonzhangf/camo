@@ -4,7 +4,7 @@
 import { BrowserInstance, BrowserInstanceConfig } from '../resources/browser/BrowserInstance.js';
 import { BrowserPool } from '../resources/browser/BrowserPool.js';
 import { BrowserPoolRegistry } from '../resources/browser/BrowserPool.js';
-import { getCookieStore } from '../core/browser/CookieStore.js';
+import { getCookieStore, CookieStore } from '../core/browser/CookieStore.js';
 
 export interface PersistentBrowserConfig {
   profile: string;           // Profile 名称
@@ -22,11 +22,12 @@ export class PersistentBrowser {
   private config: PersistentBrowserConfig;
   private running = false;
   private poolRegistry = BrowserPoolRegistry.getInstance();
-  private cookieStore = getCookieStore();
+  private cookieStore: CookieStore;
 
   constructor(config: PersistentBrowserConfig) {
     this.id = `persistent-${config.profile}-${Date.now()}`;
     this.profile = config.profile;
+    this.cookieStore = getCookieStore(config.profile);
     this.config = {
       headless: false,
       maxTabs: 3,
@@ -39,9 +40,9 @@ export class PersistentBrowser {
   async start(): Promise<void> {
     if (this.running) return;
     
-    // 创建浏览器实例
+    // 创建浏览器实例（使用传入 profile，与 cookieStore 目录保持一致）
     this.browser = new BrowserInstance({
-      profile: 'mobile_safari' as any,
+      profile: this.profile as any,
       headless: this.config.headless,
     });
     await this.browser.launch();

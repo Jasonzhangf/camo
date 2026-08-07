@@ -6,7 +6,7 @@ import { BrowserInstance } from '../../../resources/browser/BrowserInstance.mjs'
 export class XHSSearch extends SearchPlatform {
   constructor(config) { 
     super(config); 
-    this.domain = 'xiaohongshu';
+    this.domain = 'xiaohongshu.com';
   }
   get name() { return 'xhs'; }
   

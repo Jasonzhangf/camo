@@ -1,4 +1,5 @@
 // Cookie Store - ITP 防护、Netscape 格式
+// Profile 隔离：每个 profile 一个独立存储目录（~/.camo/cookies/<profile>/）
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -113,6 +114,41 @@ export class CookieStore {
     return [];
   }
   
+  // 清理过期/超限的 domain cookie 备份（与 CookieStore.ts 保持同步）
+  cleanupExpiredDomains() {
+    const now = Date.now();
+    const domains = this.getBackupDomains();
+    
+    for (const domain of domains) {
+      const lastVisit = this.visitMap.get(domain) || 0;
+      const expired = now - lastVisit > this.config.domainRetention;
+      const overCap = this.visitMap.size > this.config.maxDomains;
+      
+      if (expired || overCap) {
+        try {
+          fs.unlinkSync(this.getCookieFile(domain));
+          this.visitMap.delete(domain);
+        } catch {}
+      }
+    }
+    
+    this.persistVisitMap();
+  }
+  
+  // 清空所有 cookie 备份（与 CookieStore.ts 保持同步）
+  clearAll() {
+    try {
+      const files = fs.readdirSync(this.config.storageDir);
+      for (const file of files) {
+        if (!file.startsWith('.')) {
+          fs.unlinkSync(path.join(this.config.storageDir, file));
+        }
+      }
+      this.visitMap.clear();
+      this.persistVisitMap();
+    } catch {}
+  }
+  
   importNetscape(text) {
     const cookies = this.parseNetscapeFormat(text);
     const byDomain = new Map();
@@ -123,7 +159,12 @@ export class CookieStore {
     }
     let imported = 0;
     for (const [domain, domainCookies] of byDomain) {
-      this.saveCookies(domain, domainCookies);
+      // 与已有 cookie 合并（按 domain+path+name 去重，Netscape 唯一键）
+      const existing = this.loadCookies(domain);
+      const key = c => `${c.domain}|${c.path || '/'}|${c.name}`;
+      const merged = new Map(existing.map(c => [key(c), c]));
+      for (const c of domainCookies) merged.set(key(c), c);
+      this.saveCookies(domain, [...merged.values()]);
       imported += domainCookies.length;
     }
     return imported;
@@ -138,7 +179,28 @@ export class CookieStore {
 }
 
 let globalCookieStore = null;
-export function getCookieStore() {
-  if (!globalCookieStore) globalCookieStore = new CookieStore();
-  return globalCookieStore;
+const profileStores = new Map();
+
+/**
+ * 获取 CookieStore 实例。
+ * @param {string} [profile] - profile 名；传入时使用 profile 隔离的存储目录
+ *   （~/.camo/cookies/<profile>/），与 BrowserInstance 的 cookie 目录保持一致。
+ *   不传时返回全局共享实例（向后兼容）。
+ */
+export function getCookieStore(profile) {
+  const pid = String(profile || '').trim();
+  if (!pid) {
+    if (!globalCookieStore) globalCookieStore = new CookieStore();
+    return globalCookieStore;
+  }
+  // 与 BrowserInstance 一致的 profile 白名单校验：拒绝路径穿越/绝对路径
+  if (!/^[a-zA-Z0-9_-]+$/.test(pid)) {
+    throw new Error(`E_INVALID_PROFILE: profile must match ^[a-zA-Z0-9_-]+$, got "${pid}"`);
+  }
+  let store = profileStores.get(pid);
+  if (!store) {
+    store = new CookieStore({ storageDir: path.join(os.homedir(), '.camo', 'cookies', pid) });
+    profileStores.set(pid, store);
+  }
+  return store;
 }

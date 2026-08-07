@@ -35,9 +35,10 @@ export class SearchPlatform {
   
   async injectCookies(netscapeText) {
     if (!this.browser) return;
-    const cookieStore = getCookieStore();
+    // 使用 profile 隔离的 CookieStore，与 BrowserInstance 的 cookie 目录一致
+    const cookieStore = getCookieStore(this.config.profile);
     const imported = cookieStore.importNetscape(netscapeText);
-    console.log(`[SearchEngine] Imported ${imported} cookies`);
+    console.log(`[SearchEngine] Imported ${imported} cookies for profile=${this.config.profile || 'default'}`);
     const domains = cookieStore.getBackupDomains();
     for (const domain of domains) {
       const cookies = cookieStore.loadCookies(domain);
