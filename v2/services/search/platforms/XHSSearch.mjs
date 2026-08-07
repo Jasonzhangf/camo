@@ -21,12 +21,9 @@ export class XHSSearch extends SearchPlatform {
     return this.browser;
   }
   
-  // 确保已登录
+  // 确保已登录（登录态由持久化 profile 自动管理，浏览器自带 cookie/localStorage）
   async ensureLoggedIn() {
     if (!this.browser) await this.createBrowser();
-    
-    // 先尝试加载已有 Cookie
-    const hasCookies = await this.browser.loadCookies(this.domain);
     
     // 检查登录状态
     const isLoggedIn = await this.browser.checkLoginStatus();
@@ -39,7 +36,6 @@ export class XHSSearch extends SearchPlatform {
         await this.browser.close();
         this.browser = new BrowserInstance({ headless: false, profile: this.config.profile || 'default' });
         await this.browser.launch();
-        await this.browser.loadCookies(this.domain);
       }
       
       // 启动登录流程

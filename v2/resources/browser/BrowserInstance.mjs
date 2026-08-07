@@ -146,7 +146,8 @@ export class BrowserInstance {
     return parts.length > 2 ? parts.slice(-2).join('.') : d;
   }
   
-  // 全量保存：读取当前 context 全部 cookies，按注册域分组写入对应文件
+  // 显式全量保存工具：读取当前 context 全部 cookies，按注册域分组写入对应文件。
+  // 默认不自动调用——持久化 profile 下浏览器自动写 cookie，手动维护仅用于显式导出。
   async _saveAllCookies() {
     if (!this._browser || this.closed) return;
     try {
@@ -286,13 +287,12 @@ export class BrowserInstance {
   }
   
   // 检查是否需要登录（通过主页判断）
+  // 登录检测：直接检测浏览器当前页面状态（cookie 由持久化 profile 自动管理，不注入）
   async checkLoginStatus(url = 'https://www.xiaohongshu.com') {
     if (!this.page) return false;
     // 进入与退出时刷新活动时间，避免长时检查触发 idle 自杀
     this._touchActivity();
     try {
-      // 重新加载 cookie 后再检查（规范化域名，兼容 .json/.txt）
-      await this.loadCookies(this._normalizeDomain('xiaohongshu.com'));
       await this.page.goto(url, { timeout: 15000, waitUntil: 'networkidle' });
       await this.page.waitForTimeout(2000);
       const bodyText = await this.page.evaluate(() => document.body?.innerText || '');
@@ -332,7 +332,6 @@ export class BrowserInstance {
       });
       this.page = await this._browser.newPage();
       this.setupHandlers();
-      this.startAutoSave();
     }
     
     await this.page.goto(loginUrl, { timeout: 60000 });
@@ -345,10 +344,9 @@ export class BrowserInstance {
       this._touchActivity();
       const loggedIn = await this._detectLoginOnCurrentPage(opts.loginCookieNames);
       if (loggedIn) {
-        // 检查到登录后动态保存 cookie
-        await this.saveCookies(domain);
+        // 登录态由浏览器持久化 profile 自动写入，无需手动保存
         this._resetIdleTimeout();
-        console.log(`[BrowserInstance] Login detected, cookies saved for ${domain}`);
+        console.log(`[BrowserInstance] Login detected for ${domain}, state persisted by browser`);
         return true;
       }
       await this.page.waitForTimeout(pollMs);
@@ -397,7 +395,6 @@ export class BrowserInstance {
     
     this.page = await this._browser.newPage();
     this.setupHandlers();
-    this.startAutoSave();
   }
   
   setupHandlers() {
