@@ -79,6 +79,19 @@ function touchProfileActivity(lockFile) {
 }
 
 export class BrowserInstance {
+  // Camoufox 默认字体集不含 CJK，macOS 下中文会显示为方格。
+  // 显式加载系统简体中文字体（按 fontconfig 识别的族名），并固定 zh-CN locale。
+  static CJK_FONTS = ['Hiragino Sans GB', 'Heiti SC', 'Songti SC'];
+  static DEFAULT_LOCALE = 'zh-CN';
+  // 登录墙表单特征（未登录页面才会出现）——登录检测的唯一可靠锚点。
+  // 注意：XHS 未登录时导航栏仍含"创作中心/我的/消息"，且登录墙文案为
+  // "手机号登录/获取验证码"，不能作为已登录/未登录的判据。
+  static LOGIN_PROMPT_ANCHORS = ['扫码登录', '手机号登录', '获取验证码', '登录后推荐'];
+
+  static hasLoginPrompt(bodyText) {
+    return BrowserInstance.LOGIN_PROMPT_ANCHORS.some(a => bodyText.includes(a));
+  }
+
   constructor(config = {}) {
     this.config = {
       profile: 'default',
@@ -229,13 +242,7 @@ export class BrowserInstance {
       await this.page.goto(url, { timeout: 15000, waitUntil: 'networkidle' });
       await this.page.waitForTimeout(2000);
       const bodyText = await this.page.evaluate(() => document.body?.innerText || '');
-      // 登录判定的可靠锚点：登录墙表单特征（未登录页面才会出现）。
-      // 注意：XHS 未登录时导航栏仍含"创作中心/我的/消息"，且登录墙文案为
-      // "手机号登录/获取验证码"，不能作为已登录/未登录的判据。
-      const hasLoginPrompt = bodyText.includes('扫码登录')
-        || bodyText.includes('手机号登录')
-        || bodyText.includes('获取验证码')
-        || bodyText.includes('登录后推荐');
+      const hasLoginPrompt = BrowserInstance.hasLoginPrompt(bodyText);
       // 页面内容正常加载且无登录墙 = 已登录；页面为空/加载失败 = 未登录（安全默认）
       const isLoggedIn = bodyText.trim().length > 0 && !hasLoginPrompt;
       if (!bodyText.trim()) { console.log('[BrowserInstance] Page body empty, treat as not logged in'); }
@@ -250,30 +257,65 @@ export class BrowserInstance {
     }
   }
   
-  async launchWithLogin(domain, loginUrl) {
+  async launchWithLogin(domain, loginUrl, opts = {}) {
+    const pollMs = opts.pollMs ?? 3000;
+    const timeoutMs = opts.timeoutMs ?? 10 * 60 * 1000; // 默认 10 分钟等待登录
     console.log(`[BrowserInstance] === LOGIN REQUIRED ===`);
     console.log(`[BrowserInstance] Launching browser for login...`);
     
     // 登录流程可能远超 idle 超时，期间禁用 idle 自杀，结束后恢复
     if (this._idleTimeout) clearTimeout(this._idleTimeout);
     
-    this._browser = await Camoufox({ headless: false, viewport: null });
+    this._browser = await Camoufox({
+      headless: false,
+      viewport: null,
+      fonts: BrowserInstance.CJK_FONTS,
+      locale: BrowserInstance.DEFAULT_LOCALE,
+    });
     this.page = await this._browser.newPage();
     this.setupHandlers();
     
     await this.page.goto(loginUrl, { timeout: 60000 });
     
-    console.log(`[BrowserInstance] Please log in in the browser window`);
-    console.log(`[BrowserInstance] Press Enter after login complete...`);
+    console.log(`[BrowserInstance] Please log in in the browser window (auto-detect, poll ${pollMs}ms, timeout ${Math.round(timeoutMs / 60000)}min)...`);
     
-    await new Promise(resolve => { process.stdin.once('data', () => resolve()); });
+    // 动态轮询扫描登录结果：周期读取当前页，登录墙消失且出现登录态 cookie 即视为登录成功
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      this._touchActivity();
+      const loggedIn = await this._detectLoginOnCurrentPage(opts.loginCookieNames);
+      if (loggedIn) {
+        // 检查到登录后动态保存 cookie
+        await this.saveCookies(domain);
+        this._resetIdleTimeout();
+        console.log(`[BrowserInstance] Login detected, cookies saved for ${domain}`);
+        return true;
+      }
+      await this.page.waitForTimeout(pollMs);
+    }
     
-    // 保存登录状态
-    await this.saveCookies(domain);
+    console.log(`[BrowserInstance] Login timeout after ${timeoutMs}ms, no login detected`);
     this._resetIdleTimeout();
-    console.log(`[BrowserInstance] Login successful, cookies saved`);
-    
-    return true;
+    return false;
+  }
+  
+  // 只读当前页检测登录状态（不导航），页面导航/加载中返回 false 继续轮询
+  // 判定：页面有内容 + 无登录墙 + 存在登录态 cookie（web_session 系列），三者缺一不可，
+  // 避免"匿名页无登录墙文案"被误判为登录成功
+  async _detectLoginOnCurrentPage(loginCookieNames = ['web_session', 'web_session_available']) {
+    if (!this.page || this.closed) return false;
+    try {
+      const bodyText = await this.page.evaluate(() => document.body?.innerText || '');
+      // 页面为空/加载失败 -> 未登录（安全默认）
+      if (!bodyText.trim()) return false;
+      // 有登录墙 -> 未登录
+      if (BrowserInstance.hasLoginPrompt(bodyText)) return false;
+      // 无登录墙：用登录态 cookie 二次确认（匿名页无 web_session 不算登录）
+      const cookies = await this._browser?.contexts()[0]?.cookies() || [];
+      return cookies.some(c => loginCookieNames.includes(c.name));
+    } catch {
+      return false;
+    }
   }
   
   async launch() {
@@ -283,6 +325,8 @@ export class BrowserInstance {
       headless: this.config.headless ?? true,
       viewport: null,
       screen: null,
+      fonts: BrowserInstance.CJK_FONTS,
+      locale: BrowserInstance.DEFAULT_LOCALE,
     });
     
     this.page = await this._browser.newPage();

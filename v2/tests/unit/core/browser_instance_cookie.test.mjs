@@ -150,3 +150,42 @@ test('loadCookies falls back to .txt Netscape format', async () => {
   bi._browser = null;
   bi.close();
 });
+
+// ---- 登录检测（launchWithLogin 轮询判定复用同一锚点）----
+
+test('hasLoginPrompt detects login-wall anchors', () => {
+  assert.equal(BrowserInstance.hasLoginPrompt('手机号登录'), true);
+  assert.equal(BrowserInstance.hasLoginPrompt('获取验证码'), true);
+  assert.equal(BrowserInstance.hasLoginPrompt('扫码登录'), true);
+  assert.equal(BrowserInstance.hasLoginPrompt('登录后推荐更懂你的笔记'), true);
+  assert.equal(BrowserInstance.hasLoginPrompt('创作中心 我的 消息 首页 发现'), false, 'logged-in nav must not trigger');
+  assert.equal(BrowserInstance.hasLoginPrompt(''), false);
+});
+
+test('_detectLoginOnCurrentPage: login-wall page -> false, logged-in page -> true', async () => {
+  const bi = new BrowserInstance({ profile: 'test-p9' });
+  // 未登录：登录墙文案
+  bi.page = { evaluate: async () => '登录后推荐更懂你的笔记\n手机号登录\n获取验证码\n登录' };
+  bi._browser = { contexts: () => [{ cookies: async () => [] }] };
+  assert.equal(await bi._detectLoginOnCurrentPage(), false);
+  // 无登录墙但无登录态 cookie（匿名页，如风控/跳转页）：不能算登录
+  bi.page = { evaluate: async () => '首页 发现 创作中心 我的 消息 推荐笔记内容...' };
+  bi._browser = { contexts: () => [{ cookies: async () => [{ name: 'webId', value: 'x' }] }] };
+  assert.equal(await bi._detectLoginOnCurrentPage(), false, 'anonymous cookies must not count as logged in');
+  // 已登录：无登录墙 + 登录态 cookie web_session
+  bi._browser = { contexts: () => [{ cookies: async () => [{ name: 'web_session', value: 'abc' }] }] };
+  assert.equal(await bi._detectLoginOnCurrentPage(), true);
+  // web_session_available 同样视为登录态
+  bi._browser = { contexts: () => [{ cookies: async () => [{ name: 'web_session_available', value: '1' }] }] };
+  assert.equal(await bi._detectLoginOnCurrentPage(), true);
+  // 页面为空（加载失败/跳转中）：安全判 false
+  bi.page = { evaluate: async () => '' };
+  assert.equal(await bi._detectLoginOnCurrentPage(), false);
+  // evaluate 抛错（导航中断）：安全判 false
+  bi.page = { evaluate: async () => { throw new Error('nav interrupted'); } };
+  assert.equal(await bi._detectLoginOnCurrentPage(), false);
+  // 实例已关闭：false
+  bi.close();
+  bi.page = { evaluate: async () => 'x' };
+  assert.equal(await bi._detectLoginOnCurrentPage(), false);
+});
