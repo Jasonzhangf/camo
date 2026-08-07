@@ -162,6 +162,42 @@ test('hasLoginPrompt detects login-wall anchors', () => {
   assert.equal(BrowserInstance.hasLoginPrompt(''), false);
 });
 
+test('_saveAllCookies groups by normalized domain and writes files', async () => {
+  const bi = new BrowserInstance({ profile: 'test-p10' });
+  const allCookies = [
+    { name: 'x1', value: 'a', domain: '.xiaohongshu.com', path: '/' },
+    { name: 'x2', value: 'b', domain: 'www.xiaohongshu.com', path: '/' },
+    { name: 'o1', value: 'c', domain: '.example.org', path: '/' },
+    { name: 'nod', value: 'd', path: '/' }, // 无 domain：跳过
+  ];
+  bi._browser = { contexts: () => [{ cookies: async () => allCookies }] };
+  await bi._saveAllCookies();
+  const xhs = JSON.parse(fs.readFileSync(bi.getCookiePath('xiaohongshu.com'), 'utf8'));
+  const org = JSON.parse(fs.readFileSync(bi.getCookiePath('example.org'), 'utf8'));
+  assert.equal(xhs.length, 2, 'xiaohongshu cookies grouped (leading dot + www)');
+  assert.equal(org.length, 1);
+  assert.equal(fs.existsSync(bi.getCookiePath('nod')), false, 'domain-less cookie skipped');
+  // stopAutoSave 无副作用（未启动定时器时）
+  bi.stopAutoSave();
+  bi._browser = null;
+  bi.close();
+});
+
+test('autoSave timer stops on close and unrefs', async () => {
+  const bi = new BrowserInstance({ profile: 'test-p11' });
+  let calls = 0;
+  bi._browser = { contexts: () => [{ cookies: async () => [] }] };
+  bi._saveAllCookies = async () => { calls++; };
+  bi.startAutoSave(30);
+  assert.ok(bi._autoSaveTimer, 'timer started');
+  await new Promise(r => setTimeout(r, 80));
+  assert.ok(calls > 0, 'periodic save invoked');
+  await bi.close();
+  assert.equal(bi._autoSaveTimer, null, 'timer cleared on close');
+  const before = calls;
+  await new Promise(r => setTimeout(r, 70));
+  assert.equal(calls, before, 'no saves after close');
+});
 test('_detectLoginOnCurrentPage: login-wall page -> false, logged-in page -> true', async () => {
   const bi = new BrowserInstance({ profile: 'test-p9' });
   // 未登录：登录墙文案

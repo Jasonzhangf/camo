@@ -11,7 +11,7 @@ const PROFILE_LOCK_DIR = path.join(process.env.HOME || '/tmp', '.camo', 'profile
 
 // Profile 多 runtime 锁 - 每 profile 最多 MAX_RUNTIMES 个 runtime
 const MAX_RUNTIMES_PER_PROFILE = 2;
-const IDLE_TIMEOUT_MS = 30 * 60 * 1000;  // 30 分钟无操作自杀
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000;  // 15 分钟无操作自动关闭
 
 // 获取当前 profile 的活跃 runtime 列表
 function getActiveRuntimes(profile) {
@@ -111,10 +111,55 @@ export class BrowserInstance {
     this.closed = false;
     this._profileLockFile = null;
     this._idleTimeout = null;
+    this._autoSaveTimer = null;
+    this._autoSaveIntervalMs = 60000;  // 常态化 cookie 保存间隔（默认 60s）
     
     // 获取 profile 槽位
     this._profileLockFile = acquireProfileSlot(this.config.profile, process.pid);
     this._resetIdleTimeout();
+  }
+  
+  // 常态化 cookie 保存：活跃期间周期性把当前会话所有域的 cookie 落盘，
+  // 与关闭无关（登录后持续保存，不依赖 close 时机）
+  startAutoSave(intervalMs = this._autoSaveIntervalMs) {
+    this._autoSaveIntervalMs = intervalMs;
+    this.stopAutoSave();
+    if (!this._browser) return;
+    this._autoSaveTimer = setInterval(() => { this._saveAllCookies(); }, intervalMs);
+    this._autoSaveTimer.unref?.();
+  }
+  
+  stopAutoSave() {
+    if (this._autoSaveTimer) {
+      clearInterval(this._autoSaveTimer);
+      this._autoSaveTimer = null;
+    }
+  }
+  
+  // 取注册域（最后两段）作为分组键：www.xiaohongshu.com 与 .xiaohongshu.com 归入 xiaohongshu.com
+  _registrableDomain(domain) {
+    const d = this._normalizeDomain(domain);
+    if (!d) return '';
+    const parts = d.split('.');
+    return parts.length > 2 ? parts.slice(-2).join('.') : d;
+  }
+  
+  // 全量保存：读取当前 context 全部 cookies，按注册域分组写入对应文件
+  async _saveAllCookies() {
+    if (!this._browser || this.closed) return;
+    try {
+      const all = await this._browser.contexts()[0]?.cookies() || [];
+      const byDomain = new Map();
+      for (const c of all) {
+        const d = this._registrableDomain(c.domain);
+        if (!d) continue;
+        if (!byDomain.has(d)) byDomain.set(d, []);
+        byDomain.get(d).push(c);
+      }
+      for (const [d, cookies] of byDomain) {
+        fs.writeFileSync(this.getCookiePath(d), JSON.stringify(cookies, null, 2));
+      }
+    } catch {}
   }
   
   _resetIdleTimeout() {
@@ -123,6 +168,7 @@ export class BrowserInstance {
       console.log(`[BrowserInstance] Idle timeout (${IDLE_TIMEOUT_MS}ms), killing runtime...`);
       this.close();
     }, IDLE_TIMEOUT_MS);
+    this._idleTimeout.unref?.();  // 不阻止进程正常退出
   }
   
   _touchActivity() {
@@ -274,6 +320,7 @@ export class BrowserInstance {
     });
     this.page = await this._browser.newPage();
     this.setupHandlers();
+    this.startAutoSave();
     
     await this.page.goto(loginUrl, { timeout: 60000 });
     
@@ -331,6 +378,7 @@ export class BrowserInstance {
     
     this.page = await this._browser.newPage();
     this.setupHandlers();
+    this.startAutoSave();
   }
   
   setupHandlers() {
@@ -379,6 +427,7 @@ export class BrowserInstance {
   async close() {
     // 无条件置位：即使从未 launch，实例也不可再被 ensureReady 复活
     this.closed = true;
+    this.stopAutoSave();
     if (this._idleTimeout) {
       clearTimeout(this._idleTimeout);
       this._idleTimeout = null;
