@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  playwright-core: 1.60.0
+
 importers:
 
   .:
@@ -342,9 +345,9 @@ packages:
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
-  playwright-core@1.62.1:
-    resolution: {integrity: sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==}
-    engines: {node: '>=20'}
+  playwright-core@1.60.0:
+    resolution: {integrity: sha512-9bW6zvX/m0lEbgTKJ6YppOKx8H3VOPBMOCFh2irXFOT4BbHgrx5hPjwJYLT40Lu+4qtD36qKc/Hn56StUW57IA==}
+    engines: {node: '>=18'}
     hasBin: true
 
   pngjs@7.0.0:
@@ -595,7 +598,7 @@ snapshots:
       js-yaml: 4.3.1
       language-tags: 2.1.0
       maxmind: 4.3.29
-      playwright-core: 1.62.1
+      playwright-core: 1.60.0
       progress: 2.0.3
       sql.js: 1.14.1
       typescript: 5.9.3
@@ -788,7 +791,7 @@ snapshots:
 
   picocolors@1.1.1: {}
 
-  playwright-core@1.62.1: {}
+  playwright-core@1.60.0: {}
 
   pngjs@7.0.0: {}
 

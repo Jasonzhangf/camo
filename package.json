@@ -17,9 +17,9 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check:file-size": "node scripts/check-file-size.mjs",
-    "test": "node --test 'v2/tests/unit/**/*.test.mjs' && node --test 'v2/tests/smoke/**/*.test.mjs'",
-    "test:v2": "node --test 'v2/tests/unit/**/*.test.mjs'",
-    "test:smoke": "node --test 'v2/tests/smoke/**/*.test.mjs'",
+    "test": "CAMO_PKG_ROOT=$PWD node --test \"v2/tests/unit/**/*.test.mjs\" && CAMO_PKG_ROOT=$PWD node --test \"v2/tests/smoke/**/*.test.mjs\"",
+    "test:v2": "CAMO_PKG_ROOT=$PWD node --test \"v2/tests/unit/**/*.test.mjs\"",
+    "test:smoke": "CAMO_PKG_ROOT=$PWD node --test \"v2/tests/smoke/**/*.test.mjs\"",
     "test:e2e": "node --test 'v2/tests/e2e/**/*.test.mjs'",
     "test:all": "node --test 'v2/tests/unit/**/*.test.mjs' && node --test 'v2/tests/smoke/**/*.test.mjs' && node --test 'v2/tests/integration/**/*.test.mjs' && node --test 'v2/tests/e2e/**/*.test.mjs'",
     "gates": "cd v2 && node gates/run-all.mjs --strict",
@@ -41,6 +41,11 @@
   },
   "peerDependencies": {
     "camoufox": "^0.1.19"
+  },
+  "pnpm": {
+    "overrides": {
+      "playwright-core": "1.60.0"
+    }
   },
   "devDependencies": {
     "c8": "^10.1.3"

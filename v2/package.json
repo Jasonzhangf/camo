@@ -20,7 +20,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "camoufox": "^0.1.19"
+    "camoufox": "^0.1.19",
+    "playwright-core": "1.60.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "playwright-core": "1.60.0"
+    }
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
