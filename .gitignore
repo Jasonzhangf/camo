@@ -32,3 +32,10 @@ temp/
 *.bak
 *.syntax-error
 
+
+# pnpm local store cache
+.pnpm-store/
+
+# reasonix tool state
+.reasonix/
+reasonix.toml
