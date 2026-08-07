@@ -403,8 +403,6 @@ registry (16 with per-resource gates, +registry integrity).
 - iXHS-host detector, autoscript provider stub → no longer needed
   (legacy code paths were the only consumers; service layer in
   v2/services/autoscript/ handles validation directly).
-- legacy-app repo (per AGENTS.md section 5) is unaffected by these
-  changes; camo only ships v2/.
 
 ## 2026-07-29 Stage 6 review — blocking findings
 
