@@ -46,6 +46,7 @@ async function checkCamoufoxHealth() {
     const result = spawnSync(process.execPath, ['-e', testScript], {
       stdio: 'pipe',
       timeout: 30000,
+      cwd: process.env.CAMO_PKG_ROOT || process.cwd(),
     });
     if (result.status === 0) {
       return { ok: true };

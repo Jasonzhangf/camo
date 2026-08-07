@@ -13,18 +13,21 @@
 
 import { spawn } from 'node:child_process';
 import path from 'node:path';
-import url from 'node:url';
 import fs from 'node:fs';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { dispatch, usage } from '../cli/dispatch.mjs';
 import { isCamoError, toWire } from '../../contracts/error_envelope/projector.mjs';
 import { loadConfig } from '../config/loader.mjs';
 import { findActiveDaemon } from '../config/daemon_finder.mjs';
 import { checkCamoufoxHealth, ensureCamoufox } from '../camoufox_health.mjs';
 
-
-const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
-const DAEMON_SCRIPT = path.resolve(__dirname, '..', 'daemon', 'index.mjs');
+// PKG_ROOT is set by the bin/camo.mjs entry shim via CAMO_PKG_ROOT env var;
+// fallback 到本文件位置向上推导（bin_entry -> shell -> v2 -> 仓库根），
+// 保证直接 node 启动本文件也能解析资源路径。
+const PKG_ROOT = process.env.CAMO_PKG_ROOT
+  || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const DAEMON_SCRIPT = path.join(PKG_ROOT, 'v2', 'shell', 'daemon', 'index.mjs');
 const DAEMON_DIR = path.join(os.homedir(), '.camo', 'daemon');
 
 function makeWsTransport(url) {
@@ -60,14 +63,8 @@ const NO_TRANSPORT_CMDS = new Set([
     'list-profiles', 'remove-profile', 'clean', 'init',
     'search',
   ]);
-// `daemon` is a process-level control command; it spawns the daemon itself
-// rather than talking to one. Skip the daemon-finder path for it.
 const PROCESS_ONLY_CMDS = new Set(['daemon']);
 
-/**
- * Wait for daemon to be ready by polling ~/.camo/daemon/ directory.
- * Returns the daemon registration or throws.
- */
 async function waitForDaemon(profile, timeoutMs = 15000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -78,10 +75,6 @@ async function waitForDaemon(profile, timeoutMs = 15000) {
   throw Object.assign(new Error('Daemon did not start within timeout'), { code: 'E_DAEMON_NOT_FOUND' });
 }
 
-/**
- * Auto-start a daemon process.
- * Returns the daemon's wsUrl once ready.
- */
 async function startDaemon(profile, mode) {
   const args = [];
   if (profile && !profile.startsWith('_ephemeral_')) {
@@ -96,7 +89,6 @@ async function startDaemon(profile, mode) {
     env: { ...process.env, CAMO_WS_PORT: '0', CAMO_HTTP_PORT: '0' },
   });
 
-  // Capture stderr for diagnostics
   let stderr = '';
   child.stderr.on('data', (chunk) => { stderr += String(chunk); });
 
@@ -111,7 +103,6 @@ async function startDaemon(profile, mode) {
     const daemon = await waitForDaemon(profile);
     return { wsUrl: `ws://localhost:${daemon.wsPort}`, daemon, child };
   } catch (err) {
-    // If daemon died, surface its stderr
     if (stderr) console.error(stderr);
     throw err;
   }
@@ -119,11 +110,22 @@ async function startDaemon(profile, mode) {
 
 async function main(argv) {
   const args = argv.slice(2);
-
-  // Load config (file + env + CLI overrides)
   const config = loadConfig({});
 
-  // help / doctor / usage bypass transport
+  // handle --version specially
+  if (args.includes('--version') || args.includes('-v')) {
+    const pkgRoot = PKG_ROOT;
+    const pkgFile = path.join(pkgRoot, 'package.json');
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
+      process.stdout.write(pkg.version + '\n');
+      return 0;
+    } catch {
+      process.stdout.write('0.0.0\n');
+      return 0;
+    }
+  }
+
   const hasHelpFlag = args.includes('--help') || args.includes('-h');
   const isBrowserCmd = args.length > 0 && !hasHelpFlag && (
     ['goto', 'click', 'type', 'scroll', 'screenshot', 'get-page-info', 'get-cookies', 
@@ -132,7 +134,6 @@ async function main(argv) {
      'new-tab', 'close-tab', 'list-tabs', 'set-viewport', 'set-user-agent', 'start'].includes(args[0])
   );
   
-  // Auto-check Camoufox for browser commands
   if (isBrowserCmd) {
     const health = await checkCamoufoxHealth();
     if (!health.ok) {
@@ -152,8 +153,6 @@ async function main(argv) {
     && !PROCESS_ONLY_CMDS.has(args[0]);
   
   const processOnly = PROCESS_ONLY_CMDS.has(args[0]);
-  // For process-only commands (e.g. `daemon`), dispatch with a null
-  // transport and a processOnly flag so the dispatcher lets it through.
   if (!needsTransport || processOnly) {
     try {
       const out = await dispatch(args, { transport: null, config, processOnly });
@@ -183,7 +182,6 @@ async function main(argv) {
     }
   }
 
-  // Determine profile from args
   let profile = config.profile;
   let isEphemeral = true;
   for (let i = 0; i < args.length; i++) {
@@ -198,18 +196,13 @@ async function main(argv) {
   }
   if (isEphemeral && !profile) profile = `_ephemeral_${process.pid}_${Date.now()}`;
 
-  // CLI never silently auto-starts a daemon. This is a single-execution CLI.
-  // Users wanting a shared daemon must run `camo daemon start` separately.
-  // We deliberately do NOT fall back to spawning one here (per hard guard 3).
   let transport;
   let daemonChild = null;
   
-  // First check if there's already a daemon running for this profile.
   const existing = findActiveDaemon({ profile, ephemeral: isEphemeral });
   if (existing) {
     transport = makeWsTransport(`ws://localhost:${existing.wsPort}`);
   } else if (process.env.CAMO_AUTOSTART === '1') {
-    // Auto-start daemon if CAMO_AUTOSTART is set
     const daemon = await startDaemon(profile, isEphemeral ? 'ephemeral' : 'persistent');
     transport = makeWsTransport(daemon.wsUrl);
   } else {
@@ -239,14 +232,11 @@ async function main(argv) {
     process.stderr.write('camo: internal error: ' + (cause && cause.message || String(cause)) + '\n');
     return 3;
   } finally {
-    // For ephemeral mode, send shutdown to daemon
     if (isEphemeral && daemonChild) {
-      // Give daemon a moment to finish processing
       setTimeout(() => {
         try { daemonChild.kill('SIGTERM'); }
         catch (cause) {
-          process.stderr.write(`camo: failed to terminate daemon ${daemonChild.pid}: ${cause?.message || cause}
-`);
+          process.stderr.write(`camo: failed to terminate daemon ${daemonChild.pid}: ${cause?.message || cause}\n`);
         }
       }, 500);
     }

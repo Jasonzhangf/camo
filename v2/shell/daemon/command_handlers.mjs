@@ -141,7 +141,7 @@ export async function handleCommand(cmd, args, ctx) {
     case 'get-cookies': {
       const getCookies = await importOp('getCookies');
       const r = await getCookies({ profileId: profile });
-      return { ok: true, cookies: r.cookies };
+      return { ok: true, count: r.count, cookies: r.cookies };
     }
 
     case 'get-page-info': {
@@ -189,7 +189,7 @@ export async function handleCommand(cmd, args, ctx) {
     case 'set-cookies': {
       const setCookies = await importOp('setCookies');
       const r = await setCookies({ profileId: profile, cookies: args.cookies });
-      return { ok: true, cookiesSet: true, count: r.count };
+      return { ok: true, count: r.count, set: r.set };
     }
 
     case 'set-user-agent': {
@@ -229,7 +229,7 @@ export async function handleCommand(cmd, args, ctx) {
     default:
       throw new CamoError({
         code: 'E_PROTO_NO_HANDLER',
-        details: { cmd, known: ['start', 'stop', 'close-tab', 'daemon', 'fetch-page', 'find-elements', 'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'hover', 'list-tabs', 'new-tab', 'scroll-and-collect', 'set-cookies', 'set-user-agent', 'set-viewport', 'wait-dom-stable', ...browserCmds, '''search'''] }
+        details: { cmd, known: ['start', 'stop', 'close-tab', 'daemon', 'fetch-page', 'find-elements', 'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'hover', 'list-tabs', 'new-tab', 'scroll-and-collect', 'set-cookies', 'set-user-agent', 'set-viewport', 'wait-dom-stable', ...browserCmds, 'search'] }
       });
   }
 }

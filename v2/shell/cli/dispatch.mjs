@@ -24,8 +24,11 @@ function toCamelCase(s) {
   return s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 }
 
-const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
-const DOC_DIR = path.resolve(__dirname, '../../commands/docstrings');
+// PKG_ROOT 由 bin/camo.mjs shim 通过 CAMO_PKG_ROOT 注入；直接 node 启动时
+// 用本文件位置推导（cli -> shell -> v2 -> 仓库根）。
+const PKG_ROOT = process.env.CAMO_PKG_ROOT
+  || path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '..', '..', '..');
+const DOC_DIR = path.resolve(PKG_ROOT, 'v2', 'commands', 'docstrings');
 
 function readDocstring(cmd) {
   const file = path.join(DOC_DIR, cmd + '.md');

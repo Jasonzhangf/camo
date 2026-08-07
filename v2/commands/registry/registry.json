@@ -483,7 +483,7 @@
             "doc": "profile id"
           },
           "maxLength": {
-            "type": "number",
+            "type": "integer",
             "min": 100,
             "required": false,
             "doc": "max text length (default 50000)"
@@ -527,7 +527,7 @@
             "doc": "profile id"
           },
           "tabId": {
-            "type": "number",
+            "type": "integer",
             "min": 0,
             "required": true,
             "doc": "tab index to close"
@@ -625,13 +625,13 @@
             "doc": "profile id"
           },
           "width": {
-            "type": "number",
+            "type": "integer",
             "min": 320,
             "required": true,
             "doc": "viewport width in px"
           },
           "height": {
-            "type": "number",
+            "type": "integer",
             "min": 240,
             "required": true,
             "doc": "viewport height in px"
@@ -653,13 +653,13 @@
             "doc": "profile id"
           },
           "timeout": {
-            "type": "number",
+            "type": "integer",
             "min": 100,
             "required": false,
             "doc": "timeout ms (default 5000)"
           },
           "poll": {
-            "type": "number",
+            "type": "integer",
             "min": 100,
             "required": false,
             "doc": "poll interval ms (default 500)"
@@ -686,7 +686,7 @@
             "doc": "path to cookie file"
           },
           "max-results": {
-            "type": "number",
+            "type": "integer",
             "min": 1,
             "required": false,
             "doc": "max results to return"
@@ -721,13 +721,13 @@
             "doc": "profile id"
           },
           "scrollCount": {
-            "type": "number",
+            "type": "integer",
             "min": 1,
             "required": false,
             "doc": "number of scrolls (default 5)"
           },
           "delay": {
-            "type": "number",
+            "type": "integer",
             "min": 100,
             "required": false,
             "doc": "delay between scrolls ms (default 1000)"
@@ -749,7 +749,7 @@
             "doc": "profile id"
           },
           "timeout": {
-            "type": "number",
+            "type": "integer",
             "min": 1000,
             "required": false,
             "doc": "timeout ms (default 30000)"

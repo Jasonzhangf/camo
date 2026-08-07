@@ -1,25 +1,19 @@
 // camo v2 command registry. Module id=commands.registry.
-//
-// Single owner for the cmd_id -> metadata table. Reads registry.json
-// once at boot, caches it in-memory. Hot-reload is intentionally not
-// supported (one source of truth; restart to add commands).
-//
-// Hard guards:
-//   - No fallback for unknown cmd ids. look throws E_PROTO_NO_HANDLER.
-//   - The returned spec is a frozen copy so callers cannot mutate it.
 
 import fs from 'node:fs';
 import path from 'node:path';
-import url from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { CamoError } from '../../contracts/error_envelope/projector.mjs';
 import { COMMAND_IDS } from '../../protocol/versions/v1.mjs';
 
-const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
+// PKG_ROOT 由 bin/camo.mjs shim 注入；直接 node 启动时用本文件位置推导
+const PKG_ROOT = process.env.CAMO_PKG_ROOT
+  || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 let _cache = null;
 
 function loadFile() {
-  const file = path.join(__dirname, 'registry.json');
+  const file = path.join(PKG_ROOT, 'v2', 'commands', 'registry', 'registry.json');
   let raw;
   try { raw = JSON.parse(fs.readFileSync(file, 'utf8')); }
   catch (cause) {
@@ -65,7 +59,6 @@ function ensureLoaded() {
   return _cache;
 }
 
-// Test seam: allow forcing a reload after registry.json changes.
 export function __enableTestRoot() { _cache = null; }
 export function __resetForTest() { _cache = null; }
 
