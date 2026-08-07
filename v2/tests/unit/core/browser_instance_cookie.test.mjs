@@ -198,6 +198,21 @@ test('autoSave timer stops on close and unrefs', async () => {
   await new Promise(r => setTimeout(r, 70));
   assert.equal(calls, before, 'no saves after close');
 });
+test('_context supports both Browser and persistent BrowserContext', () => {
+  const bi = new BrowserInstance({ profile: 'test-p12' });
+  // 临时 profile：Browser 形态（有 contexts()）
+  bi._browser = { contexts: () => [{ name: 'ctx0' }] };
+  assert.equal(bi._context().name, 'ctx0');
+  // 持久化 data_dir：BrowserContext 形态（无 contexts()，自身即 context）
+  bi._browser = { name: 'persistent' };
+  assert.equal(bi._context().name, 'persistent');
+  // 无浏览器：null
+  bi._browser = null;
+  assert.equal(bi._context(), null);
+  // 持久化数据目录按 profile 定位
+  assert.ok(bi._profileDataDir().endsWith(path.join('test-p12', 'browser-data')));
+  bi.close();
+});
 test('_detectLoginOnCurrentPage: login-wall page -> false, logged-in page -> true', async () => {
   const bi = new BrowserInstance({ profile: 'test-p9' });
   // 未登录：登录墙文案

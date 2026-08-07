@@ -3,9 +3,9 @@ import { CamoError } from '../../contracts/error_envelope/projector.mjs';
 import { sendCommand } from '../../transports/client/api.mjs';
 export const cmd = 'hover';
 function safeProfile(profileId) {
-  const id = String(profileId || '').trim();
+  const id = String(profileId || 'default').trim();
   if (!id) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'profileId' } });
-  if (!/^[a-zA-Z0-9._-]+$/.test(id)) throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'profileId', value: id } });
+  if (!/^[a-zA-Z0-9_-]+$/.test(id)) throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'profileId', value: id } });
   return id;
 }
 export async function run(transport, parsed = {}, ctx = {}) {

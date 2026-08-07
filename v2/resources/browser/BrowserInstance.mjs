@@ -8,6 +8,8 @@ const path = require('path');
 const COOKIE_DIR = path.join(process.env.HOME || '/tmp', '.camo', 'cookies');
 const LOCK_DIR = path.join(process.env.HOME || '/tmp', '.camo', 'locks');
 const PROFILE_LOCK_DIR = path.join(process.env.HOME || '/tmp', '.camo', 'profile-locks');
+// 持久化浏览器数据目录：localStorage/cookie/指纹随 profile 保留，登录态可跨实例恢复
+const PROFILE_DATA_DIR = path.join(process.env.HOME || '/tmp', '.camo', 'profiles');
 
 // Profile 多 runtime 锁 - 每 profile 最多 MAX_RUNTIMES 个 runtime
 const MAX_RUNTIMES_PER_PROFILE = 2;
@@ -148,7 +150,7 @@ export class BrowserInstance {
   async _saveAllCookies() {
     if (!this._browser || this.closed) return;
     try {
-      const all = await this._browser.contexts()[0]?.cookies() || [];
+      const all = await this._context()?.cookies() || [];
       const byDomain = new Map();
       for (const c of all) {
         const d = this._registrableDomain(c.domain);
@@ -175,6 +177,12 @@ export class BrowserInstance {
     // 仅刷新 profile 锁与 idle 计时，不动 _isLoading（由 navigate 管理加载状态）
     if (this._profileLockFile) touchProfileActivity(this._profileLockFile);
     this._resetIdleTimeout();
+  }
+  
+  // 兼容 Browser（临时 profile）与 BrowserContext（持久化 data_dir）两种启动方式
+  _context() {
+    if (!this._browser) return null;
+    return this._browser.contexts ? this._browser.contexts()[0] : this._browser;
   }
   
   getCookieDir() {
@@ -206,7 +214,7 @@ export class BrowserInstance {
     const target = this._normalizeDomain(domain);
     if (!target) return;
     // 只保存属于该 domain 的 cookies（含子域），文件名与内容一致
-    const allCookies = await this._browser.contexts()[0]?.cookies() || [];
+    const allCookies = await this._context()?.cookies() || [];
     const cookies = allCookies.filter(c => this._cookieMatchesDomain(c.domain, target));
     const p = this.getCookiePath(target);
     if (cookies.length === 0) {
@@ -240,7 +248,7 @@ export class BrowserInstance {
     }
     
     if (cookies && cookies.length > 0 && this._browser) {
-      const ctx = this._browser.contexts()[0];
+      const ctx = this._context();
       if (ctx) {
         // 修正 domain 格式（缺 domain 字段的 cookie 跳过，避免 addCookies 崩溃）
         const fixed = cookies
@@ -312,15 +320,20 @@ export class BrowserInstance {
     // 登录流程可能远超 idle 超时，期间禁用 idle 自杀，结束后恢复
     if (this._idleTimeout) clearTimeout(this._idleTimeout);
     
-    this._browser = await Camoufox({
-      headless: false,
-      viewport: null,
-      fonts: BrowserInstance.CJK_FONTS,
-      locale: BrowserInstance.DEFAULT_LOCALE,
-    });
-    this.page = await this._browser.newPage();
-    this.setupHandlers();
-    this.startAutoSave();
+    // 复用已有实例（持久化 data_dir 同一 profile 只允许一个实例，重复创建会触发
+    // Firefox profile 锁冲突导致启动失败）；无实例时才创建
+    if (!this._browser || !this.page) {
+      this._browser = await Camoufox({
+        headless: false,
+        viewport: null,
+        fonts: BrowserInstance.CJK_FONTS,
+        locale: BrowserInstance.DEFAULT_LOCALE,
+        data_dir: this._profileDataDir(),
+      });
+      this.page = await this._browser.newPage();
+      this.setupHandlers();
+      this.startAutoSave();
+    }
     
     await this.page.goto(loginUrl, { timeout: 60000 });
     
@@ -358,11 +371,16 @@ export class BrowserInstance {
       // 有登录墙 -> 未登录
       if (BrowserInstance.hasLoginPrompt(bodyText)) return false;
       // 无登录墙：用登录态 cookie 二次确认（匿名页无 web_session 不算登录）
-      const cookies = await this._browser?.contexts()[0]?.cookies() || [];
+      const cookies = await this._context()?.cookies() || [];
       return cookies.some(c => loginCookieNames.includes(c.name));
     } catch {
       return false;
     }
+  }
+  
+  // 持久化启动：data_dir 固定到 profile 目录，localStorage/指纹跨实例保留
+  _profileDataDir() {
+    return path.join(PROFILE_DATA_DIR, this.config.profile, 'browser-data');
   }
   
   async launch() {
@@ -374,6 +392,7 @@ export class BrowserInstance {
       screen: null,
       fonts: BrowserInstance.CJK_FONTS,
       locale: BrowserInstance.DEFAULT_LOCALE,
+      data_dir: this._profileDataDir(),
     });
     
     this.page = await this._browser.newPage();
@@ -411,8 +430,8 @@ export class BrowserInstance {
   async getText(selector) { await this.ensureReady(); this._touchActivity(); return selector ? await this.page.locator(selector).textContent() || '' : await this.page.textContent('body') || ''; }
   async scroll(direction, amount = 500) { await this.ensureReady(); this._touchActivity(); const deltaY = direction === 'down' ? amount : -amount; await this.page.evaluate((dy) => { window.scrollBy(0, dy); }, deltaY); }
   async executeJS(script) { await this.ensureReady(); this._touchActivity(); return await this.page.evaluate(script); }
-  async getCookies() { await this.ensureReady(); this._touchActivity(); return await this._browser.contexts()[0]?.cookies() || []; }
-  async setCookies(cookies) { await this.ensureReady(); this._touchActivity(); if (cookies) { const ctx = this._browser.contexts()[0]; if (ctx) await ctx.addCookies(cookies); } }
+  async getCookies() { await this.ensureReady(); this._touchActivity(); return await this._context()?.cookies() || []; }
+  async setCookies(cookies) { await this.ensureReady(); this._touchActivity(); if (cookies) { const ctx = this._context(); if (ctx) await ctx.addCookies(cookies); } }
   async getReadable() { await this.ensureReady(); this._touchActivity(); return await this.page.evaluate(() => { const doc = document.cloneNode(true); doc.querySelectorAll('script, style, nav, footer, header, aside').forEach(el => el.remove()); return doc.body?.textContent?.trim() || ''; }); }
   async findElements(selector) { await this.ensureReady(); this._touchActivity(); const count = await this.page.locator(selector).count(); const results = []; for (let i = 0; i < Math.min(count, 100); i++) results.push(await this.page.locator(selector).nth(i).textContent() || ''); return results; }
   async hover(selector) { await this.ensureReady(); this._touchActivity(); await this.page.locator(selector).hover(); }

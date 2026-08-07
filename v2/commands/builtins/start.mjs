@@ -6,7 +6,7 @@
 // session lifecycle.
 //
 // Hard guards:
-//   - profile id must match [a-zA-Z0-9._-]+ (already checked by parser
+//   - profile id must match [a-zA-Z0-9_-]+ (already checked by parser
 //     when --profile was supplied; if --profile omitted we still
 //     normalise the env/default value).
 //   - No retry; no fallback. First failure is reported.
@@ -17,11 +17,11 @@ import { sendCommand } from '../../transports/client/api.mjs';
 export const cmd = 'start';
 
 function safeProfile(profileId) {
-  const id = String(profileId || '').trim();
+  const id = String(profileId || 'default').trim();
   if (!id) {
     throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'profileId' } });
   }
-  if (!/^[a-zA-Z0-9._-]+$/.test(id)) {
+  if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
     throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'profileId', value: id } });
   }
   return id;

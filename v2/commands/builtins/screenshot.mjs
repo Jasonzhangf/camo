@@ -10,11 +10,11 @@ import { tmpdir } from 'os';
 export const cmd = 'screenshot';
 
 function safeProfile(profileId) {
-  const id = String(profileId || '').trim();
+  const id = String(profileId || 'default').trim();
   if (!id) {
     throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'profileId' } });
   }
-  if (!/^[a-zA-Z0-9._-]+$/.test(id)) {
+  if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
     throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'profileId', value: id } });
   }
   return id;
