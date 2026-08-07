@@ -85,6 +85,9 @@ export class BrowserInstance {
   // 显式加载系统简体中文字体（按 fontconfig 识别的族名），并固定 zh-CN locale。
   static CJK_FONTS = ['Hiragino Sans GB', 'Heiti SC', 'Songti SC'];
   static DEFAULT_LOCALE = 'zh-CN';
+  // 启动窗口尺寸（宽, 高）：显式固定避免随机指纹尺寸/全屏（全屏窗口无可拖拽边缘），
+  // 窗口非最大化后可像普通浏览器一样用鼠标拖拽改变大小，viewport 随窗口动态跟随
+  static DEFAULT_WINDOW = [1440, 900];
   // 登录墙表单特征（未登录页面才会出现）——登录检测的唯一可靠锚点。
   // 注意：XHS 未登录时导航栏仍含"创作中心/我的/消息"，且登录墙文案为
   // "手机号登录/获取验证码"，不能作为已登录/未登录的判据。
@@ -326,6 +329,7 @@ export class BrowserInstance {
       this._browser = await Camoufox({
         headless: false,
         viewport: null,
+        window: BrowserInstance.DEFAULT_WINDOW,
         fonts: BrowserInstance.CJK_FONTS,
         locale: BrowserInstance.DEFAULT_LOCALE,
         data_dir: this._profileDataDir(),
@@ -388,6 +392,7 @@ export class BrowserInstance {
       headless: this.config.headless ?? true,
       viewport: null,
       screen: null,
+      window: BrowserInstance.DEFAULT_WINDOW,
       fonts: BrowserInstance.CJK_FONTS,
       locale: BrowserInstance.DEFAULT_LOCALE,
       data_dir: this._profileDataDir(),
