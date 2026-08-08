@@ -250,6 +250,21 @@
           "symbol": "scrollAndCollect"
         }
       ]
+    },
+    {
+      "id": "search.platform.execute",
+      "status": "active",
+      "owner_module": "services.search",
+      "entry_symbols": [
+        {
+          "path": "v2/services/search/SearchEngine.mjs",
+          "symbol": "search"
+        },
+        {
+          "path": "v2/services/search/platforms/XHSSearch.mjs",
+          "symbol": "search"
+        }
+      ]
     }
   ]
 }

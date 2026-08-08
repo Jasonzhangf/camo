@@ -3,6 +3,20 @@
 import { SearchPlatform } from '../SearchEngine.mjs';
 import { BrowserInstance } from '../../../resources/browser/BrowserInstance.mjs';
 
+// 解析小红书卡片点赞数：支持 "295" / "1.2万" / "1.5亿" 中文单位。
+// 作为模块级唯一实现，注入页面脚本内联同一源码，测试也直接锁定本函数。
+export function parseLikeCount(raw) {
+  if (!raw) return undefined;
+  const s = String(raw).trim();
+  const m = s.match(/^([0-9]+(?:\.[0-9]+)?)\s*(万|亿)?$/);
+  if (!m) return undefined;
+  const num = parseFloat(m[1]);
+  if (!Number.isFinite(num)) return undefined;
+  if (m[2] === '万') return Math.round(num * 10000);
+  if (m[2] === '亿') return Math.round(num * 100000000);
+  return Math.round(num);
+}
+
 export class XHSSearch extends SearchPlatform {
   constructor(config) { 
     super(config); 
@@ -12,7 +26,8 @@ export class XHSSearch extends SearchPlatform {
   
   async createBrowser() {
     // 社交媒体搜索默认使用有头模式以便登录
-    const headless = this.config.headless !== undefined ? this.config.headless : false;
+    const h = this.config.headless;
+    const headless = h === true || h === 'true';
     this.browser = new BrowserInstance({ 
       headless,
       profile: this.config.profile || 'default' 
@@ -92,12 +107,12 @@ export class XHSSearch extends SearchPlatform {
   
   async parseResultsFromPage(maxResults) {
     const script = `(function() {
+      ${parseLikeCount.toString()}
       const notes = [];
       const selectors = [
-        '[class*="discovery"] [class*="note"]',
         '.search-result .note-item',
-        '[class*="feeds"] [class*="item"]',
-        'section[class*="search"] [class*="item"]',
+        '.feeds-page .note-item',
+        '[class*="discovery"] [class*="note"]',
         '.feeds-container > div',
       ];
       
@@ -108,17 +123,24 @@ export class XHSSearch extends SearchPlatform {
       }
       
       elements.slice(0, ${maxResults}).forEach(el => {
-        const titleEl = el.querySelector('h1, h2, h3, [class*="title"], [class*="desc"]');
+        const titleEl = el.querySelector('.title');
         const title = titleEl ? titleEl.textContent.trim() : '';
         
-        const linkEl = el.querySelector('a[href*="/discovery/"]') || el.closest('a');
+        const linkEl = el.querySelector('a[href*="/search_result/"]') || el.querySelector('a[href^="/explore/"]') || el.closest('a');
         let url = linkEl ? linkEl.href : '';
         if (url && !url.startsWith('http')) url = 'https://www.xiaohongshu.com' + url;
         
-        const authorEl = el.querySelector('[class*="user"] [class*="name"]');
+        const authorEl = el.querySelector('.author .name');
         const author = authorEl ? authorEl.textContent.trim() : '';
         
-        if (title || url) notes.push({ title: title, url: url, author: author });
+        const timeEl = el.querySelector('.author .time');
+        const timestamp = timeEl ? timeEl.textContent.trim() : '';
+        
+        const likeEl = el.querySelector('.like-wrapper .count');
+        const likesRaw = likeEl ? likeEl.textContent.trim() : '';
+        const likes = parseLikeCount(likesRaw);
+        
+        if (title || url) notes.push({ title: title, url: url, author: author, timestamp: timestamp, likes: likes });
       });
       
       return notes;
@@ -131,6 +153,8 @@ export class XHSSearch extends SearchPlatform {
         title: r.title || '',
         url: r.url || '',
         author: r.author || '',
+        timestamp: r.timestamp || '',
+        likes: typeof r.likes === 'number' ? r.likes : undefined,
         platform: 'xhs',
       }));
     }

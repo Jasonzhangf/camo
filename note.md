@@ -458,3 +458,11 @@ Stage 8: dynamic ports and daemon discovery are present in source but live CLI v
 - 审计行为协议级：click/type/scroll 必须真实输入事件，禁 JS DOM 操作。
 - 已审 interaction_ops：click=locator.click(协议级OK), hover=locator.hover(OK), type=page.keyboard.type(OK), upload=setInputFiles(OK), **scroll=page.evaluate(window.scrollTo)=JS hack 违规**。需改 mouse.wheel 真实滚轮。
 - 补 switch-tab CLI 命令：camo 无切换 tab 命令，需加。
+
+## 2026-08-08 未移交代码审计 + 提交
+
+**审计发现（业务边界）**: services.search（XHSSearch/WeiboSearch）含 XHS/微博业务流程（parseLikeCount、卡片 selectors、cookie 注入策略），违反 AGENTS.md "camo 只承载通用能力，不承载业务编排与平台策略"。本次提交保留但显式记录，业务剥离是后续治理项。
+
+**测试 mock 闭环**: BrowserInstance.mjs 新增 _detectLoginOnCurrentPage 读 page.url() 做 loginPageHosts 守卫，单元测试 mock 缺 url() 抛错。补 mock 让 gate 320/320 全绿。
+
+**排除**: `.agent-collab/review/`、`_diag_weibo2.mjs` 不入仓。

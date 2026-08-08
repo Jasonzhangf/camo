@@ -108,6 +108,14 @@
       "status": "active"
     },
     {
+      "id": "services.search",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/services/search/**"
+      ],
+      "status": "active"
+    },
+    {
       "id": "services.subscription",
       "layer": "L2_service",
       "owned_paths": [

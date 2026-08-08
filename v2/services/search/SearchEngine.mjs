@@ -68,7 +68,10 @@ export class SearchEngine {
       return { success: false, results: [], totalCount: 0, pageURL: '', error: `Unknown platform: ${options.platform}` };
     }
     
-    const platform = new Platform({ profile: options.profile || 'default' });
+    const platform = new Platform({
+      profile: options.profile || 'default',
+      headless: options.headless,
+    });
     
     try {
       await platform.createBrowser();

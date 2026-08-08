@@ -216,11 +216,11 @@ test('_context supports both Browser and persistent BrowserContext', () => {
 test('_detectLoginOnCurrentPage: login-wall page -> false, logged-in page -> true', async () => {
   const bi = new BrowserInstance({ profile: 'test-p9' });
   // 未登录：登录墙文案
-  bi.page = { evaluate: async () => '登录后推荐更懂你的笔记\n手机号登录\n获取验证码\n登录' };
+  bi.page = { evaluate: async () => '登录后推荐更懂你的笔记\n手机号登录\n获取验证码\n登录', url: () => '' };
   bi._browser = { contexts: () => [{ cookies: async () => [] }] };
   assert.equal(await bi._detectLoginOnCurrentPage(), false);
   // 无登录墙但无登录态 cookie（匿名页，如风控/跳转页）：不能算登录
-  bi.page = { evaluate: async () => '首页 发现 创作中心 我的 消息 推荐笔记内容...' };
+  bi.page = { evaluate: async () => '首页 发现 创作中心 我的 消息 推荐笔记内容...', url: () => '' };
   bi._browser = { contexts: () => [{ cookies: async () => [{ name: 'webId', value: 'x' }] }] };
   assert.equal(await bi._detectLoginOnCurrentPage(), false, 'anonymous cookies must not count as logged in');
   // 已登录：无登录墙 + 登录态 cookie web_session
@@ -230,13 +230,13 @@ test('_detectLoginOnCurrentPage: login-wall page -> false, logged-in page -> tru
   bi._browser = { contexts: () => [{ cookies: async () => [{ name: 'web_session_available', value: '1' }] }] };
   assert.equal(await bi._detectLoginOnCurrentPage(), true);
   // 页面为空（加载失败/跳转中）：安全判 false
-  bi.page = { evaluate: async () => '' };
+  bi.page = { evaluate: async () => '', url: () => '' };
   assert.equal(await bi._detectLoginOnCurrentPage(), false);
   // evaluate 抛错（导航中断）：安全判 false
-  bi.page = { evaluate: async () => { throw new Error('nav interrupted'); } };
+  bi.page = { evaluate: async () => { throw new Error('nav interrupted'); }, url: () => '' };
   assert.equal(await bi._detectLoginOnCurrentPage(), false);
   // 实例已关闭：false
   bi.close();
-  bi.page = { evaluate: async () => 'x' };
+  bi.page = { evaluate: async () => 'x', url: () => '' };
   assert.equal(await bi._detectLoginOnCurrentPage(), false);
 });

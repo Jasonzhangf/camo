@@ -3,6 +3,7 @@
 
 import { getSearchEngine } from '../../../services/search/SearchEngine.mjs';
 import { XHSSearch } from '../../../services/search/platforms/XHSSearch.mjs';
+import { WeiboSearch } from '../../../services/search/platforms/WeiboSearch.mjs';
 import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,6 +43,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
   
   const engine = getSearchEngine();
   engine.registerPlatform('xhs', XHSSearch);
+  engine.registerPlatform('weibo', WeiboSearch);
   
   const result = await engine.search({
     platform,

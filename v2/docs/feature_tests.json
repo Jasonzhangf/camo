@@ -232,6 +232,16 @@
       "negative": [
         "v2/tests/unit/shell/cli.dispatch.test.mjs"
       ]
+    },
+    {
+      "id": "search.platform.execute",
+      "owner_resource": "browser_instance",
+      "positive": [
+        "v2/tests/unit/services/search.engine.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/services/search.engine.test.mjs"
+      ]
     }
   ]
 }

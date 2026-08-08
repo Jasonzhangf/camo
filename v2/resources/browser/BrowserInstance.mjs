@@ -313,6 +313,29 @@ export class BrowserInstance {
       this._touchActivity();
     }
   }
+
+  // 按平台登录态 cookie 判定是否已登录（通用能力）。
+  // 导航到 url 后，页面无登录墙文案且存在任一给定登录态 cookie 即视为已登录。
+  async hasSessionCookies(url, cookieNames = ['web_session', 'web_session_available']) {
+    if (!this.page) return false;
+    this._touchActivity();
+    try {
+      await this.page.goto(url, { timeout: 15000, waitUntil: 'domcontentloaded' });
+      await this.page.waitForTimeout(2000);
+      const bodyText = await this.page.evaluate(() => document.body?.innerText || '');
+      if (!bodyText.trim()) return false;
+      if (BrowserInstance.hasLoginPrompt(bodyText)) return false;
+      const cookies = await this._context()?.cookies() || [];
+      const hasSession = cookies.some(c => cookieNames.includes(c.name));
+      console.log(`[BrowserInstance] Session cookie check: ${hasSession ? 'LOGGED_IN' : 'NOT_LOGGED_IN'}`);
+      return hasSession;
+    } catch (err) {
+      console.log(`[BrowserInstance] Session cookie check failed: ${err.message}`);
+      return false;
+    } finally {
+      this._touchActivity();
+    }
+  }
   
   async launchWithLogin(domain, loginUrl, opts = {}) {
     const pollMs = opts.pollMs ?? 3000;
@@ -346,7 +369,7 @@ export class BrowserInstance {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       this._touchActivity();
-      const loggedIn = await this._detectLoginOnCurrentPage(opts.loginCookieNames);
+      const loggedIn = await this._detectLoginOnCurrentPage(opts.loginCookieNames, opts.loginPageHosts);
       if (loggedIn) {
         // 登录态由浏览器持久化 profile 自动写入，无需手动保存
         this._resetIdleTimeout();
@@ -364,9 +387,12 @@ export class BrowserInstance {
   // 只读当前页检测登录状态（不导航），页面导航/加载中返回 false 继续轮询
   // 判定：页面有内容 + 无登录墙 + 存在登录态 cookie（web_session 系列），三者缺一不可，
   // 避免"匿名页无登录墙文案"被误判为登录成功
-  async _detectLoginOnCurrentPage(loginCookieNames = ['web_session', 'web_session_available']) {
+  async _detectLoginOnCurrentPage(loginCookieNames = ['web_session', 'web_session_available'], loginPageHosts = []) {
     if (!this.page || this.closed) return false;
     try {
+      // 当前 URL 命中登录页域名 -> 仍在登录流程，未登录（避免残留 cookie 误判）
+      const cur = this.page.url() || '';
+      if (loginPageHosts.some(h => cur.includes(h))) return false;
       const bodyText = await this.page.evaluate(() => document.body?.innerText || '');
       // 页面为空/加载失败 -> 未登录（安全默认）
       if (!bodyText.trim()) return false;

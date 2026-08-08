@@ -9,7 +9,10 @@
     ".": "./dist/index.js",
     "./browser": "./dist/core/browser/index.js",
     "./resources": "./dist/resources/browser/index.js",
-    "./search": "./dist/services/search/index.js",
+    "./search": {
+      "types": "./services/search/index.d.ts",
+      "import": "./services/search/index.mjs"
+    },
     "./runtime": "./dist/runtime/index.js",
     "./monitoring": "./dist/monitoring/index.js"
   },

@@ -58,6 +58,12 @@
       "reason": "read profile defaults (read-only)"
     },
     {
+      "from": "commands.builtins",
+      "to": "services.search",
+      "kind": "call",
+      "reason": "search builtin runs platform search via SearchEngine"
+    },
+    {
       "from": "transports.client",
       "to": "transports.ws",
       "kind": "call",
@@ -206,6 +212,12 @@
       "to": "transports.daemon",
       "kind": "call",
       "reason": "fan out ws subscribers"
+    },
+    {
+      "from": "shell.daemon",
+      "to": "commands.builtins",
+      "kind": "call",
+      "reason": "daemon dispatches search via builtin command"
     },
     {
       "from": "shell.bin_entry",

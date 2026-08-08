@@ -25,12 +25,12 @@
 ## 阶段 2: 搜索技能封装 ✅
 
 ### 2.1 搜索抽象层 ✅
-- [x] `v2/services/search/SearchEngine.ts` - 搜索抽象接口
+- [x] `v2/services/search/SearchEngine.mjs` - 搜索抽象接口
 - [x] 统一的搜索接口签名
 - [x] 结果解析的泛型支持
 
 ### 2.2 平台实现 ✅
-- [x] `v2/services/search/platforms/XHSSearch.ts` - 小红书搜索
+- [x] `v2/services/search/platforms/XHSSearch.mjs` - 小红书搜索
 - [x] Cookie 注入方式
 - [x] 结果解析 (笔记列表)
 
@@ -59,9 +59,9 @@
 ## 验收信号
 - [x] `v2/core/browser/Actions.ts` - TypeScript 检查通过
 - [x] `v2/resources/browser/BrowserInstance.ts` - Camoufox 封装
-- [x] `v2/services/search/SearchEngine.ts` - 搜索引擎
+- [x] `v2/services/search/SearchEngine.mjs` - 搜索引擎
 - [x] `v2/shell/daemon/command_handlers.mjs` - search 命令已注册
-- [ ] `camo search xhs "测试"` 返回结果 (待验证)
+- [x] `camo search xhs "咖啡"` 返回结构化结果 (已验证, 含 title/url/author/timestamp/likes)
 - [ ] `camo browser list` 显示隔离实例 (待验证)
 - [ ] 临时任务超时后自动清理 (待验证)
 - [ ] 持久任务跨命令保持状态 (待验证)
@@ -74,13 +74,12 @@
 | Cookie 管理 | `v2/core/browser/CookieStore.ts` | ✅ |
 | 资源层 | `v2/resources/browser/BrowserPool.ts` | ✅ |
 | 资源层 | `v2/resources/browser/BrowserInstance.ts` | ✅ |
-| 搜索核心 | `v2/services/search/SearchEngine.ts` | ✅ |
-| XHS 平台 | `v2/services/search/platforms/XHSSearch.ts` | ✅ |
+| 搜索核心 | `v2/services/search/SearchEngine.mjs` | ✅ |
+| XHS 平台 | `v2/services/search/platforms/XHSSearch.mjs` | ✅ |
 | 临时浏览器 | `v2/runtime/TransientBrowser.ts` | ✅ |
 | 持久浏览器 | `v2/runtime/PersistentBrowser.ts` | ✅ |
 | 监控 | `v2/monitoring/ResourceMonitor.ts` | ✅ |
 | CLI 命令 | `v2/shell/daemon/command_handlers.mjs` | ✅ |
-| 集成测试 | `v2/tests/integration/search.test.ts` | ✅ |
 
 ## 执行顺序
 1. ✅ 阶段 1: 架构对齐

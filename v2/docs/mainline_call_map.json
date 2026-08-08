@@ -590,6 +590,51 @@
         "local_symbol": "pageOps.scrollAndCollect"
       },
       "semantic_io": "serialized collection loop to Camoufox page input"
+    },
+    {
+      "feature_id": "search.platform.execute",
+      "from": "shell.cli",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/shell/cli/dispatch.mjs",
+        "symbol": "dispatch"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run",
+        "local_symbol": "runBuiltin"
+      },
+      "semantic_io": "parsed search platform+query to builtin dispatch"
+    },
+    {
+      "feature_id": "search.platform.execute",
+      "from": "commands.builtins",
+      "to": "services.search",
+      "caller": {
+        "path": "v2/commands/builtins/search/index.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/services/search/SearchEngine.mjs",
+        "symbol": "search",
+        "local_symbol": "engine.search"
+      },
+      "semantic_io": "search query to platform-agnostic SearchEngine"
+    },
+    {
+      "feature_id": "search.platform.execute",
+      "from": "shell.daemon",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/shell/daemon/command_handlers.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/search/index.mjs",
+        "symbol": "run",
+        "local_symbol": "runSearch"
+      },
+      "semantic_io": "daemon search request to search builtin"
     }
   ]
 }
