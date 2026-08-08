@@ -98,6 +98,10 @@ export function boot({ profileId, headless, mode } = {}) {
 let _lockHandle = null;
 let _currentProfile = null;
 
+function lockOwner() {
+    return `browser-service-${process.pid}`;
+}
+
 function emit(type, payload) {
     appendProgress({ runId: 'run-default', event: type, source: 'browser_service', payload, ts: new Date().toISOString() });
 }
@@ -125,15 +129,22 @@ export async function startSession({ profileId, headless, mode, viewport } = {})
 
     // Acquire CLI-facing lock
     const { acquire: acquireLock } = await import('../lock/manager.mjs');
-    const lockOwner = `browser-service-${process.pid}`;
-    _lockHandle = acquireLock(pid, { owner: lockOwner, mode: 'F' });
+    _lockHandle = acquireLock(pid, { owner: lockOwner(), pid: process.pid, mode: 'F' });
 
     // Launch Camoufox
-    const record = await launchBrowser(pid, {
-        headless: hl,
-        viewport: viewport || profileMeta.viewportSize,
-        fingerprintPlatform: profileMeta.fingerprint?.platform || null,
-    });
+    let record;
+    try {
+        record = await launchBrowser(pid, {
+            headless: hl,
+            viewport: viewport || profileMeta.viewportSize,
+            fingerprintPlatform: profileMeta.fingerprint?.platform || null,
+        });
+    } catch (cause) {
+        const { release: releaseLock } = await import('../lock/manager.mjs');
+        releaseLock(pid, { owner: lockOwner(), pid: process.pid });
+        _lockHandle = null;
+        throw cause;
+    }
 
     // Create session record
     const { create: createSession, deleteSession: deleteSession, tryRead: tryReadSession } = await import('../session/manager.mjs');
@@ -184,7 +195,7 @@ export async function stopSession(profileId) {
 
     if (_lockHandle) {
         const { release: releaseLock } = await import('../lock/manager.mjs');
-        releaseLock(pid);
+        releaseLock(pid, { owner: lockOwner(), pid: process.pid });
         _lockHandle = null;
     }
 
@@ -225,7 +236,7 @@ export async function shutdown() {
     await closeAll();
     if (_lockHandle && _currentProfile) {
         const { release: releaseLock } = await import('../lock/manager.mjs');
-        releaseLock(_currentProfile);
+        releaseLock(_currentProfile, { owner: lockOwner(), pid: process.pid });
         _lockHandle = null;
     }
     _currentProfile = null;

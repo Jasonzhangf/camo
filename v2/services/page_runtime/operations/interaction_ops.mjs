@@ -7,6 +7,10 @@ import { safeId, getPageOrThrow, emit, resolveLocator } from './_page_helpers.mj
 
 /**
  * Click an element.
+ *
+ * Uses .first() to avoid strict mode failure when selector matches multiple elements.
+ * Scrolls element into view and waits for visibility before clicking.
+ *
  * @param {Object} opts
  * @param {string} opts.profileId
  * @param {string} [opts.selector] - CSS selector
@@ -23,7 +27,15 @@ export async function click({ profileId, selector, text, button = 'left' }) {
   const btn = allowedButtons.has(button) ? button : 'left';
   emit(pid, 'click.start', { selector, text, button: btn });
   try {
-    await locator.click({ button: btn, timeout: 10000 });
+    // Use .first() to avoid strict mode failure on multiple matches
+    // Scroll into view and wait for visibility before clicking
+    const loc = locator.first();
+    await loc.scrollIntoViewIfNeeded();
+    await loc.waitFor({ state: 'visible', timeout: 10000 });
+    // Camoufox can hang waiting for a navigation that may not occur.
+    // noWaitAfter avoids the navigation wait; callers explicitly wait for
+    // page state when needed.
+    await loc.click({ button: btn, timeout: 10000, force: true, noWaitAfter: true });
     const result = { profileId: pid, clicked: true, selector: hasSelector ? selector : null, text: hasText ? text : null, button: btn };
     emit(pid, 'click.done', result);
     return result;
@@ -59,29 +71,51 @@ export async function hover({ profileId, selector, text }) {
 }
 
 /**
- * Type text using keyboard.
+ * Type text into an element or focused element.
+ *
+ * Strategy:
+ * 1. If selector provided: use locator.fill() which triggers 'input' events
+ *    that Vue/React reactive inputs listen to.
+ * 2. If no selector: use keyboard.type() at current focus.
+ *
+ * Note: keyboard.type() sends keydown/keypress/keyup events, not 'input' events.
+ * For Vue/React inputs, fill() is the correct approach.
+ *
  * @param {Object} opts
  * @param {string} opts.profileId
  * @param {string} opts.text - Text to type
+ * @param {string} [opts.selector] - Element selector (optional)
  * @param {number} [opts.delay] - Delay between keystrokes in ms
  * @returns {Object} type result
  */
-export async function type({ profileId, text, delay }) {
+export async function type({ profileId, text, selector, delay }) {
   const pid = safeId(profileId, 'profileId');
   const page = getPageOrThrow(pid);
   if (!text || typeof text !== 'string') throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'text' } });
   const delayMs = typeof delay === 'number' && delay >= 0 ? delay : 0;
-  emit(pid, 'type.start', { length: text.length, delay: delayMs });
+  emit(pid, 'type.start', { length: text.length, delay: delayMs, selector });
   try {
-    await page.keyboard.type(text, { delay: delayMs });
-    const result = { profileId: pid, typed: true, length: text.length, delay: delayMs };
+    if (selector) {
+      // Use .first() to avoid strict mode failure on multiple matches
+      const loc = page.locator(selector).first();
+      await loc.scrollIntoViewIfNeeded();
+      await loc.waitFor({ state: 'visible', timeout: 5000 });
+      // fill() triggers 'input' events that Vue/React reactive inputs handle
+      // This is the correct approach for Vue/React forms.
+      await loc.fill(text);
+    } else {
+      // No selector: type at current focus using keyboard
+      await page.keyboard.type(text, { delay: delayMs });
+    }
+    const result = { profileId: pid, typed: true, length: text.length, delay: delayMs, selector: selector || null };
     emit(pid, 'type.done', result);
     return result;
   } catch (cause) {
-    emit(pid, 'type.error', { length: text.length, error: cause?.message });
-    throw new CamoError({ code: 'E_BROWSER_TYPE_FAILED', details: { profileId: pid, reason: cause?.message }, cause });
+    emit(pid, 'type.error', { length: text.length, selector, error: cause?.message });
+    throw new CamoError({ code: 'E_BROWSER_TYPE_FAILED', details: { profileId: pid, selector, reason: cause?.message }, cause });
   }
 }
+
 
 /**
  * Scroll the page by offset.

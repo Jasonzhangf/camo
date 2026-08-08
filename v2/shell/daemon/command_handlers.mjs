@@ -85,7 +85,7 @@ export async function handleCommand(cmd, args, ctx) {
 
     case 'type': {
       const type = await importOp('type');
-      const r = await type({ profileId: profile, text: args.text, delay: args.delay });
+      const r = await type({ profileId: profile, text: args.text, selector: args.selector, delay: args.delay });
       return { ok: true, typed: true, length: r.length };
     }
 
@@ -97,8 +97,8 @@ export async function handleCommand(cmd, args, ctx) {
 
     case 'screenshot': {
       const screenshot = await importOp('screenshot');
-      const r = await screenshot({ profileId: profile, fullPage: args.fullPage === true });
-      return { ok: true, screenshot: true, format: r.format, size: r.size };
+      const r = await screenshot({ profileId: profile, fullPage: args.fullPage === true, path: args.path });
+      return { ok: true, screenshot: true, format: r.format, size: r.size, saved: r.saved || false, savedPath: r.savedPath || null };
     }
 
     case 'snapshot': {

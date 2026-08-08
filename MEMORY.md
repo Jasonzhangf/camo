@@ -220,3 +220,28 @@ Tags: camo, v2, stage-7, browser-runtime, playwright, daemon
 **经验**: daemon 内浏览器生命周期状态（模块级 + browserState 快照）必须单一真源同步；health 是快速诊断手段。
 
 Tags: camo, google, fingerprint, camoufox, firefox-ua, daemon, browserstate, duplicate
+
+## camo 0.4.2 Root Fixes — 2026-08-08
+
+### Root causes fixed
+1. **Persistent daemon dies after CLI exits**: `spawn()` in `daemon.mjs` and `bin_entry/index.mjs` lacked `detached: true` + `child.unref()`. CLI exited and SIGTERM'd the daemon child. Fixed by adding both options. Verified: PID stays alive >10 min after CLI exits.
+
+2. **`type --selector` silently dropped selector**: `command_handlers.mjs` passed only `text`/`delay` to the type operation, ignoring `selector`. Vue reactive inputs need the element to be targeted. Fixed by passing `selector` to the page runtime. Verified: `document.querySelector('#login-password').value` returns the typed text.
+
+3. **`screenshot --path` does not save file**: `command_handlers.mjs` didn't pass `args.path` to the page runtime, and the response didn't include `saved`/`savedPath`. Fixed both directions. Verified: `saved: true` and real file on disk.
+
+4. **`browserState is not defined`**: `ensureBrowser()` in daemon referenced the wrong variable name. Fixed to `_currentBrowserState`.
+
+5. **Lock release owner mismatch**: `stopSession()` called `releaseLock(pid)` without the owner, but `lock/manager.mjs` requires exact `owner`/`pid` match. Fixed by extracting `lockOwner()` helper and passing `{ owner, pid }` consistently. Also added rollback on `launchBrowser` failure.
+
+6. **Click ambiguous selector hangs**: `resolveLocator` returned strict-mode locator, causing `E_BROWSER_CLICK_FAILED` when selector matched 11 buttons. Fixed by using `.first()` and adding `force: true, noWaitAfter: true` to avoid Camoufox/Firefox actionability hang.
+
+### Remaining Camoufox limitation
+`click` with `force: true, noWaitAfter: true` still hangs ~20s on Firefox form submit buttons. The Camoufox Playwright binding seems to wait for navigation even with `noWaitAfter`. Workaround: use `evaluate` with `element.click()` or `form.dispatchEvent(new Event('submit'))`. Root cause is in Camoufox's Playwright binding, not camo.
+
+### Test evidence
+- gates: 18/18 pass
+- unit tests: 320/320 pass
+- smoke tests: 10/10 pass
+- global install: 0.4.2 installed
+- OneStop canonical: `type --selector` writes `adminadmin` to password field; `screenshot --path` saves real file; `click` on submit returns `clicked: true`

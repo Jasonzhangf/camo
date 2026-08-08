@@ -10,23 +10,35 @@ import { safeId, getPageOrThrow, emit } from './_page_helpers.mjs';
  * @param {Object} opts
  * @param {string} opts.profileId
  * @param {boolean} [opts.fullPage] - Capture full scrollable page
- * @returns {Object} screenshot result with base64 data
+ * @param {string} [opts.path] - File path to save screenshot (optional)
+ * @returns {Object} screenshot result with base64 data and saved path
  */
-export async function screenshot({ profileId, fullPage = false }) {
+export async function screenshot({ profileId, fullPage = false, path: destPath }) {
   const pid = safeId(profileId, 'profileId');
   const page = getPageOrThrow(pid);
-  emit(pid, 'screenshot.start', { fullPage });
+  emit(pid, 'screenshot.start', { fullPage, path: destPath || null });
   try {
-    const buffer = await page.screenshot({ fullPage, type: 'png' });
+    const screenshotOpts = { fullPage, type: 'png' };
+    if (destPath) screenshotOpts.path = destPath;
+    const buffer = await page.screenshot(screenshotOpts);
     const base64 = buffer.toString('base64');
-    const result = { profileId: pid, screenshot: true, format: 'png', size: buffer.length, data: base64 };
-    emit(pid, 'screenshot.done', { size: buffer.length });
+    const result = {
+      profileId: pid,
+      screenshot: true,
+      format: 'png',
+      size: buffer.length,
+      data: base64,
+      saved: destPath ? true : false,
+      savedPath: destPath || null
+    };
+    emit(pid, 'screenshot.done', { size: buffer.length, saved: destPath ? true : false });
     return result;
   } catch (cause) {
     emit(pid, 'screenshot.error', { error: cause?.message });
     throw new CamoError({ code: 'E_BROWSER_SCREENSHOT_FAILED', details: { profileId: pid, reason: cause?.message }, cause });
   }
 }
+
 
 /**
  * Get DOM snapshot (full HTML).

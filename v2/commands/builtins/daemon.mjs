@@ -56,8 +56,11 @@ export async function run(_transport, parsed = {}, _ctx = {}) {
       if (parsed.named?.ephemeral === true) args.push('--ephemeral');
       const child = spawn(process.execPath, [DAEMON_SCRIPT, ...args], {
         stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true,
         env: { ...process.env, CAMO_WS_PORT: '0', CAMO_HTTP_PORT: '0' },
       });
+      // Detach the child so it survives after this process exits
+      child.unref();
       const stderrBuf = [];
       child.stderr.on('data', (c) => stderrBuf.push(String(c)));
       child.on('exit', (code) => {

@@ -86,8 +86,10 @@ async function startDaemon(profile, mode) {
 
   const child = spawn(process.execPath, [DAEMON_SCRIPT, ...args], {
     stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
     env: { ...process.env, CAMO_WS_PORT: '0', CAMO_HTTP_PORT: '0' },
   });
+  child.unref();
 
   let stderr = '';
   child.stderr.on('data', (chunk) => { stderr += String(chunk); });

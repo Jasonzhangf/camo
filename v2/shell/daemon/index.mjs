@@ -213,7 +213,7 @@ async function ensureBrowser(profile, forcePersistent) {
     await startSession({ profileId: targetProfile, headless: opts.mode === 'headless' });
     currentBrowserProfile = targetProfile;
     browserRefCount = 1;
-    if (browserState) browserState.currentBrowserProfile = targetProfile;
+    if (_currentBrowserState) _currentBrowserState.currentBrowserProfile = targetProfile;
   } else {
     browserRefCount++;
   }
