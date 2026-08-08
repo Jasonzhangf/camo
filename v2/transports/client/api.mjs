@@ -16,12 +16,12 @@ import { sendRequest as httpSendRequest } from '../http/client.mjs';
 let _enabled = false;
 export function __enableTestRoot() { _enabled = true; }
 
-// All 28 commands supported by camo v2 (kebab-case)
+// All 29 commands supported by camo v2 (kebab-case)
 const ALLOWED_CMDS = new Set([
   'click', 'close-tab', 'daemon', 'evaluate', 'fetch-page', 'find-elements',
   'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'goto', 'hover',
   'list-tabs', 'new-tab', 'screenshot', 'scroll', 'scroll-and-collect', 'select',
-  'set-cookies', 'set-user-agent', 'set-viewport', 'snapshot', 'start', 'stop',
+  'set-cookies', 'set-user-agent', 'set-viewport', 'snapshot', 'start', 'stop', 'switch-tab',
   'type', 'upload', 'wait', 'wait-dom-stable'
 ]);
 

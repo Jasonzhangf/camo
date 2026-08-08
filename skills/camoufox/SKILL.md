@@ -91,3 +91,19 @@ Then report capability gap instead of switching control surface.
 - `v2/PLAN.md` — architecture plan
 - `v2/README.md` — v2 readme
 - `v2/GOAL.md` — rebuild goal
+
+## Fingerprint 硬约束（钉死默认）
+
+- **引擎是 Camoufox（Firefox 内核），指纹必须用 Firefox UA**。禁止 Chrome UA。
+  - Firefox UA 格式：`Mozilla/5.0 (Macintosh; Intel Mac OS X 14.6; rv:128.0) Gecko/20100101 Firefox/128.0`
+  - `navigator.vendor` 为空字符串 `''`（Firefox 特征），不是 `Google Inc.`。
+- **指纹平台必须与真机 OS 一致**（macOS 真机用 macos，Windows 用 windows），禁止随机。
+- 生成指纹时显式指定 platform：profile 的 `camo-profile.json` 设 `fingerprint.platform: "macos"`（或 windows），避免 `generateFingerprint` 随机 50% 选错。
+- 新 profile 指纹文件在 `~/.camo/fingerprints/<profile>.json`。改指纹规则后需删除旧文件重新生成。
+- **为什么**: Chrome UA + Firefox 内核特征不一致，Google 等风控判"浏览器或应用可能不安全"，阻断登录。
+
+## daemon browserState 同步（已知坑）
+
+- 浏览器生命周期状态（currentBrowserProfile/browserRefCount）模块级与 browserState 快照必须同步。
+- 改 daemon 命令处理时，`ensureBrowser`/`releaseBrowser` 必须更新传入的 browserState，否则每次命令后状态被清空 → 下次命令 `E_STATE_DUPLICATE`。
+- 快速诊断：`curl localhost:<httpPort>/health` 看 `profile`/`browserCount`。正常应 `profile:"<name>", browserCount:1`；若 `idle/0` 说明状态同步坏了。

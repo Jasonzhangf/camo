@@ -147,6 +147,29 @@ export function getPage(profileId) {
 }
 
 /**
+ * Switch the active page for a profile to the tab at the given index.
+ * tabId is the zero-based index into context.pages() (same as listTabs).
+ * Protocol-level: brings the target tab to front and updates the active
+ * page handle so subsequent operations target it.
+ */
+export async function switchPage(profileId, tabId) {
+    ensureWritable();
+    const pid = String(profileId || '').trim();
+    if (!pid) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'profileId' } });
+    const record = _records.get(pid);
+    if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
+    const pages = record.context.pages();
+    const idx = Number(tabId);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= pages.length) {
+        throw new CamoError({ code: 'E_INPUT_OUT_OF_RANGE', details: { field: 'tabId', value: tabId, available: pages.length } });
+    }
+    const target = pages[idx];
+    await target.bringToFront();
+    record.page = target;
+    return { profileId: pid, tabId: idx, url: target.url() };
+}
+
+/**
  * Get the full record for a profile.
  */
 export function getBrowser(profileId) {

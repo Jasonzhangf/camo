@@ -43,33 +43,46 @@ export async function scrollAndCollect({ profileId, scrollCount, scrollDelay }) 
   const delay = typeof scrollDelay === 'number' && scrollDelay > 0 ? scrollDelay : 1000;
   emit(pid, 'scrollAndCollect.start', { scrollCount: count, scrollDelay: delay });
   try {
-    const collected = await page.evaluate(({ maxScrolls, delayMs }) => {
-      return new Promise((resolve) => {
-        const texts = [];
-        let scrolls = 0;
-        function scrollAndCollect() {
-          if (scrolls >= maxScrolls) {
-            resolve({ collected: texts, scrolls, totalChars: texts.join('\n').length });
-            return;
+    // Protocol-level scrolling: drive real wheel events from Node and read
+    // visible text via a read-only DOM query (no window.scrollBy hack).
+    const viewport = page.viewportSize() || { width: 800, height: 600 };
+    const cx = Math.floor(viewport.width / 2);
+    const cy = Math.floor(viewport.height / 2);
+    const stepY = Math.floor(viewport.height * 0.8);
+    const collected = [];
+    const seen = new Set();
+    let scrolls = 0;
+    for (let i = 0; i < count; i++) {
+      // Read current visible text (read-only query; not an action).
+      const visible = await page.evaluate(() => {
+        const items = [];
+        const innerHeight = window.innerHeight || 600;
+        for (const el of document.querySelectorAll('*')) {
+          const rect = el.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0 && rect.top >= 0 && rect.top < innerHeight) {
+            const text = (el.textContent || '').trim();
+            if (text && text.length > 20) items.push({ tag: el.tagName.toLowerCase(), text: text.slice(0, 500) });
           }
-          const visible = [];
-          for (const el of document.querySelectorAll('*')) {
-            const rect = el.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0 && rect.top >= 0 && rect.top < window.innerHeight) {
-              const text = (el.textContent || '').trim();
-              if (text && text.length > 20) visible.push({ tag: el.tagName.toLowerCase(), text: text.slice(0, 500) });
-            }
-          }
-          if (visible.length > 0) texts.push(...visible);
-          scrolls++;
-          window.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' });
-          setTimeout(scrollAndCollect, delayMs);
         }
-        scrollAndCollect();
+        return items;
       });
-    }, { maxScrolls: count, delayMs: delay });
-    const output = { profileId: pid, ...collected };
-    emit(pid, 'scrollAndCollect.done', { scrolls: collected.scrolls, items: collected.collected?.length });
+      for (const item of visible) {
+        const key = `${item.tag}:${item.text}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          collected.push(item);
+        }
+      }
+      // Scroll via a real wheel event.
+      await page.mouse.move(cx, cy);
+      await page.mouse.wheel(0, stepY);
+      scrolls++;
+      if (i < count - 1) {
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+    const output = { profileId: pid, collected, scrolls, totalChars: collected.reduce((n, c) => n + c.text.length, 0) };
+    emit(pid, 'scrollAndCollect.done', { scrolls, items: collected.length });
     return output;
   } catch (cause) {
     emit(pid, 'scrollAndCollect.error', { error: cause?.message });

@@ -554,6 +554,28 @@
       "docstring": "commands/docstrings/list-tabs.md"
     },
     {
+      "cmd": "switch-tab",
+      "module": "commands/builtins/switchTab.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "tabId": {
+            "type": "integer",
+            "min": 0,
+            "required": true,
+            "doc": "tab index to switch to (from list-tabs)"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/switch-tab.md"
+    },
+    {
       "cmd": "get-cookies",
       "module": "commands/builtins/getCookies.mjs",
       "args_schema": {

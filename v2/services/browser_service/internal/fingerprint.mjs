@@ -19,26 +19,30 @@ function resolveFingerprintDir() {
 const PLATFORM_FINGERPRINTS = {
     windows: [
         {
-            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0',
             platform: 'Win32',
             osVersion: '10.0',
+            vendor: '',
         },
         {
-            userAgent: 'Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            userAgent: 'Mozilla/5.0 (Windows NT 11.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0',
             platform: 'Win32',
             osVersion: '11.0',
+            vendor: '',
         },
     ],
     macos: [
         {
-            userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:128.0) Gecko/20100101 Firefox/128.0',
             platform: 'MacIntel',
             osVersion: '10.15.7',
+            vendor: '',
         },
         {
-            userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14.6; rv:128.0) Gecko/20100101 Firefox/128.0',
             platform: 'MacIntel',
             osVersion: '14.6.1',
+            vendor: '',
         },
     ],
 };
@@ -71,8 +75,8 @@ export function generateFingerprint(profileId = 'default', options = {}) {
         },
         timezoneId: 'Asia/Shanghai',
         maxTouchPoints: 0,
-        vendor: 'Google Inc.',
-        renderer: 'ANGLE (NVIDIA, NVIDIA GeForce, D3D11)',
+        vendor: base.vendor ?? '',
+        renderer: '',
         originalPlatform: platform || (base.platform === 'Win32' ? 'windows' : 'macos'),
         fingerprintSalt: hash.slice(0, 8),
     };

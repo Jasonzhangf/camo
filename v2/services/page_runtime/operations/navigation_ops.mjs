@@ -51,7 +51,7 @@ export async function newTab({ profileId, url }) {
   if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
   emit(pid, 'newTab.start', { url });
   try {
-    const page = await record.browser.newPage();
+    const page = await record.context.newPage();
     if (url && /^https?:\/\//.test(url)) {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
     }
@@ -114,5 +114,30 @@ export async function listTabs({ profileId }) {
   } catch (cause) {
     emit(pid, 'listTabs.error', { error: cause?.message });
     throw new CamoError({ code: 'E_BROWSER_LISTTABS_FAILED', details: { profileId: pid, reason: cause?.message }, cause });
+  }
+}
+
+/**
+ * Switch the active tab to the given tabId (zero-based index into listTabs).
+ * Protocol-level: brings the target tab to front and makes it the active page.
+ * @param {Object} opts
+ * @param {string} opts.profileId
+ * @param {number} opts.tabId - Zero-based tab index from listTabs
+ * @returns {Object} switch result
+ */
+export async function switchTab({ profileId, tabId }) {
+  const pid = safeId(profileId, 'profileId');
+  const bridge = await getBridge();
+  const record = bridge.getBrowser(pid);
+  if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
+  emit(pid, 'switchTab.start', { tabId });
+  try {
+    const r = await bridge.switchPage(pid, tabId);
+    const result = { profileId: pid, tabId: r.tabId, url: r.url, switched: true };
+    emit(pid, 'switchTab.done', { tabId: r.tabId, url: r.url });
+    return result;
+  } catch (cause) {
+    emit(pid, 'switchTab.error', { tabId, error: cause?.message });
+    throw new CamoError({ code: 'E_BROWSER_SWITCHTAB_FAILED', details: { profileId: pid, tabId, reason: cause?.message }, cause });
   }
 }

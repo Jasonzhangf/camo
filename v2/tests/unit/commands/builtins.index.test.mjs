@@ -10,10 +10,10 @@ const EXPECTED_BUILTINS = [
   'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'goto', 'hover',
   'list-tabs', 'new-tab', 'screenshot', 'scroll', 'scroll-and-collect', 'search', 'select',
   'set-cookies', 'set-user-agent', 'set-viewport', 'snapshot', 'start', 'stop',
-  'type', 'upload', 'wait', 'wait-dom-stable',
+  'switch-tab', 'type', 'upload', 'wait', 'wait-dom-stable',
 ];
 
-test('positive: list returns all 29 builtins sorted (kebab-case)', () => {
+test('positive: list returns all 30 builtins sorted (kebab-case)', () => {
   assert.deepEqual(list(), EXPECTED_BUILTINS);
 });
 

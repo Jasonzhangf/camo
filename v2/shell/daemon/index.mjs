@@ -190,6 +190,7 @@ function emit(type, payload) {
 // --- Browser lifecycle management ---
 let currentBrowserProfile = null;
 let browserRefCount = 0;
+let _currentBrowserState = null;
 
 async function ensureBrowser(profile, forcePersistent) {
   const targetProfile = profile || opts.profile;
@@ -201,8 +202,10 @@ async function ensureBrowser(profile, forcePersistent) {
       }
       await startSession({ profileId: targetProfile, headless: opts.mode === 'headless' });
       currentBrowserProfile = targetProfile;
+      if (_currentBrowserState) _currentBrowserState.currentBrowserProfile = targetProfile;
     }
     browserRefCount++;
+    if (_currentBrowserState) _currentBrowserState.browserRefCount = browserRefCount;
     return targetProfile;
   }
   
@@ -210,9 +213,11 @@ async function ensureBrowser(profile, forcePersistent) {
     await startSession({ profileId: targetProfile, headless: opts.mode === 'headless' });
     currentBrowserProfile = targetProfile;
     browserRefCount = 1;
+    if (browserState) browserState.currentBrowserProfile = targetProfile;
   } else {
     browserRefCount++;
   }
+  if (_currentBrowserState) _currentBrowserState.browserRefCount = browserRefCount;
   return currentBrowserProfile;
 }
 
@@ -222,10 +227,12 @@ async function releaseBrowser(forceClose) {
       try { await stopSession(currentBrowserProfile); } catch {}
       currentBrowserProfile = null;
       browserRefCount = 0;
+      if (_currentBrowserState) _currentBrowserState.currentBrowserProfile = null;
     }
   } else {
     browserRefCount = Math.max(0, browserRefCount - 1);
   }
+  if (_currentBrowserState) _currentBrowserState.browserRefCount = browserRefCount;
 }
 
 // --- Command dispatch ---
@@ -239,6 +246,7 @@ async function handleCommand(env) {
 
   try {
     const browserState = { currentBrowserProfile, browserRefCount };
+    _currentBrowserState = browserState;
     const result = await dispatchCommand(cmd, args, {
       profile,
       isEphemeral,

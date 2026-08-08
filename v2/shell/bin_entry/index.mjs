@@ -59,7 +59,7 @@ function makeWsTransport(url) {
 
 const NO_TRANSPORT_CMDS = new Set([
     '--help', '-h', 'help', 'doctor', 'usage', 'describe',
-    '--version', 'version', 'daemon', 'stop', 'start',
+    '--version', 'version', 'daemon', 'stop',
     'list-profiles', 'remove-profile', 'clean', 'init',
     'search',
   ]);
@@ -194,7 +194,10 @@ async function main(argv) {
       profile = `_ephemeral_${process.pid}_${Date.now()}`;
     }
   }
-  if (isEphemeral && !profile) profile = `_ephemeral_${process.pid}_${Date.now()}`;
+  if (isEphemeral && !profile && args[0] !== 'start') profile = `_ephemeral_${process.pid}_${Date.now()}`;
+  // For `start` without --profile, default to the 'default' profile so
+  // the single-command boot flow lands on a real persistent profile.
+  if (args[0] === 'start' && !profile) { profile = 'default'; isEphemeral = false; }
 
   let transport;
   let daemonChild = null;
@@ -202,7 +205,7 @@ async function main(argv) {
   const existing = findActiveDaemon({ profile, ephemeral: isEphemeral });
   if (existing) {
     transport = makeWsTransport(`ws://localhost:${existing.wsPort}`);
-  } else if (process.env.CAMO_AUTOSTART === '1') {
+  } else if (process.env.CAMO_AUTOSTART === '1' || args[0] === 'start') {
     const daemon = await startDaemon(profile, isEphemeral ? 'ephemeral' : 'persistent');
     transport = makeWsTransport(daemon.wsUrl);
   } else {

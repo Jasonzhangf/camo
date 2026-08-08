@@ -18,6 +18,7 @@ export {
   newTab,
   closeTab,
   listTabs,
+  switchTab,
 } from './navigation_ops.mjs';
 
 export {

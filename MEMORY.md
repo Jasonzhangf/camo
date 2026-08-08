@@ -192,3 +192,31 @@ Tags: camo, v2, stage-7, browser-runtime, playwright, daemon
 - Dynamic import detection must handle: literal `import('x')`, template `import(\`x\`)`, variable `import(variable)`
 - Test import paths: `v2/tests/unit/` needs `../../../services/` (3 levels)
 - ephemeral cleanup: single call site in success path, no catch retry
+
+## 2026-08-08: Google 登录"浏览器不安全"根因与修复
+
+**问题**: opencode1 profile 登录 Google，提交邮箱后报"此浏览器或应用可能不安全"，无法进密码步骤。
+
+**根因（两层叠加）**:
+1. **平台指纹矛盾**: `generateFingerprint` 未指定 platform 时用随机字节 50% 选 Windows/50% macOS。opencode1 随机到 Windows UA，但真机是 macOS arm64。→ profile 设 `fingerprint.platform: "macos"` 修复。
+2. **浏览器类型矛盾（核心）**: camo 用 Camoufox（Firefox 内核），但指纹系统生成 **Chrome/131 UA + vendor 'Google Inc.' + ANGLE renderer**。UA 声称 Chrome 而内核是 Firefox，Google 检测到 UA/内核不一致 → 判不安全。
+
+**修复**: `v2/services/browser_service/internal/fingerprint.mjs` 的 `PLATFORM_FINGERPRINTS` 从 Chrome UA 改为 **Firefox UA**（`Gecko/20100101 Firefox/128.0`），vendor 清空。UA 与 Camoufox 内核一致后 Google 正常进入密码步骤。
+
+**验证**: type 邮箱 + 点击"下一步"后显示"欢迎 akwaclaude0@gmail.com 输入您的密码"，不再报不安全。
+
+**经验（钉死）**: Camoufox 引擎必须用 **Firefox UA** 指纹，禁止 Chrome UA。指纹平台必须与真机 OS 一致。
+
+## 2026-08-08: daemon browserState 同步 bug（E_STATE_DUPLICATE）
+
+**问题**: goto 后紧跟 type/click/screenshot 报 `E_STATE_DUPLICATE`（launchBrowser.duplicate），阻断登录输入。
+
+**根因**: `v2/shell/daemon/index.mjs` `handleCommand` 里 `browserState = { currentBrowserProfile, browserRefCount }` 是**快照**。`ensureBrowser` 修改的是**模块级**状态，不更新 browserState；goto/type 分支也没设 browserState。同步行 `currentBrowserProfile = browserState.currentBrowserProfile` 用快照（仍 null）覆盖模块级 → 每次命令后 daemon 以为浏览器未启动，下次命令重复 `startSession` → `_records` 已有 → duplicate。health 端点显示 `profile:"idle", browserCount:0` 佐证。
+
+**修复**: `ensureBrowser(profile, forcePersistent, browserState)` / `releaseBrowser(forceClose, browserState)` 接收并同步更新 browserState。handleCommand 传 `ensureBrowser: (p,f)=>ensureBrowser(p,f,browserState)`。
+
+**验证**: goto 后 health 显示 `profile:"opencode1", browserCount:1`（修复前 idle/0）；type/click/screenshot 不再 duplicate。
+
+**经验**: daemon 内浏览器生命周期状态（模块级 + browserState 快照）必须单一真源同步；health 是快速诊断手段。
+
+Tags: camo, google, fingerprint, camoufox, firefox-ua, daemon, browserstate, duplicate

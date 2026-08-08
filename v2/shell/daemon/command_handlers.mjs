@@ -42,9 +42,24 @@ export async function handleCommand(cmd, args, ctx) {
   switch (cmd) {
     case 'start': {
       const { startSession } = await import('../../services/browser_service/bootstrap.mjs');
+      // If a browser already exists for this profile, just open a blank
+      // page on the active page instead of failing with duplicate.
+      const bridge = await import('../../services/browser_service/internal/camoufox_bridge.mjs');
+      const existing = bridge.getBrowser(profile);
+      if (existing) {
+        const page = bridge.getPage(profile);
+        const targetUrl = (args && typeof args.url === 'string' && args.url) ? args.url : 'about:blank';
+        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        browserState.currentBrowserProfile = profile;
+        return { ok: true, sessionId: existing.sessionId || null, profile, reused: true };
+      }
       const session = await startSession({ profileId: profile, headless: opts.mode === 'headless' });
       browserState.currentBrowserProfile = profile;
       browserState.browserRefCount = 1;
+      if (args && typeof args.url === 'string' && args.url) {
+        const fresh = bridge.getPage(profile);
+        await fresh.goto(args.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      }
       return { ok: true, sessionId: session.sessionId, profile: session.profileId };
     }
 
@@ -122,6 +137,12 @@ export async function handleCommand(cmd, args, ctx) {
       return { ok: true, closedTab: true };
     }
 
+    case 'switch-tab': {
+      const switchTab = await importOp('switchTab');
+      const r = await switchTab({ profileId: profile, tabId: args.tabId });
+      return { ok: true, switched: true, tabId: r.tabId, url: r.url };
+    }
+
     case 'daemon': {
       return { ok: true, daemonId: opts.daemonId, mode: opts.mode, profile: opts.profile };
     }
@@ -177,7 +198,7 @@ export async function handleCommand(cmd, args, ctx) {
     case 'new-tab': {
       const newTab = await importOp('newTab');
       const r = await newTab({ profileId: profile, url: args.url });
-      return { ok: true, newTab: true, tabId: r.tabId };
+      return { ok: true, newTab: true, created: true, tabId: r.tabId, url: r.url };
     }
 
     case 'scroll-and-collect': {
@@ -205,19 +226,27 @@ export async function handleCommand(cmd, args, ctx) {
     }
 
     case 'search': {
-      const { getSearchEngine } = await import('../../services/search/SearchEngine.js');
-      const { XHSSearch } = await import('../../services/search/platforms/XHSSearch.js');
-      const engine = getSearchEngine();
-      engine.registerPlatform('xhs', XHSSearch);
-      const result = await engine.search({
-        platform: args.platform || 'xhs',
-        query: args.query,
-        cookies: args.cookies,
-        profile: profile,
-        maxResults: args.maxResults,
-        timeout: args.timeout,
-      });
-      return { ok: result.success, searched: true, results: result.results, totalCount: result.totalCount, pageURL: result.pageURL, error: result.error };
+      const { run: runSearch } = await import('../../commands/builtins/search/index.mjs');
+      const parsed = {
+        profile,
+        positional: [args.platform || 'xhs', args.query || ''],
+        named: {
+          profile,
+          cookies: args.cookies,
+          'max-results': args.maxResults,
+          headless: args.headless,
+        },
+      };
+      const result = await runSearch(null, parsed, { profile });
+      return {
+        ok: result.success,
+        searched: result.searched,
+        results: result.results,
+        totalCount: result.totalCount,
+        pageURL: result.pageURL,
+        error: result.error,
+        requires_login: result.requires_login,
+      };
     }
 
     case 'wait-dom-stable': {

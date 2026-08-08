@@ -98,7 +98,14 @@ export async function scroll({ profileId, x = 0, y = 0 }) {
   const scrollY = typeof y === 'number' ? y : 0;
   emit(pid, 'scroll.start', { x: scrollX, y: scrollY });
   try {
-    await page.evaluate(({ scrollX, scrollY }) => window.scrollTo({ top: scrollY, left: scrollX, behavior: 'smooth' }), { scrollX, scrollY });
+    // Protocol-level scroll: dispatch a real wheel input event, not a JS
+    // window.scrollTo hack. Move the pointer into the viewport first so the
+    // wheel event targets the scrolling region.
+    const viewport = page.viewportSize() || { width: 800, height: 600 };
+    const cx = Math.floor(viewport.width / 2);
+    const cy = Math.floor(viewport.height / 2);
+    await page.mouse.move(cx, cy);
+    await page.mouse.wheel(scrollX, scrollY);
     const result = { profileId: pid, scrolled: true, x: scrollX, y: scrollY };
     emit(pid, 'scroll.done', result);
     return result;

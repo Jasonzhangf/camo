@@ -72,6 +72,12 @@ function looksLikeFlag(a) {
   return typeof a === 'string' && a.startsWith('--');
 }
 
+// Convert a kebab-case flag key (--tab-id) to its schema camelCase field
+// name (tabId) so CLI flags match args_schema.named keys.
+function camelizeKey(k) {
+  return k.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+}
+
 // parse(argv, opts?) -> { cmd, profile, named, positional, errors, missing_required, help }
 // argv is what comes AFTER `camo <cmd>`. We add the cmd via opts.cmd or derive it.
 export function parse(argv, opts = {}) {
@@ -111,10 +117,10 @@ export function parse(argv, opts = {}) {
     const eq = key.indexOf('=');
     let k; let v;
     if (eq >= 0) {
-      k = key.slice(0, eq);
+      k = camelizeKey(key.slice(0, eq));
       v = key.slice(eq + 1);
     } else {
-      k = key;
+      k = camelizeKey(key);
       const next = args[i + 1];
       if (next === undefined || looksLikeFlag(next)) {
         v = 'true'; // boolean flag default

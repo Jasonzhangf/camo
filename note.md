@@ -453,3 +453,8 @@ recovers from the in-flight app-server process shown by
 mandates. The local gates (registry strict + npm test + check-file-size)
 are all green and verifiable independently of codex.
 Stage 8: dynamic ports and daemon discovery are present in source but live CLI verification remains pending. Stage 9 ephemeral/persistent behavior must be verified against the current daemon and browser lifecycle. Next: root-cause audit and test design before edits.
+
+## 2026-08-08 camo 补齐任务
+- 审计行为协议级：click/type/scroll 必须真实输入事件，禁 JS DOM 操作。
+- 已审 interaction_ops：click=locator.click(协议级OK), hover=locator.hover(OK), type=page.keyboard.type(OK), upload=setInputFiles(OK), **scroll=page.evaluate(window.scrollTo)=JS hack 违规**。需改 mouse.wheel 真实滚轮。
+- 补 switch-tab CLI 命令：camo 无切换 tab 命令，需加。
