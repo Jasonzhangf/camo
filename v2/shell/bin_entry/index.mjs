@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { dispatch, usage } from '../cli/dispatch.mjs';
 import { isCamoError, toWire } from '../../contracts/error_envelope/projector.mjs';
 import { loadConfig } from '../config/loader.mjs';
-import { findActiveDaemon } from '../config/daemon_finder.mjs';
+import { findActiveDaemon } from '../../services/daemon_registration/registry.mjs';
 import { checkCamoufoxHealth, ensureCamoufox } from '../camoufox_health.mjs';
 
 // PKG_ROOT is set by the bin/camo.mjs entry shim via CAMO_PKG_ROOT env var;
@@ -68,7 +68,7 @@ const PROCESS_ONLY_CMDS = new Set(['daemon']);
 async function waitForDaemon(profile, timeoutMs = 15000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    const daemon = findActiveDaemon({ profile, ephemeral: true });
+    const daemon = findActiveDaemon();
     if (daemon) return daemon;
     await new Promise(r => setTimeout(r, 200));
   }
@@ -204,7 +204,7 @@ async function main(argv) {
   let transport;
   let daemonChild = null;
   
-  const existing = findActiveDaemon({ profile, ephemeral: isEphemeral });
+  const existing = findActiveDaemon();
   if (existing) {
     transport = makeWsTransport(`ws://localhost:${existing.wsPort}`);
   } else if (process.env.CAMO_AUTOSTART === '1' || args[0] === 'start') {

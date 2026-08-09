@@ -128,14 +128,16 @@ function stripV2Prefix(p) { return p.replace(/^v2\//, ''); }
   else fail('registry.resources.forbidden_paths_unique', dups.join(', '));
 }
 
-// Gate 9: probe each module's owned_paths[0] for a README.md.
-// owned_paths like "v2/services/profile/**" -> resolve under V2_ROOT/services/profile.
+// Gate 9: probe each module's first owned path. Directory globs require a
+// README; exact machine paths must exist as files.
 {
   const missing = [];
   for (const m of modules.modules) {
-    const root = m.owned_paths[0].replace(/\/\*\*$/, ''); // strip /** suffix
-    const inside = stripV2Prefix(root);                    // services/profile
-    const probe = path.join(V2_ROOT, inside, 'README.md');
+    const owned = m.owned_paths[0];
+    const isDirectoryGlob = owned.endsWith('/**');
+    const root = owned.replace(/\/\*\*$/, '');
+    const inside = stripV2Prefix(root);
+    const probe = path.join(V2_ROOT, inside, isDirectoryGlob ? 'README.md' : '');
     if (!fs.existsSync(probe)) missing.push(`${m.id} (no ${path.relative(V2_ROOT, probe)})`);
   }
   if (missing.length === 0) ok('registry.modules.probe_files_exist');

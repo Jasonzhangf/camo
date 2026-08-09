@@ -143,7 +143,7 @@
       "id": "services.autoscript",
       "layer": "L2_service",
       "owned_paths": [
-        "v2/services/autoscript/**"
+        "v2/services/autoscript/runner.mjs"
       ],
       "status": "active"
     },
@@ -191,7 +191,7 @@
       "id": "services.browser_service",
       "layer": "L2_service",
       "owned_paths": [
-        "v2/services/browser_service/**"
+        "v2/services/browser_service/bootstrap.mjs"
       ],
       "status": "active"
     },
@@ -329,22 +329,6 @@
       "layer": "L5_shell",
       "owned_paths": [
         "v2/shell/daemon/**"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "shell.daemon.command_handlers",
-      "layer": "L5_shell",
-      "owned_paths": [
-        "v2/shell/daemon/**"
-      ],
-      "status": "active"
-    },
-    {
-      "id": "services.page_runtime.operations",
-      "layer": "L2_service",
-      "owned_paths": [
-        "v2/services/page_runtime/operations/**"
       ],
       "status": "active"
     }

@@ -39,9 +39,6 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "peerDependencies": {
-    "camoufox": "^0.1.19"
-  },
   "pnpm": {
     "overrides": {
       "playwright-core": "1.60.0"
@@ -52,7 +49,9 @@
   },
   "dependencies": {
     "acorn": "^8.18.0",
+    "camoufox": "0.1.19",
     "jsqr": "^1.4.0",
+    "playwright-core": "1.60.0",
     "pngjs": "^7.0.0",
     "proper-lockfile": "^4.1.2",
     "ws": "^8.19.0"

@@ -188,6 +188,7 @@ export async function launchEngineContext(opts) {
     if (!Camoufox) {
         throw new CamoError({ code: 'E_BROWSER_LAUNCH_FAILED', details: { reason: 'camoufox_invalid_api' } });
     }
+    const executablePath = String(opts.executablePath || process.env.CAMO_EXECUTABLE_PATH || '').trim();
 
     const targetOS = process.platform === 'win32' ? 'windows'
         : process.platform === 'darwin' ? 'macos' : 'linux';
@@ -237,6 +238,7 @@ export async function launchEngineContext(opts) {
         }),
         ...(opts.userAgent ? { extraHTTPHeaders: {} } : {}),
         ...(opts.userAgent ? { userAgent: opts.userAgent } : {}),
+        ...(executablePath ? { executable_path: executablePath } : {}),
     });
 
     if (result && typeof result.pages === 'function') {

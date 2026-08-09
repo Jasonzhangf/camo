@@ -32,12 +32,13 @@ test('scroll operations use Camoufox page input and expose failures', () => {
         context: {},
         page: {
           mouse: {
+            move: async () => {},
             wheel: async (x, y) => { wheelCalls.push([x, y]); },
           },
           viewportSize: () => ({ width: 1200, height: 1000 }),
           evaluate: async () => {
             evaluateCalls += 1;
-            return [{ tag: 'p', text: 'visible text long enough for collection' }];
+            return [{ tag: 'p', text: 'visible text long enough for collection ' + evaluateCalls }];
           },
           waitForTimeout: async () => { waitCalls += 1; },
         },
@@ -52,7 +53,7 @@ test('scroll operations use Camoufox page input and expose failures', () => {
         browser: {},
         context: {},
         page: {
-          mouse: { wheel: async () => { throw new Error('wheel failed'); } },
+          mouse: { move: async () => {}, wheel: async () => { throw new Error('wheel failed'); } },
         },
       });
       let failureCode = null;
@@ -84,7 +85,7 @@ test('scroll operations use Camoufox page input and expose failures', () => {
     assert.equal(result.collected.scrolls, 2);
     assert.equal(result.collected.collected.length, 2);
     assert.equal(result.evaluateCalls, 2);
-    assert.equal(result.waitCalls, 1);
+    assert.equal(result.waitCalls, 0);
     assert.equal(result.failureCode, 'E_BROWSER_SCROLL_FAILED');
   } finally {
     fs.rmSync(home, { recursive: true, force: true });

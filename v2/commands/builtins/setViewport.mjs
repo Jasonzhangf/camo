@@ -16,5 +16,8 @@ export async function run(transport, parsed = {}, ctx = {}) {
   if (isNaN(width) || width <= 0) throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'width', value: parsed.named?.width } });
   if (isNaN(height) || height <= 0) throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'height', value: parsed.named?.height } });
   const reply = await sendCommand(transport, { cmd: 'set-viewport', args: { profile, width, height } });
-  return { cmd: 'set-viewport', profile, width, height, set: reply.payload?.set === true, issuedAt: new Date().toISOString(), traceId: ctx.traceId || null };
+  if (reply.payload?.set !== true || reply.payload?.width !== width || reply.payload?.height !== height) {
+    throw new CamoError({ code: 'E_PROTO_BAD_ENVELOPE', details: { cmd, expected: { set: true, width, height }, actual: reply.payload || null } });
+  }
+  return { cmd: 'set-viewport', profile, width, height, set: true, issuedAt: new Date().toISOString(), traceId: ctx.traceId || null };
 }

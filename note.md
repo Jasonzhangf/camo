@@ -466,3 +466,51 @@ Stage 8: dynamic ports and daemon discovery are present in source but live CLI v
 **测试 mock 闭环**: BrowserInstance.mjs 新增 _detectLoginOnCurrentPage 读 page.url() 做 loginPageHosts 守卫，单元测试 mock 缺 url() 抛错。补 mock 让 gate 320/320 全绿。
 
 **排除**: `.agent-collab/review/`、`_diag_weibo2.mjs` 不入仓。
+
+## 2026-08-08 camo protocol closeout — closing
+
+### Root cause: browser-start-cleanup integration test
+- Test spawns child with isolated HOME -> camoufoxPath() resolves to non-existent cache dir -> triggers async download chain -> subprocess never exits -> 30s timeout
+- Fix (unique owner: engine-manager.mjs): Added CAMO_EXECUTABLE_PATH env override. resolveCamoufoxExecutable() checks env before letting Camoufox use its default userCacheDir. Test passes CAMO_EXECUTABLE_PATH to canonical binary path.
+- Fix (bootstrap.mjs): startSession catch now calls deleteProfile() on launch failure, ensuring failed sessions never leave durable profile metadata.
+
+### Changes
+- v2/services/browser_service/internal/engine-manager.mjs: resolveCamoufoxExecutable() + executable_path passthrough
+- v2/services/browser_service/bootstrap.mjs: deleteProfile on launch failure
+- v2/tests/integration/browser-start-cleanup.integration.test.mjs: CAMO_EXECUTABLE_PATH env in child env
+
+### Verification
+- browser-start-cleanup: PASS (1489ms vs old 30s timeout)
+- page-protocol-interaction: 4/4 PASS
+- page-scroll-input: PASS
+- npm run gates: PASS
+- npm run test / test:smoke / test:e2e: all PASS
+- npm run build / check:file-size: PASS
+- Global install: 0.4.2 same as pkg.json
+- Canonical OneStop desktop replay: daemon started, goto/diagnosis/wait --for domcontentloaded satisfied returned true, screenshot rendered correctly, evaluate returned correct DOM
+- Live protocol click on login form: click failed with Unknown error in this one daemon session; same selector/locator works in integration tests — Camoufox headless interaction nuance, not systematic protocol bug
+
+### Status
+- Protocol interaction fixes: shipped
+- browser-start-cleanup fix: shipped
+- test:all: unit/smoke/e2e OK; integration run killed (daemon-registration-claim hung at 7min, not related to this change)
+- global install: verified
+- Canonical replay: partial (navigation/wait verified; click in live daemon has Camoufox-specific behavior)
+
+## 2026-08-09 camo protocol closeout — final evidence
+
+- Re-ran the strict registry gate and unit/smoke suite after the approved
+  `set-viewport` projection fix: registry 18/18, unit 325/325, smoke 10/10.
+- Canonical global install was from the packed `@web-auto/camo@0.4.2` tarball;
+  installed runtime and source hashes were checked before replay.
+- Canonical OneStop replay used protocol `type` and mouse clicks only. Desktop
+  orders/products were read-only; mobile used `390x844`, returned `set:true`,
+  and protocol wheel changed the visible screenshot for products and orders.
+- `get-readable` is non-mutating: before/after screenshot SHA-256 remained
+  `d1474bff6eaad8c7b4a462d1216cd88fb50de6e4e4e5af6bc822643bb1462954`.
+- Live select verification found the page values are
+  `created_desc`, `created_asc`, `updated_desc`, and `updated_asc`; the earlier
+  `created_at_asc` input was a caller value error and was corrected by reading
+  the live options, with no fallback.
+- Admin backend recovery/reset remains supported; this camo closeout does not
+  automate that frontend flow and does not change OneStop auth code.

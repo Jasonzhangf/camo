@@ -36,13 +36,20 @@ export async function run(transport, parsed = {}, ctx = {}) {
     cmd: 'type',
     args: { profile, text, selector, delay },
   });
+  const typedChars = reply.payload?.typedChars;
+  if (!Number.isInteger(typedChars) || typedChars < 0) {
+    throw new CamoError({
+      code: 'E_PROTO_BAD_ENVELOPE',
+      details: { field: 'typedChars', value: typedChars },
+    });
+  }
   return {
     cmd: 'type',
     profile,
     selector,
     text,
     delay,
-    typedChars: reply.payload?.typedChars || text.length,
+    typedChars,
     issuedAt: new Date().toISOString(),
     traceId: ctx.traceId || null,
   };

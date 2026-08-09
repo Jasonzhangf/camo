@@ -5,11 +5,89 @@
 import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
 import { safeId, getPageOrThrow, emit, resolveLocator } from './_page_helpers.mjs';
 
+async function chooseVisibleLocator(page, locator, profileId, selector, text, failureCode) {
+  const count = await locator.count();
+  const viewport = page.viewportSize?.() || null;
+  let selected = null;
+  let visibleSelected = null;
+  let selectedArea = Number.POSITIVE_INFINITY;
+  let visibleArea = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < count; index += 1) {
+    const candidate = locator.nth(index);
+    const box = await candidate.boundingBox();
+    if (!box || box.width <= 0 || box.height <= 0) continue;
+    if (viewport && (
+      box.x + box.width > 0
+      && box.y + box.height > 0
+      && box.x < viewport.width
+      && box.y < viewport.height
+    )) {
+      const area = box.width * box.height;
+      if (area < visibleArea) {
+        visibleSelected = candidate;
+        visibleArea = area;
+      }
+    }
+    const area = box.width * box.height;
+    if (area < selectedArea) {
+      selected = candidate;
+      selectedArea = area;
+    }
+  }
+  selected = visibleSelected || selected;
+  if (!selected) {
+    throw new CamoError({
+      code: failureCode,
+      details: { profileId, selector, text, reason: 'no visible target matched' },
+    });
+  }
+  return selected;
+}
+
+async function moveLocatorIntoViewport(page, locator, profileId, selector, text, failureCode) {
+  const viewport = page.viewportSize() || { width: 800, height: 600 };
+  const margin = 8;
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const box = await locator.boundingBox();
+    if (!box) {
+      throw new CamoError({
+        code: failureCode,
+        details: { profileId, selector, text, reason: 'element not visible or not in DOM' },
+      });
+    }
+
+    const cx = Math.round(box.x + box.width / 2);
+    const cy = Math.round(box.y + box.height / 2);
+    const inside = cx >= margin && cx <= viewport.width - margin
+      && cy >= margin && cy <= viewport.height - margin;
+    if (inside) return { x: cx, y: cy };
+
+    const wheelX = cx < margin
+      ? Math.min(-120, cx - margin)
+      : (cx > viewport.width - margin ? Math.max(120, cx - (viewport.width - margin)) : 0);
+    const wheelY = cy < margin
+      ? Math.min(-120, cy - margin)
+      : (cy > viewport.height - margin ? Math.max(120, cy - (viewport.height - margin)) : 0);
+    await page.mouse.move(Math.floor(viewport.width / 2), Math.floor(viewport.height / 2));
+    await page.mouse.wheel(wheelX, wheelY);
+  }
+
+  throw new CamoError({
+    code: failureCode,
+    details: { profileId, selector, text, reason: 'element did not enter viewport after protocol wheel input' },
+  });
+}
+
 /**
- * Click an element.
+ * Click an element using protocol-level mouse simulation.
  *
- * Uses .first() to avoid strict mode failure when selector matches multiple elements.
- * Scrolls element into view and waits for visibility before clicking.
+ * Strategy:
+ * 1. Get element center via locator.boundingBox()
+ * 2. Move it into view with protocol wheel events when necessary
+ * 3. page.mouse.move() -> down() -> up() at element center
+ *    This bypasses Playwright's actionability layer completely.
+ *    No JS injection, no locator.click() actionability wait.
  *
  * @param {Object} opts
  * @param {string} opts.profileId
@@ -26,16 +104,14 @@ export async function click({ profileId, selector, text, button = 'left' }) {
   const allowedButtons = new Set(['left', 'right', 'middle']);
   const btn = allowedButtons.has(button) ? button : 'left';
   emit(pid, 'click.start', { selector, text, button: btn });
+
   try {
-    // Use .first() to avoid strict mode failure on multiple matches
-    // Scroll into view and wait for visibility before clicking
-    const loc = locator.first();
-    await loc.scrollIntoViewIfNeeded();
-    await loc.waitFor({ state: 'visible', timeout: 10000 });
-    // Camoufox can hang waiting for a navigation that may not occur.
-    // noWaitAfter avoids the navigation wait; callers explicitly wait for
-    // page state when needed.
-    await loc.click({ button: btn, timeout: 10000, force: true, noWaitAfter: true });
+    const loc = await chooseVisibleLocator(page, locator, pid, selector, text, 'E_BROWSER_CLICK_FAILED');
+    const point = await moveLocatorIntoViewport(page, loc, pid, selector, text, 'E_BROWSER_CLICK_FAILED');
+    await page.mouse.move(point.x, point.y);
+    await page.mouse.down({ button: btn });
+    await page.mouse.up({ button: btn });
+
     const result = { profileId: pid, clicked: true, selector: hasSelector ? selector : null, text: hasText ? text : null, button: btn };
     emit(pid, 'click.done', result);
     return result;
@@ -60,7 +136,9 @@ export async function hover({ profileId, selector, text }) {
   if (!locator) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'selector or text' } });
   emit(pid, 'hover.start', { selector, text });
   try {
-    await locator.hover({ timeout: 10000 });
+    const loc = await chooseVisibleLocator(page, locator, pid, selector, text, 'E_BROWSER_HOVER_FAILED');
+    const point = await moveLocatorIntoViewport(page, loc, pid, selector, text, 'E_BROWSER_HOVER_FAILED');
+    await page.mouse.move(point.x, point.y);
     const result = { profileId: pid, hovered: true, selector: hasSelector ? selector : null, text: hasText ? text : null };
     emit(pid, 'hover.done', result);
     return result;
@@ -71,15 +149,11 @@ export async function hover({ profileId, selector, text }) {
 }
 
 /**
- * Type text into an element or focused element.
+ * Type text using protocol-level mouse and keyboard simulation.
  *
- * Strategy:
- * 1. If selector provided: use locator.fill() which triggers 'input' events
- *    that Vue/React reactive inputs listen to.
- * 2. If no selector: use keyboard.type() at current focus.
- *
- * Note: keyboard.type() sends keydown/keypress/keyup events, not 'input' events.
- * For Vue/React inputs, fill() is the correct approach.
+ * When a selector is provided, the element is focused with a real mouse
+ * move/down/up sequence, then real keyboard events are sent through the
+ * browser protocol. No DOM value assignment or evaluate-based input is used.
  *
  * @param {Object} opts
  * @param {string} opts.profileId
@@ -94,19 +168,18 @@ export async function type({ profileId, text, selector, delay }) {
   if (!text || typeof text !== 'string') throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'text' } });
   const delayMs = typeof delay === 'number' && delay >= 0 ? delay : 0;
   emit(pid, 'type.start', { length: text.length, delay: delayMs, selector });
+
   try {
     if (selector) {
-      // Use .first() to avoid strict mode failure on multiple matches
-      const loc = page.locator(selector).first();
-      await loc.scrollIntoViewIfNeeded();
-      await loc.waitFor({ state: 'visible', timeout: 5000 });
-      // fill() triggers 'input' events that Vue/React reactive inputs handle
-      // This is the correct approach for Vue/React forms.
-      await loc.fill(text);
-    } else {
-      // No selector: type at current focus using keyboard
-      await page.keyboard.type(text, { delay: delayMs });
+      const loc = await chooseVisibleLocator(page, page.locator(selector), pid, selector, null, 'E_BROWSER_TYPE_FAILED');
+      const point = await moveLocatorIntoViewport(page, loc, pid, selector, null, 'E_BROWSER_TYPE_FAILED');
+      await page.mouse.move(point.x, point.y);
+      await page.mouse.down({ button: 'left' });
+      await page.mouse.up({ button: 'left' });
+      await page.keyboard.press('ControlOrMeta+A');
+      await page.keyboard.press('Backspace');
     }
+    await page.keyboard.type(text, { delay: delayMs });
     const result = { profileId: pid, typed: true, length: text.length, delay: delayMs, selector: selector || null };
     emit(pid, 'type.done', result);
     return result;

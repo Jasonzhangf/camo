@@ -116,12 +116,14 @@ export async function startSession({ profileId, headless, mode, viewport } = {})
 
     // Ensure profile metadata exists (auto-create for ephemeral)
     let profileMeta;
+    let profileCreated = false;
     try {
         profileMeta = readProfile(pid);
     } catch (cause) {
         if (cause.code === 'E_STATE_NOT_FOUND') {
             const { write: writeProfile } = await import('../profile/store.mjs');
             profileMeta = writeProfile(pid, {});
+            profileCreated = true;
         } else {
             throw cause;
         }
@@ -143,6 +145,10 @@ export async function startSession({ profileId, headless, mode, viewport } = {})
         const { release: releaseLock } = await import('../lock/manager.mjs');
         releaseLock(pid, { owner: lockOwner(), pid: process.pid });
         _lockHandle = null;
+        if (profileCreated) {
+            const { deleteProfile } = await import('../profile/store.mjs');
+            deleteProfile(pid);
+        }
         throw cause;
     }
 

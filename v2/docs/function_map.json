@@ -61,7 +61,7 @@
     {
       "id": "daemon.shutdown.orchestrate",
       "status": "active",
-      "owner_module": "transports.daemon",
+      "owner_module": "shell.daemon",
       "entry_symbols": [
         {
           "path": "v2/shell/daemon/index.mjs",
@@ -110,7 +110,7 @@
     {
       "id": "browser.runtime.ownership",
       "status": "active",
-      "owner_module": "services.browser_runtime",
+      "owner_module": "services.browser_service.internal",
       "entry_symbols": [
         {
           "path": "v2/services/browser_service/internal/camoufox_bridge.mjs",
@@ -196,6 +196,129 @@
         {
           "path": "v2/services/page_runtime/operations/page_ops.mjs",
           "symbol": "getPageInfo"
+        }
+      ]
+    },
+    {
+      "id": "cmd.click.request",
+      "status": "active",
+      "owner_module": "commands.builtins",
+      "entry_symbols": [
+        {
+          "path": "v2/commands/builtins/click.mjs",
+          "symbol": "run"
+        }
+      ]
+    },
+    {
+      "id": "cmd.click.execute",
+      "status": "active",
+      "owner_module": "services.page_runtime",
+      "entry_symbols": [
+        {
+          "path": "v2/services/page_runtime/input_pipeline.mjs",
+          "symbol": "click"
+        },
+        {
+          "path": "v2/services/page_runtime/operations/interaction_ops.mjs",
+          "symbol": "click"
+        }
+      ]
+    },
+    {
+      "id": "cmd.hover.request",
+      "status": "active",
+      "owner_module": "commands.builtins",
+      "entry_symbols": [
+        {
+          "path": "v2/commands/builtins/hover.mjs",
+          "symbol": "run"
+        }
+      ]
+    },
+    {
+      "id": "cmd.hover.execute",
+      "status": "active",
+      "owner_module": "services.page_runtime",
+      "entry_symbols": [
+        {
+          "path": "v2/services/page_runtime/input_pipeline.mjs",
+          "symbol": "hover"
+        },
+        {
+          "path": "v2/services/page_runtime/operations/interaction_ops.mjs",
+          "symbol": "hover"
+        }
+      ]
+    },
+    {
+      "id": "cmd.type.request",
+      "status": "active",
+      "owner_module": "commands.builtins",
+      "entry_symbols": [
+        {
+          "path": "v2/commands/builtins/type.mjs",
+          "symbol": "run"
+        }
+      ]
+    },
+    {
+      "id": "cmd.type.execute",
+      "status": "active",
+      "owner_module": "services.page_runtime",
+      "entry_symbols": [
+        {
+          "path": "v2/services/page_runtime/input_pipeline.mjs",
+          "symbol": "type"
+        },
+        {
+          "path": "v2/services/page_runtime/operations/interaction_ops.mjs",
+          "symbol": "type"
+        }
+      ]
+    },
+    {
+      "id": "cmd.browser-wire.project",
+      "status": "active",
+      "owner_module": "shell.daemon",
+      "entry_symbols": [
+        {
+          "path": "v2/shell/daemon/command_handlers.mjs",
+          "symbol": "handleCommand"
+        },
+        {
+          "path": "v2/shell/daemon/browser_commands.mjs",
+          "symbol": "isBrowserCommand"
+        }
+      ]
+    },
+    {
+      "id": "cmd.set_viewport.project",
+      "status": "active",
+      "owner_module": "shell.daemon",
+      "entry_symbols": [
+        {
+          "path": "v2/shell/daemon/command_handlers.mjs",
+          "symbol": "handleCommand"
+        },
+        {
+          "path": "v2/commands/builtins/setViewport.mjs",
+          "symbol": "run"
+        }
+      ]
+    },
+    {
+      "id": "cmd.get_readable.execute",
+      "status": "active",
+      "owner_module": "services.page_runtime",
+      "entry_symbols": [
+        {
+          "path": "v2/services/page_runtime/input_pipeline.mjs",
+          "symbol": "getReadable"
+        },
+        {
+          "path": "v2/services/page_runtime/operations/query_ops.mjs",
+          "symbol": "getReadable"
         }
       ]
     },

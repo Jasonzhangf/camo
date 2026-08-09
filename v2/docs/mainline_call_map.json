@@ -48,7 +48,7 @@
     },
     {
       "feature_id": "daemon.registration.write",
-      "from": "transports.daemon",
+      "from": "shell.daemon",
       "to": "services.daemon_registration",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
@@ -63,7 +63,7 @@
     },
     {
       "feature_id": "daemon.registration.write",
-      "from": "transports.daemon",
+      "from": "shell.daemon",
       "to": "services.daemon_registration",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
@@ -78,7 +78,7 @@
     },
     {
       "feature_id": "daemon.registration.write",
-      "from": "transports.daemon",
+      "from": "shell.daemon",
       "to": "services.daemon_registration",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
@@ -93,7 +93,7 @@
     },
     {
       "feature_id": "daemon.registration.write",
-      "from": "transports.daemon",
+      "from": "shell.daemon",
       "to": "services.daemon_registration",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
@@ -108,8 +108,8 @@
     },
     {
       "feature_id": "daemon.shutdown.orchestrate",
-      "from": "transports.daemon",
-      "to": "transports.daemon",
+      "from": "shell.daemon",
+      "to": "shell.daemon",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
         "symbol": "shutdown"
@@ -123,8 +123,8 @@
     },
     {
       "feature_id": "daemon.shutdown.orchestrate",
-      "from": "transports.daemon",
-      "to": "transports.daemon",
+      "from": "shell.daemon",
+      "to": "shell.daemon",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
         "symbol": "shutdown"
@@ -143,7 +143,7 @@
     },
     {
       "feature_id": "browser.lifecycle.shutdown",
-      "from": "transports.daemon",
+      "from": "shell.daemon",
       "to": "services.browser_service",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
@@ -163,7 +163,7 @@
     },
     {
       "feature_id": "browser.lifecycle.ephemeral",
-      "from": "transports.daemon",
+      "from": "shell.daemon",
       "to": "services.browser_service",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
@@ -178,7 +178,7 @@
     },
     {
       "feature_id": "browser.lifecycle.ephemeral",
-      "from": "transports.daemon",
+      "from": "shell.daemon",
       "to": "services.browser_service",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
@@ -193,7 +193,7 @@
     },
     {
       "feature_id": "browser.lifecycle.persistent",
-      "from": "transports.daemon",
+      "from": "shell.daemon",
       "to": "services.browser_service",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
@@ -208,7 +208,7 @@
     },
     {
       "feature_id": "browser.lifecycle.persistent",
-      "from": "transports.daemon",
+      "from": "shell.daemon",
       "to": "services.browser_service",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
@@ -224,7 +224,7 @@
     {
       "feature_id": "browser.runtime.ownership",
       "from": "services.browser_service",
-      "to": "services.browser_runtime",
+      "to": "services.browser_service.internal",
       "caller": {
         "path": "v2/services/browser_service/bootstrap.mjs",
         "symbol": "startSession"
@@ -239,7 +239,7 @@
     {
       "feature_id": "browser.runtime.ownership",
       "from": "services.browser_service",
-      "to": "services.browser_runtime",
+      "to": "services.browser_service.internal",
       "caller": {
         "path": "v2/services/browser_service/bootstrap.mjs",
         "symbol": "startSession"
@@ -254,7 +254,7 @@
     {
       "feature_id": "browser.runtime.ownership",
       "from": "services.browser_service",
-      "to": "services.browser_runtime",
+      "to": "services.browser_service.internal",
       "caller": {
         "path": "v2/services/browser_service/bootstrap.mjs",
         "symbol": "stopSession"
@@ -306,7 +306,7 @@
     },
     {
       "feature_id": "cmd.start.navigate",
-      "from": "transports.daemon",
+      "from": "shell.daemon",
       "to": "services.page_runtime",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
@@ -359,7 +359,7 @@
     },
     {
       "feature_id": "cmd.screenshot.write",
-      "from": "transports.daemon",
+      "from": "shell.daemon",
       "to": "services.page_runtime",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
@@ -427,7 +427,7 @@
     },
     {
       "feature_id": "cmd.get_page_info.create",
-      "from": "transports.daemon",
+      "from": "shell.daemon",
       "to": "services.page_runtime",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
@@ -454,6 +454,270 @@
         "local_symbol": "pageOps.getPageInfo"
       },
       "semantic_io": "serialized page-info request to Camoufox page projection"
+    },
+    {
+      "feature_id": "cmd.click.request",
+      "from": "shell.cli",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/shell/cli/dispatch.mjs",
+        "symbol": "dispatch"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run",
+        "local_symbol": "runBuiltin"
+      },
+      "semantic_io": "validated selector or text target to click builtin dispatch"
+    },
+    {
+      "feature_id": "cmd.click.request",
+      "from": "commands.builtins",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/click.mjs",
+        "symbol": "run",
+        "local_symbol": "click.run"
+      },
+      "invocation": {
+        "kind": "registry_dispatch",
+        "registry_object": "BUILTINS",
+        "command_id": "click",
+        "builtin_namespace": "click",
+        "dispatch_local_symbol": "mod",
+        "method": "run"
+      },
+      "semantic_io": "registry-selected click command to concrete builtin owner"
+    },
+    {
+      "feature_id": "cmd.click.execute",
+      "from": "shell.daemon",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "click",
+        "local_symbol": "click"
+      },
+      "semantic_io": "profile-scoped target to serialized protocol mouse click"
+    },
+    {
+      "feature_id": "cmd.click.execute",
+      "from": "services.page_runtime",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "click"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/operations/interaction_ops.mjs",
+        "symbol": "click",
+        "local_symbol": "pageOps.click"
+      },
+      "semantic_io": "serialized click target to protocol mouse move, down, and up"
+    },
+    {
+      "feature_id": "cmd.hover.request",
+      "from": "shell.cli",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/shell/cli/dispatch.mjs",
+        "symbol": "dispatch"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run",
+        "local_symbol": "runBuiltin"
+      },
+      "semantic_io": "validated selector or text target to hover builtin dispatch"
+    },
+    {
+      "feature_id": "cmd.hover.request",
+      "from": "commands.builtins",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/hover.mjs",
+        "symbol": "run",
+        "local_symbol": "hover.run"
+      },
+      "invocation": {
+        "kind": "registry_dispatch",
+        "registry_object": "BUILTINS",
+        "command_id": "hover",
+        "builtin_namespace": "hover",
+        "dispatch_local_symbol": "mod",
+        "method": "run"
+      },
+      "semantic_io": "registry-selected hover command to concrete builtin owner"
+    },
+    {
+      "feature_id": "cmd.hover.execute",
+      "from": "shell.daemon",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "hover",
+        "local_symbol": "hover"
+      },
+      "semantic_io": "profile-scoped target to serialized protocol mouse hover"
+    },
+    {
+      "feature_id": "cmd.hover.execute",
+      "from": "services.page_runtime",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "hover"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/operations/interaction_ops.mjs",
+        "symbol": "hover",
+        "local_symbol": "pageOps.hover"
+      },
+      "semantic_io": "serialized hover target to protocol mouse move"
+    },
+    {
+      "feature_id": "cmd.type.request",
+      "from": "shell.cli",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/shell/cli/dispatch.mjs",
+        "symbol": "dispatch"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run",
+        "local_symbol": "runBuiltin"
+      },
+      "semantic_io": "validated text, optional target, and delay to type builtin dispatch"
+    },
+    {
+      "feature_id": "cmd.type.request",
+      "from": "commands.builtins",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/type.mjs",
+        "symbol": "run",
+        "local_symbol": "type.run"
+      },
+      "invocation": {
+        "kind": "registry_dispatch",
+        "registry_object": "BUILTINS",
+        "command_id": "type",
+        "builtin_namespace": "type",
+        "dispatch_local_symbol": "mod",
+        "method": "run"
+      },
+      "semantic_io": "registry-selected type command to concrete builtin owner"
+    },
+    {
+      "feature_id": "cmd.type.execute",
+      "from": "shell.daemon",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "type",
+        "local_symbol": "type"
+      },
+      "semantic_io": "profile-scoped text and optional target to serialized input"
+    },
+    {
+      "feature_id": "cmd.type.execute",
+      "from": "services.page_runtime",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "type"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/operations/interaction_ops.mjs",
+        "symbol": "type",
+        "local_symbol": "pageOps.type"
+      },
+      "semantic_io": "serialized target focus and text to protocol mouse and keyboard input"
+    },
+    {
+      "feature_id": "cmd.browser-wire.project",
+      "from": "shell.daemon",
+      "to": "shell.daemon",
+      "caller": {
+        "path": "v2/shell/daemon/command_handlers.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/shell/daemon/browser_commands.mjs",
+        "symbol": "isBrowserCommand",
+        "local_symbol": "isBrowserCommand"
+      },
+      "semantic_io": "command id to canonical browser-admission classification"
+    },
+    {
+      "feature_id": "cmd.browser-wire.project",
+      "from": "shell.daemon",
+      "to": "shell.daemon",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/shell/daemon/browser_commands.mjs",
+        "symbol": "isBrowserCommand",
+        "local_symbol": "isBrowserCommand"
+      },
+      "semantic_io": "command id to canonical ephemeral-cleanup classification"
+    },
+    {
+      "feature_id": "cmd.set_viewport.project",
+      "from": "shell.daemon",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/shell/daemon/command_handlers.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "setViewport",
+        "local_symbol": "setViewport"
+      },
+      "semantic_io": "requested dimensions to exact runtime viewport result projection"
+    },
+    {
+      "feature_id": "cmd.set_viewport.project",
+      "from": "services.page_runtime",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "setViewport"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/operations/config_ops.mjs",
+        "symbol": "setViewport",
+        "local_symbol": "pageOps.setViewport"
+      },
+      "semantic_io": "serialized dimensions to protocol viewport update and exact success truth"
     },
     {
       "feature_id": "cmd.scroll.request",
@@ -495,7 +759,7 @@
     },
     {
       "feature_id": "cmd.scroll.execute",
-      "from": "transports.daemon",
+      "from": "shell.daemon",
       "to": "services.page_runtime",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
@@ -563,7 +827,7 @@
     },
     {
       "feature_id": "cmd.scroll_and_collect.execute",
-      "from": "transports.daemon",
+      "from": "shell.daemon",
       "to": "services.page_runtime",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
@@ -590,6 +854,36 @@
         "local_symbol": "pageOps.scrollAndCollect"
       },
       "semantic_io": "serialized collection loop to Camoufox page input"
+    },
+    {
+      "feature_id": "cmd.get_readable.execute",
+      "from": "shell.daemon",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/shell/daemon/command_handlers.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "getReadable",
+        "local_symbol": "getReadable"
+      },
+      "semantic_io": "profile-scoped readable query to serialized page-runtime operation"
+    },
+    {
+      "feature_id": "cmd.get_readable.execute",
+      "from": "services.page_runtime",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "getReadable"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/operations/query_ops.mjs",
+        "symbol": "getReadable",
+        "local_symbol": "pageOps.getReadable"
+      },
+      "semantic_io": "serialized readable query to clone-only text extraction without live DOM mutation"
     },
     {
       "feature_id": "search.platform.execute",

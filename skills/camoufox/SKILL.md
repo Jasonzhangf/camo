@@ -107,3 +107,25 @@ Then report capability gap instead of switching control surface.
 - 浏览器生命周期状态（currentBrowserProfile/browserRefCount）模块级与 browserState 快照必须同步。
 - 改 daemon 命令处理时，`ensureBrowser`/`releaseBrowser` 必须更新传入的 browserState，否则每次命令后状态被清空 → 下次命令 `E_STATE_DUPLICATE`。
 - 快速诊断：`curl localhost:<httpPort>/health` 看 `profile`/`browserCount`。正常应 `profile:"<name>", browserCount:1`；若 `idle/0` 说明状态同步坏了。
+
+## Protocol closeout verification rules (2026-08)
+
+- Real user actions must stay at the protocol surface: `camo click`, `type`,
+  `hover`, and `scroll` use mouse/keyboard/wheel events. Do not replace a
+  failed action with DOM APIs, `evaluate`, CDP, or a second control path.
+- For mobile replay, call `camo set-viewport --width 390 --height 844` and
+  require the response to contain `set:true` plus the exact requested width
+  and height. Verify the screenshot is physically 390x844.
+- A visible scroll is proved with protocol wheel input and before/after
+  screenshots (or equivalent page-state evidence); do not infer scrolling from
+  a success-shaped response alone.
+- Before `camo select`, inspect the live page's actual option values with
+  `camo snapshot` or `camo find-elements`; pass the exact value exposed by the
+  page. A rejected guessed value is an explicit input error, not a runtime gap
+  and must not receive fallback handling.
+- Global-install evidence must come from a packed tarball. Record installed
+  version and compare the installed runtime/source SHA-256 before canonical
+  replay; source-only execution is not release evidence.
+- OneStop Admin is only a canonical browser-verification target for this camo
+  closeout. Admin backend recovery/reset flows remain supported and are outside
+  this round's frontend automation scope; do not remove or disable them.

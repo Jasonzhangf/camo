@@ -14,26 +14,20 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { setTimeout as wait } from 'node:timers/promises';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import url from 'node:url';
-import os from 'node:os';
 
-import { findActiveDaemon } from '../../shell/config/daemon_finder.mjs';
 import { WebSocket } from 'ws';
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
 const DAEMON_SCRIPT = path.join(__dirname, '..', '..', 'shell', 'daemon', 'index.mjs');
+const TEST_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-e2e-lifecycle-'));
+process.env.HOME = TEST_HOME;
+const { findActiveDaemon, listRegistrations } = await import('../../services/daemon_registration/registry.mjs');
 
 function readReg(pid) {
-  const dir = path.join(os.homedir(), '.camo', 'daemon');
-  if (!fs.existsSync(dir)) return null;
-  for (const f of fs.readdirSync(dir)) {
-    try {
-      const raw = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
-      if (raw.pid === pid) return raw;
-    } catch {}
-  }
-  return null;
+  return listRegistrations({ includeStale: true }).find((registration) => registration.pid === pid) || null;
 }
 
 async function waitForRegistration(pid, timeoutMs = 8000) {
@@ -49,7 +43,7 @@ async function waitForRegistration(pid, timeoutMs = 8000) {
 test('e2e: ephemeral daemon start → ws ping → sigterm → cleanup', { skip: process.env.CAMO_E2E_SKIP === '1' }, async (t) => {
   const profile = `e2e-${Date.now()}-${process.pid}`;
   const child = spawn(process.execPath, [DAEMON_SCRIPT, '--ephemeral'], {
-    env: { ...process.env, CAMO_WS_PORT: '0', CAMO_HTTP_PORT: '0', CAMO_PROFILE: profile },
+    env: { ...process.env, HOME: TEST_HOME, CAMO_WS_PORT: '0', CAMO_HTTP_PORT: '0', CAMO_PROFILE: profile },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   
@@ -65,7 +59,7 @@ test('e2e: ephemeral daemon start → ws ping → sigterm → cleanup', { skip: 
 
   // Wait for the daemon to register itself.
   const reg = await waitForRegistration(child.pid);
-  assert.equal(reg.profile.startsWith('_ephemeral_'), true, 'ephemeral profile gets _ephemeral_ prefix');
+  assert.equal(reg.scope, 'shared');
   assert.equal(reg.mode, 'ephemeral');
   assert.ok(reg.wsPort > 0, 'wsPort is a real port number');
   assert.ok(reg.httpPort > 0, 'httpPort is a real port number');
@@ -117,10 +111,10 @@ test('e2e: ephemeral daemon start → ws ping → sigterm → cleanup', { skip: 
   assert.equal(leftover, null, 'daemon registration file should be removed on shutdown');
 });
 
-test('e2e: same-profile conflict is detected and rejected', { skip: process.env.CAMO_E2E_SKIP === '1' }, async (t) => {
+test('e2e: second shared daemon is rejected regardless of requested profile', { skip: process.env.CAMO_E2E_SKIP === '1' }, async (t) => {
   const profile = `e2e-conflict-${Date.now()}`;
   const child = spawn(process.execPath, [DAEMON_SCRIPT, '--profile', profile], {
-    env: { ...process.env, CAMO_WS_PORT: '0', CAMO_HTTP_PORT: '0' },
+    env: { ...process.env, HOME: TEST_HOME, CAMO_WS_PORT: '0', CAMO_HTTP_PORT: '0' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   
@@ -133,7 +127,7 @@ test('e2e: same-profile conflict is detected and rejected', { skip: process.env.
 
   // Try a second daemon on the same profile; it should exit non-zero.
   const second = spawn(process.execPath, [DAEMON_SCRIPT, '--profile', profile], {
-    env: { ...process.env, CAMO_WS_PORT: '0', CAMO_HTTP_PORT: '0' },
+    env: { ...process.env, HOME: TEST_HOME, CAMO_WS_PORT: '0', CAMO_HTTP_PORT: '0' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   
@@ -144,8 +138,8 @@ test('e2e: same-profile conflict is detected and rejected', { skip: process.env.
     second.on('exit', (c) => resolve(c));
     setTimeout(() => { try { second.kill('SIGKILL'); } catch {}; resolve(-1); }, 5000);
   });
-  assert.notEqual(code, 0, 'second daemon on same profile must exit non-zero');
-  assert.match(stderr.join(''), /already owned by daemon/, 'stderr explains the conflict');
+  assert.notEqual(code, 0, 'second shared daemon must exit non-zero');
+  assert.match(stderr.join(''), /shared_daemon_already_running/, 'stderr identifies the canonical shared-daemon conflict');
   
   // Cleanup: kill first daemon.
   child.kill('SIGTERM');
@@ -153,12 +147,9 @@ test('e2e: same-profile conflict is detected and rejected', { skip: process.env.
 });
 
 test('e2e: daemon finder returns active daemons and filters dead ones', () => {
-  const profile = 'finder-test';
   // Active: just launched from previous test would be present, but
   // for finder unit test we just verify the shape.
-  const result = findActiveDaemon({ profile: '__no_such_profile__' });
-  assert.equal(result, null);
-  const any = findActiveDaemon({ ephemeral: true });
+  const any = findActiveDaemon();
   // Either we have one (left over) or none — both are valid.
   if (any) {
     assert.ok(any.pid > 0);

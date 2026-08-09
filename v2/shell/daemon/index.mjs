@@ -17,10 +17,6 @@
 
 import { WebSocketServer } from 'ws';
 import http from 'node:http';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-import url from 'node:url';
 import { CamoError, project as projectError } from '../../contracts/error_envelope/projector.mjs';
 import { build, parse } from '../../contracts/ws_messages/v1/envelope.mjs';
 import { append as appendProgress } from '../../services/progress_event/log.mjs';
@@ -28,107 +24,24 @@ import {
   startSession, 
   stopSession, 
   getSession,
+  shutdown as shutdownBrowserService,
   __enableTestRoot as enableBrowserServiceTest,
   enableAllOwners as enableAllBrowserOwners
 } from '../../services/browser_service/bootstrap.mjs';
-import { cleanupStaleRegistrations, unregisterByPid } from '../config/daemon_finder.mjs';
+import {
+  claimDaemonSlot,
+  registerDaemon,
+  releaseDaemonSlot,
+  unregisterDaemon,
+} from '../../services/daemon_registration/registry.mjs';
 import { handleCommand as dispatchCommand } from './command_handlers.mjs';
-
-const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
+import { isBrowserCommand } from './browser_commands.mjs';
+import { shutdownDaemonResources } from './shutdown_policy.mjs';
 
 // --- Configuration ---
 const WS_PORT = parseInt(process.env.CAMO_WS_PORT || '0', 10);
 const HTTP_PORT = parseInt(process.env.CAMO_HTTP_PORT || '0', 10);
 const DEFAULT_PROFILE = process.env.CAMO_PROFILE || '_ephemeral_';
-
-// --- Daemon registration ---
-const DAEMON_DIR = path.join(os.homedir(), '.camo', 'daemon');
-const LOCK_DIR = path.join(os.homedir(), '.camo', 'locks');
-
-function generateDaemonId() {
-  return `daemon-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-}
-
-function registerDaemon(wsPort, httpPort, profile, mode) {
-  fs.mkdirSync(DAEMON_DIR, { recursive: true });
-  const daemonId = generateDaemonId();
-  const payload = {
-    daemonId,
-    pid: process.pid,
-    wsPort,
-    httpPort,
-    profile,
-    mode,
-    startedAt: new Date().toISOString(),
-    hostname: os.hostname(),
-  };
-  const file = path.join(DAEMON_DIR, `${daemonId}.json`);
-  const tmp = file + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), 'utf8');
-  fs.renameSync(tmp, file);
-  return { daemonId, file, payload };
-}
-
-function unregisterDaemon(daemonId) {
-  if (!daemonId) return;
-  const file = path.join(DAEMON_DIR, `${daemonId}.json`);
-  try { fs.unlinkSync(file); }
-  catch (cause) {
-    if (cause.code !== 'ENOENT') {
-      throw new CamoError({
-        code: 'E_IO_FILESYSTEM',
-        details: { op: 'daemon.unregister', path: file, reason: cause?.message || String(cause) },
-        cause,
-      });
-    }
-  }
-}
-
-function cleanupStaleDaemons(profile) {
-  if (!fs.existsSync(DAEMON_DIR)) return;
-  for (const entry of fs.readdirSync(DAEMON_DIR)) {
-    if (!entry.endsWith('.json')) continue;
-    const file = path.join(DAEMON_DIR, entry);
-    try {
-      const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
-      if (raw.pid === process.pid) continue;
-      if (profile && raw.profile && raw.profile !== profile && !raw.profile.startsWith('_ephemeral_')) continue;
-      try { process.kill(raw.pid, 0); } // alive
-      catch {
-        try { fs.unlinkSync(file); }
-        catch (cause) {
-          if (cause.code !== 'ENOENT') {
-            throw new CamoError({
-              code: 'E_IO_FILESYSTEM',
-              details: { op: 'daemon.cleanupStale', path: file, reason: cause?.message || String(cause) },
-              cause,
-            });
-          }
-        }
-      }
-    } catch {}
-  }
-}
-
-function checkProfileConflict(profile) {
-  if (!profile || profile.startsWith('_ephemeral_')) return null;
-  if (!fs.existsSync(DAEMON_DIR)) return null;
-  for (const entry of fs.readdirSync(DAEMON_DIR)) {
-    if (!entry.endsWith('.json')) continue;
-    try {
-      const raw = JSON.parse(fs.readFileSync(path.join(DAEMON_DIR, entry), 'utf8'));
-      if (raw.profile === profile && raw.pid !== process.pid) {
-        try {
-          process.kill(raw.pid, 0);
-          return { pid: raw.pid, daemonId: raw.daemonId, wsPort: raw.wsPort };
-        } catch {
-          // stale
-        }
-      }
-    } catch {}
-  }
-  return null;
-}
 
 let opts = {
   profile: DEFAULT_PROFILE,
@@ -153,25 +66,6 @@ function parseArgs(argv) {
   return o;
 }
 
-// --- Parse args early ---
-opts = parseArgs(process.argv);
-
-// Check for same-profile conflict before starting
-const conflict = checkProfileConflict(opts.profile);
-if (conflict) {
-  console.error(`[camo daemon] Fatal: profile "${opts.profile}" already owned by daemon pid=${conflict.pid} wsPort=${conflict.wsPort}`);
-  console.error(`[camo daemon] Use --force or stop the existing daemon first.`);
-  process.exit(2);
-}
-
-// Clean stale daemon registrations for this profile
-cleanupStaleDaemons(opts.profile);
-
-// Enable browser_service for this daemon process
-enableBrowserServiceTest();
-// Ensure all downstream writable scopes are enabled before serving.
-await enableAllBrowserOwners();
-
 // Generate ephemeral runId
 const RUN_ID = opts.mode === 'ephemeral' 
   ? `ephemeral-${process.pid}-${Date.now()}`
@@ -191,14 +85,16 @@ function emit(type, payload) {
 let currentBrowserProfile = null;
 let browserRefCount = 0;
 let _currentBrowserState = null;
+let browserOwnersEnabled = false;
 
 async function ensureBrowser(profile, forcePersistent) {
   const targetProfile = profile || opts.profile;
+  const { getBrowser } = await import('../../services/browser_service/internal/camoufox_bridge.mjs');
   
   if (opts.mode === 'ephemeral' || forcePersistent) {
     if (currentBrowserProfile !== targetProfile || browserRefCount === 0) {
       if (currentBrowserProfile && currentBrowserProfile !== targetProfile) {
-        try { await stopSession(currentBrowserProfile); } catch {}
+        await stopSession(currentBrowserProfile);
       }
       await startSession({ profileId: targetProfile, headless: opts.mode === 'headless' });
       currentBrowserProfile = targetProfile;
@@ -209,8 +105,10 @@ async function ensureBrowser(profile, forcePersistent) {
     return targetProfile;
   }
   
-  if (!currentBrowserProfile) {
-    await startSession({ profileId: targetProfile, headless: opts.mode === 'headless' });
+  if (!currentBrowserProfile || currentBrowserProfile !== targetProfile) {
+    if (!getBrowser(targetProfile)) {
+      await startSession({ profileId: targetProfile, headless: opts.mode === 'headless' });
+    }
     currentBrowserProfile = targetProfile;
     browserRefCount = 1;
     if (_currentBrowserState) _currentBrowserState.currentBrowserProfile = targetProfile;
@@ -224,7 +122,7 @@ async function ensureBrowser(profile, forcePersistent) {
 async function releaseBrowser(forceClose) {
   if (opts.mode === 'ephemeral' || forceClose) {
     if (currentBrowserProfile) {
-      try { await stopSession(currentBrowserProfile); } catch {}
+      await stopSession(currentBrowserProfile);
       currentBrowserProfile = null;
       browserRefCount = 0;
       if (_currentBrowserState) _currentBrowserState.currentBrowserProfile = null;
@@ -244,10 +142,12 @@ async function handleCommand(env) {
 
   emit('command.start', { cmd, args, profile, ephemeral: isEphemeral });
 
+  let result = null;
+  let commandError = null;
   try {
     const browserState = { currentBrowserProfile, browserRefCount };
     _currentBrowserState = browserState;
-    const result = await dispatchCommand(cmd, args, {
+    const commandResult = await dispatchCommand(cmd, args, {
       profile,
       isEphemeral,
       opts,
@@ -260,25 +160,33 @@ async function handleCommand(env) {
     currentBrowserProfile = browserState.currentBrowserProfile;
     browserRefCount = browserState.browserRefCount;
 
-    // Close ephemeral browser after command
-    const browserCmds = new Set(['goto', 'click', 'type', 'scroll', 'screenshot', 'snapshot', 'wait', 'evaluate', 'upload', 'select']);
-    if (isEphemeral && browserCmds.has(cmd)) {
-      await releaseBrowser(true);
-    }
-
-    emit('command.done', { cmd, profile, durationMs: Date.now() - startedAt });
-    return { kind: 'result', payload: { cmd, ...result } };
-
+    result = { kind: 'result', payload: { cmd, ...commandResult } };
   } catch (cause) {
-    const proj = cause instanceof CamoError ? cause : new CamoError({
+    commandError = cause;
+  }
+
+  if (isEphemeral && isBrowserCommand(cmd)) {
+    try {
+      await releaseBrowser(true);
+    } catch (cause) {
+      commandError ||= cause;
+      result = null;
+    }
+  }
+
+  if (commandError) {
+    const proj = commandError instanceof CamoError ? commandError : new CamoError({
       code: 'E_INTERNAL_UNEXPECTED',
-      message: cause?.message || String(cause),
-      cause
+      message: commandError?.message || String(commandError),
+      cause: commandError,
     });
     const projected = projectError(proj);
     emit('command.error', { cmd, profile, error: projected });
     return { kind: 'error', payload: projected };
   }
+
+  emit('command.done', { cmd, profile, durationMs: Date.now() - startedAt });
+  return result;
 }
 
 // --- HTTP server ---
@@ -377,6 +285,26 @@ function createWsServer() {
 let wsServer = null;
 let httpServer = null;
 let shuttingDown = false;
+let daemonClaim = null;
+
+function closeServer(server) {
+  if (!server) return Promise.resolve();
+  for (const client of server.clients || []) client.terminate();
+  server.closeAllConnections?.();
+  return new Promise((resolve, reject) => {
+    server.close((cause) => {
+      if (cause) reject(cause);
+      else resolve();
+    });
+  });
+}
+
+export async function closeProtocolServers() {
+  await closeServer(wsServer);
+  await closeServer(httpServer);
+  wsServer = null;
+  httpServer = null;
+}
 
 async function shutdown(code = 0) {
   if (shuttingDown) return;
@@ -384,39 +312,39 @@ async function shutdown(code = 0) {
   
   emit('daemon.shutdown', { code });
   
-  // Close all browsers
-  if (currentBrowserProfile) {
-    await stopSession(currentBrowserProfile); // surface to shutdown caller
+  const result = await shutdownDaemonResources({
+    shutdownBrowsers: async () => {
+      if (browserOwnersEnabled) await shutdownBrowserService();
+    },
+    clearBrowserTruth: () => {
+      currentBrowserProfile = null;
+      browserRefCount = 0;
+      _currentBrowserState = null;
+    },
+    closeServers: closeProtocolServers,
+    releaseRegistration: () => {
+      if (!daemonClaim) return;
+      if (opts.daemonId) unregisterDaemon(opts.daemonId, daemonClaim);
+      else releaseDaemonSlot(daemonClaim);
+      daemonClaim = null;
+    },
+  });
+  if (!result.ok) {
+    console.error(`[camo daemon] shutdown failed at ${result.stage}: ${result.cause?.message || String(result.cause)}`);
+    process.exitCode = 1;
+    return;
   }
-  
-  // Unregister daemon
-  unregisterDaemon(opts.daemonId);
-  
-  // Close servers
-  if (httpServer) httpServer.close();
-  if (wsServer) wsServer.close();
-  
-  await new Promise(r => setTimeout(r, 100));
   process.exit(code);
 }
 
 // --- Main ---
 async function main(argv) {
   opts = parseArgs(argv);
-  
-  // Check for same-profile conflict
-  const conflict = checkProfileConflict(opts.profile);
-  if (conflict) {
-    console.error(`[camo daemon] Fatal: profile "${opts.profile}" already owned by daemon pid=${conflict.pid} wsPort=${conflict.wsPort}`);
-    console.error(`[camo daemon] Use --force or stop the existing daemon first.`);
-    process.exit(2);
-  }
-  
-  // Clean stale daemons
-  cleanupStaleDaemons(opts.profile);
+  daemonClaim = claimDaemonSlot();
   
   enableBrowserServiceTest();
   await enableAllBrowserOwners();
+  browserOwnersEnabled = true;
   
   emit('daemon.start', { daemonId: opts.daemonId || 'pending', ...opts, wsPort: WS_PORT, httpPort: HTTP_PORT });
 
@@ -461,15 +389,16 @@ async function main(argv) {
       }
     });
     
-    // Register daemon with actual ports
-    const actualWsPort = () => {
-      try { return wsServer.address().port; } catch { return WS_PORT; }
-    };
-    
     // Wait for WS server to be ready
     wsServer.on('listening', () => {
       const actualWsPort = wsServer.address().port;
-      const reg = registerDaemon(actualWsPort, actualHttpPort, opts.profile, opts.mode);
+      const reg = registerDaemon({
+        claim: daemonClaim,
+        wsPort: actualWsPort,
+        httpPort: actualHttpPort,
+        headless: opts.mode === 'headless',
+        mode: opts.mode,
+      });
       opts.daemonId = reg.daemonId;
       opts.daemonRegistration = reg;
       
@@ -491,13 +420,11 @@ async function main(argv) {
       }
     }, idleTimeout);
     
-    // Reset idle timer on each command
-    const origHandleCommand = handleCommand;
-    // We'll let the daemon stay alive; CLI will shut it down after the command
   }
 }
 
-main(process.argv).catch((e) => {
-  console.error(`[camo daemon] fatal: ${e?.message || String(e)}`);
-  shutdown(1);
+await main(process.argv).catch(async (e) => {
+  const fatal = e instanceof CamoError ? projectError(e) : null;
+  console.error(`[camo daemon] fatal: ${fatal?.message || e?.message || String(e)}`);
+  await shutdown(1);
 });

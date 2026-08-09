@@ -9,13 +9,17 @@ function createMockTransport() {
   return {
     async sendFrame(envelope) {
       const replyId = envelope.id || `mock-${++idCounter}`;
+      const payload = { cmd: envelope.payload?.cmd, ok: true, ...envelope.payload?.args };
+      if (envelope.payload?.cmd === 'type') {
+        payload.typedChars = 11;
+      }
       // Return a valid reply envelope
       return {
         v: 'camo.v2.protocol/v1',
         id: replyId,
         kind: 'result',
         ts: new Date().toISOString(),
-        payload: { cmd: envelope.payload?.cmd, ok: true, ...envelope.payload?.args },
+        payload,
       };
     },
   };

@@ -39,3 +39,7 @@ temp/
 # reasonix tool state
 .reasonix/
 reasonix.toml
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json

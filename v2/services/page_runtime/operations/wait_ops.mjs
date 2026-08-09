@@ -9,15 +9,38 @@ import { safeId, getPageOrThrow, emit } from './_page_helpers.mjs';
  * Wait for a duration.
  * @param {Object} opts
  * @param {string} opts.profileId
- * @param {number} [opts.ms] - Milliseconds to wait (default 1000)
+ * @param {string} [opts.for_] - Condition: load, domcontentloaded, networkidle, selector, text, url
+ * @param {string} [opts.target] - Selector, text, or URL target for conditional waits
+ * @param {number} [opts.timeout] - Maximum wait time in milliseconds
  * @returns {Object} wait result
  */
-export async function wait({ profileId, ms = 1000 }) {
+export async function wait({ profileId, for_: condition = 'load', target = null, timeout = 30000, ms }) {
   const pid = safeId(profileId, 'profileId');
-  const waitMs = typeof ms === 'number' && ms > 0 ? ms : 1000;
-  emit(pid, 'wait.start', { ms: waitMs });
-  await new Promise(resolve => setTimeout(resolve, waitMs));
-  const result = { profileId: pid, waited: true, ms: waitMs };
+  const allowed = new Set(['load', 'domcontentloaded', 'networkidle', 'selector', 'text', 'url']);
+  if (!allowed.has(condition)) throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'for', value: condition } });
+  const timeoutMs = typeof timeout === 'number' && timeout >= 0 ? timeout : 30000;
+  const page = getPageOrThrow(pid);
+  if (['selector', 'text', 'url'].includes(condition) && !target) {
+    throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'target' } });
+  }
+  emit(pid, 'wait.start', { for: condition, target, timeout: timeoutMs });
+  try {
+    if (typeof ms === 'number' && ms > 0) {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+    } else if (condition === 'selector') {
+      await page.locator(target).waitFor({ state: 'visible', timeout: timeoutMs });
+    } else if (condition === 'text') {
+      await page.getByText(target, { exact: false }).waitFor({ state: 'visible', timeout: timeoutMs });
+    } else if (condition === 'url') {
+      await page.waitForURL(target, { timeout: timeoutMs });
+    } else {
+      await page.waitForLoadState(condition, { timeout: timeoutMs });
+    }
+  } catch (cause) {
+    emit(pid, 'wait.error', { for: condition, target, error: cause?.message });
+    throw new CamoError({ code: 'E_IO_TIMEOUT', details: { profileId: pid, for: condition, target, timeout: timeoutMs, reason: cause?.message }, cause });
+  }
+  const result = { profileId: pid, waited: true, satisfied: true, for: condition, target, timeout: timeoutMs };
   emit(pid, 'wait.done', result);
   return result;
 }

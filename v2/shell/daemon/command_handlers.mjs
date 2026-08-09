@@ -5,6 +5,7 @@
 
 import { CamoError, project as projectError } from '../../contracts/error_envelope/projector.mjs';
 import { append as appendProgress } from '../../services/progress_event/log.mjs';
+import { browserCommandNames, isBrowserCommand } from './browser_commands.mjs';
 
 function emit(profileId, type, payload) {
   appendProgress({ event: type, source: 'daemon_handler', profileId, payload, ts: new Date().toISOString() });
@@ -14,8 +15,6 @@ async function importOp(opName) {
   const { [opName]: fn } = await import('../../services/page_runtime/input_pipeline.mjs');
   return fn;
 }
-
-const browserCmds = new Set(['goto', 'click', 'type', 'scroll', 'screenshot', 'snapshot', 'wait', 'evaluate', 'upload', 'select']);
 
 /**
  * Handle a command. Delegates to input_pipeline operations.
@@ -34,7 +33,7 @@ export async function handleCommand(cmd, args, ctx) {
   const { profile, isEphemeral, opts, ensureBrowser, releaseBrowser, browserState } = ctx;
   let closeAfter = false;
 
-  if (browserCmds.has(cmd)) {
+  if (isBrowserCommand(cmd)) {
     await ensureBrowser(profile, false);
     closeAfter = isEphemeral;
   }
@@ -86,12 +85,12 @@ export async function handleCommand(cmd, args, ctx) {
     case 'type': {
       const type = await importOp('type');
       const r = await type({ profileId: profile, text: args.text, selector: args.selector, delay: args.delay });
-      return { ok: true, typed: true, length: r.length };
+      return { ok: true, typed: true, typedChars: r.length };
     }
 
     case 'scroll': {
       const scroll = await importOp('scroll');
-      const r = await scroll({ profileId: profile, x: args.x || 0, y: args.y || 0 });
+      const r = await scroll({ profileId: profile, x: args.dx, y: args.dy });
       return { ok: true, scrolled: true };
     }
 
@@ -109,8 +108,8 @@ export async function handleCommand(cmd, args, ctx) {
 
     case 'wait': {
       const wait = await importOp('wait');
-      await wait({ profileId: profile, ms: args.ms || 1000 });
-      return { ok: true, waited: true, ms: args.ms || 1000 };
+      const r = await wait({ profileId: profile, for_: args.for || 'load', target: args.target || null, timeout: args.timeout, ms: args.ms });
+      return { ok: true, waited: true, satisfied: r.satisfied === true, for: r.for, target: r.target, timeout: r.timeout };
     }
 
     case 'evaluate': {
@@ -174,7 +173,7 @@ export async function handleCommand(cmd, args, ctx) {
     case 'get-readable': {
       const getReadable = await importOp('getReadable');
       const r = await getReadable({ profileId: profile, maxLength: args.maxLength });
-      return { ok: true, content: r.content, textLength: r.textLength };
+      return { ok: true, text: r.text, length: r.length };
     }
 
     case 'get-text': {
@@ -222,7 +221,7 @@ export async function handleCommand(cmd, args, ctx) {
     case 'set-viewport': {
       const setViewport = await importOp('setViewport');
       const r = await setViewport({ profileId: profile, width: args.width, height: args.height });
-      return { ok: true, viewportSet: true };
+      return { ok: true, set: r.set === true, width: r.width, height: r.height };
     }
 
     case 'search': {
@@ -258,7 +257,7 @@ export async function handleCommand(cmd, args, ctx) {
     default:
       throw new CamoError({
         code: 'E_PROTO_NO_HANDLER',
-        details: { cmd, known: ['start', 'stop', 'close-tab', 'daemon', 'fetch-page', 'find-elements', 'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'hover', 'list-tabs', 'new-tab', 'scroll-and-collect', 'set-cookies', 'set-user-agent', 'set-viewport', 'wait-dom-stable', ...browserCmds, 'search'] }
+        details: { cmd, known: ['start', 'stop', 'close-tab', 'daemon', 'fetch-page', 'find-elements', 'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'list-tabs', 'new-tab', 'scroll-and-collect', 'set-cookies', 'set-user-agent', 'set-viewport', 'wait-dom-stable', ...browserCommandNames(), 'search'] }
       });
   }
 }

@@ -245,3 +245,20 @@ Tags: camo, google, fingerprint, camoufox, firefox-ua, daemon, browserstate, dup
 - smoke tests: 10/10 pass
 - global install: 0.4.2 installed
 - OneStop canonical: `type --selector` writes `adminadmin` to password field; `screenshot --path` saves real file; `click` on submit returns `clicked: true`
+
+## 2026-08-09: protocol closeout release baseline
+
+- `set-viewport` is a strict wire contract: successful output must carry
+  `set:true` and exactly match the requested width and height. The canonical
+  mobile replay used `390x844`, and the screenshot was physically 390x844.
+- Mobile scrolling is verified by protocol wheel input plus changed before /
+  after screenshots. `get-readable` is verified non-mutating by identical
+  before/after screenshot SHA-256.
+- Live select values must be read from the page before issuing the command;
+  `created_asc` is valid for the OneStop orders page while `created_at_asc` is
+  not. Do not add fallback handling for a caller-supplied option value error.
+- OneStop Admin is a canonical browser target only. Its backend admin
+  recovery/reset chain remains supported; this closeout deliberately does not
+  automate that frontend flow and makes no auth-code change.
+
+Tags: camo, protocol, set-viewport, mobile, wheel, readable, tarball, onestop, admin-recovery

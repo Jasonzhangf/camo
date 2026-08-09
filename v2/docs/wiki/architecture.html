@@ -525,6 +525,242 @@ reader can map a paragraph back to a machine-checked entry.</p>
       <td><code>L3_transport</code></td>
       <td><code>L4_command</code></td>
       <td>reverse dependency forbidden</td>
+    </tr></tbody></table><h3>Forbidden edges</h3><table><thead><tr><th>from</th><th>to</th><th>reason</th></tr></thead><tbody>
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.session</code></td>
+      <td>shell may only read session; writes must go through ws/http</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.container</code></td>
+      <td>container match is service-only</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.lock</code></td>
+      <td>single-writer rule</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.page_runtime</code></td>
+      <td>page runtime is server-only</td>
+    </tr>
+
+    <tr>
+      <td><code>commands.builtins</code></td>
+      <td><code>services.session</code></td>
+      <td>must use transports</td>
+    </tr>
+
+    <tr>
+      <td><code>commands.builtins</code></td>
+      <td><code>services.container</code></td>
+      <td>must use transports</td>
+    </tr>
+
+    <tr>
+      <td><code>transports.client</code></td>
+      <td><code>services.lock</code></td>
+      <td>clients only observe; locks are server-writer</td>
+    </tr>
+
+    <tr>
+      <td><code>L5_shell</code></td>
+      <td><code>L2_service</code></td>
+      <td>shell must never import a service module directly; only via command+transport</td>
+    </tr>
+
+    <tr>
+      <td><code>L4_command</code></td>
+      <td><code>L0_protocol</code></td>
+      <td>command must use contracts/parsers, never protocol</td>
+    </tr>
+
+    <tr>
+      <td><code>L3_transport</code></td>
+      <td><code>L4_command</code></td>
+      <td>reverse dependency forbidden</td>
+    </tr></tbody></table><h3>Forbidden edges</h3><table><thead><tr><th>from</th><th>to</th><th>reason</th></tr></thead><tbody>
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.session</code></td>
+      <td>shell may only read session; writes must go through ws/http</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.container</code></td>
+      <td>container match is service-only</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.lock</code></td>
+      <td>single-writer rule</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.page_runtime</code></td>
+      <td>page runtime is server-only</td>
+    </tr>
+
+    <tr>
+      <td><code>commands.builtins</code></td>
+      <td><code>services.session</code></td>
+      <td>must use transports</td>
+    </tr>
+
+    <tr>
+      <td><code>commands.builtins</code></td>
+      <td><code>services.container</code></td>
+      <td>must use transports</td>
+    </tr>
+
+    <tr>
+      <td><code>transports.client</code></td>
+      <td><code>services.lock</code></td>
+      <td>clients only observe; locks are server-writer</td>
+    </tr>
+
+    <tr>
+      <td><code>L5_shell</code></td>
+      <td><code>L2_service</code></td>
+      <td>shell must never import a service module directly; only via command+transport</td>
+    </tr>
+
+    <tr>
+      <td><code>L4_command</code></td>
+      <td><code>L0_protocol</code></td>
+      <td>command must use contracts/parsers, never protocol</td>
+    </tr>
+
+    <tr>
+      <td><code>L3_transport</code></td>
+      <td><code>L4_command</code></td>
+      <td>reverse dependency forbidden</td>
+    </tr></tbody></table><h3>Forbidden edges</h3><table><thead><tr><th>from</th><th>to</th><th>reason</th></tr></thead><tbody>
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.session</code></td>
+      <td>shell may only read session; writes must go through ws/http</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.container</code></td>
+      <td>container match is service-only</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.lock</code></td>
+      <td>single-writer rule</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.page_runtime</code></td>
+      <td>page runtime is server-only</td>
+    </tr>
+
+    <tr>
+      <td><code>commands.builtins</code></td>
+      <td><code>services.session</code></td>
+      <td>must use transports</td>
+    </tr>
+
+    <tr>
+      <td><code>commands.builtins</code></td>
+      <td><code>services.container</code></td>
+      <td>must use transports</td>
+    </tr>
+
+    <tr>
+      <td><code>transports.client</code></td>
+      <td><code>services.lock</code></td>
+      <td>clients only observe; locks are server-writer</td>
+    </tr>
+
+    <tr>
+      <td><code>L5_shell</code></td>
+      <td><code>L2_service</code></td>
+      <td>shell must never import a service module directly; only via command+transport</td>
+    </tr>
+
+    <tr>
+      <td><code>L4_command</code></td>
+      <td><code>L0_protocol</code></td>
+      <td>command must use contracts/parsers, never protocol</td>
+    </tr>
+
+    <tr>
+      <td><code>L3_transport</code></td>
+      <td><code>L4_command</code></td>
+      <td>reverse dependency forbidden</td>
+    </tr></tbody></table><h3>Forbidden edges</h3><table><thead><tr><th>from</th><th>to</th><th>reason</th></tr></thead><tbody>
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.session</code></td>
+      <td>shell may only read session; writes must go through ws/http</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.container</code></td>
+      <td>container match is service-only</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.lock</code></td>
+      <td>single-writer rule</td>
+    </tr>
+
+    <tr>
+      <td><code>shell.cli</code></td>
+      <td><code>services.page_runtime</code></td>
+      <td>page runtime is server-only</td>
+    </tr>
+
+    <tr>
+      <td><code>commands.builtins</code></td>
+      <td><code>services.session</code></td>
+      <td>must use transports</td>
+    </tr>
+
+    <tr>
+      <td><code>commands.builtins</code></td>
+      <td><code>services.container</code></td>
+      <td>must use transports</td>
+    </tr>
+
+    <tr>
+      <td><code>transports.client</code></td>
+      <td><code>services.lock</code></td>
+      <td>clients only observe; locks are server-writer</td>
+    </tr>
+
+    <tr>
+      <td><code>L5_shell</code></td>
+      <td><code>L2_service</code></td>
+      <td>shell must never import a service module directly; only via command+transport</td>
+    </tr>
+
+    <tr>
+      <td><code>L4_command</code></td>
+      <td><code>L0_protocol</code></td>
+      <td>command must use contracts/parsers, never protocol</td>
+    </tr>
+
+    <tr>
+      <td><code>L3_transport</code></td>
+      <td><code>L4_command</code></td>
+      <td>reverse dependency forbidden</td>
     </tr></tbody></table></ul><h2>Checklist</h2>
 <ol>
   <li>Resource truth: each <code>resource_id</code> has exactly one <code>truth_owner</code>.</li>

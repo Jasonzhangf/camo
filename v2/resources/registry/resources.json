@@ -262,6 +262,7 @@
         "v2/services/page_runtime/input_pipeline.mjs::status",
         "v2/services/page_runtime/input_pipeline.mjs::goto",
         "v2/services/page_runtime/input_pipeline.mjs::click",
+        "v2/services/page_runtime/input_pipeline.mjs::hover",
         "v2/services/page_runtime/input_pipeline.mjs::type",
         "v2/services/page_runtime/input_pipeline.mjs::scroll",
         "v2/services/page_runtime/input_pipeline.mjs::screenshot",
@@ -274,6 +275,7 @@
       "write_paths": [
         "v2/services/page_runtime/input_pipeline.mjs::goto",
         "v2/services/page_runtime/input_pipeline.mjs::click",
+        "v2/services/page_runtime/input_pipeline.mjs::hover",
         "v2/services/page_runtime/input_pipeline.mjs::type",
         "v2/services/page_runtime/input_pipeline.mjs::scroll",
         "v2/services/page_runtime/input_pipeline.mjs::screenshot",
@@ -285,6 +287,9 @@
       ],
       "indirect_paths": [
         "v2/shell/daemon/index.mjs::handleCommand->goto",
+        "v2/shell/daemon/index.mjs::handleCommand->click",
+        "v2/shell/daemon/index.mjs::handleCommand->hover",
+        "v2/shell/daemon/index.mjs::handleCommand->type",
         "v2/shell/daemon/index.mjs::handleCommand->screenshot",
         "v2/shell/daemon/index.mjs::handleCommand->scroll"
       ],
@@ -520,10 +525,11 @@
       "resource_id": "daemon.command_handlers",
       "display_name": "Daemon command dispatch",
       "layer": "L5_shell",
-      "truth_owner": "shell.daemon.command_handlers",
+      "truth_owner": "shell.daemon",
       "truth_store": "no_persistence",
       "read_paths": [
-        "v2/shell/daemon/index.mjs::handleCommand"
+        "v2/shell/daemon/command_handlers.mjs::handleCommand",
+        "v2/shell/daemon/browser_commands.mjs::isBrowserCommand"
       ],
       "write_paths": [],
       "indirect_paths": [],
@@ -538,7 +544,7 @@
       "resource_id": "page_ops",
       "display_name": "Page operations (all sub-modules)",
       "layer": "L2_service",
-      "truth_owner": "services.page_runtime.operations",
+      "truth_owner": "services.page_runtime",
       "truth_store": "no_persistence",
       "read_paths": [
         "v2/services/page_runtime/input_pipeline.mjs::goto",
@@ -576,164 +582,6 @@
       "verification_gate": "registry.resources.page_ops",
       "policy_id": "single-truth",
       "status": "active"
-    }
-  ],
-  "edges": [
-    {
-      "caller": "daemon",
-      "callee": "daemon.command_handlers",
-      "feature": "daemon_commands",
-      "line": 1
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 30
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 31
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 32
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 33
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 34
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 35
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 36
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 37
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 38
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 39
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 40
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 41
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 42
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 43
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 44
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 45
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 46
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 47
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 48
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 49
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 50
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 51
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 52
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 53
-    },
-    {
-      "caller": "input_pipeline",
-      "callee": "page_ops",
-      "feature": "browser_ops",
-      "line": 54
     }
   ]
 }

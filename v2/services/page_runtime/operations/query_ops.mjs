@@ -169,11 +169,9 @@ export async function getReadable({ profileId, maxLength }) {
   emit(pid, 'getReadable.start', { maxLength: max });
   try {
     const result = await page.evaluate((maxLen) => {
-      const removeTags = ['script', 'style', 'noscript', 'iframe', 'svg', 'nav', 'footer', 'header'];
-      for (const tag of removeTags) document.querySelectorAll(tag).forEach(el => el.remove());
       const article = document.querySelector('article') || document.querySelector('main') || document.body;
       const clone = article.cloneNode(true);
-      clone.querySelectorAll('script,style,noscript,iframe,svg').forEach(el => el.remove());
+      clone.querySelectorAll('script,style,noscript,iframe,svg,nav,footer,header').forEach(el => el.remove());
       const text = (clone.textContent || '').trim();
       return text.length > maxLen ? text.slice(0, maxLen) + '\n... [truncated]' : text;
     }, max);

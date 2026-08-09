@@ -1,8 +1,8 @@
 // camo v2 builtin: `camo daemon start|stop|status`
 //
 // Process-level daemon control. Starts a detached daemon child process
-// (camo v2 daemon entry script) for the active profile and writes the
-// daemon registration file. Other commands require this daemon to be running.
+// (camo v2 daemon entry script). The daemon process claims and writes the one
+// canonical shared registration. Other commands select profiles through it.
 //
 // Hard guards:
 //   - daemon start is the ONLY way to bring up the browser runtime from CLI
@@ -12,10 +12,8 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import url from 'node:url';
-import os from 'node:os';
-import fs from 'node:fs';
 import { CamoError } from '../../contracts/error_envelope/projector.mjs';
-import { findActiveDaemon, unregisterByPid } from '../../shell/config/daemon_finder.mjs';
+import { findActiveDaemon, listRegistrations } from '../../services/daemon_registration/registry.mjs';
 
 export const cmd = 'daemon';
 
@@ -32,7 +30,7 @@ function safeProfile(profileId) {
 async function waitForDaemonRegistration(profile, timeoutMs = 15000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    const reg = findActiveDaemon({ profile, ephemeral: true });
+    const reg = findActiveDaemon();
     if (reg) return reg;
     await new Promise((r) => setTimeout(r, 200));
   }
@@ -48,7 +46,7 @@ export async function run(_transport, parsed = {}, _ctx = {}) {
 
   switch (sub) {
     case 'start': {
-      const existing = findActiveDaemon({ profile });
+      const existing = findActiveDaemon();
       if (existing) {
         return { cmd: 'daemon.start', profile, status: 'already_running', pid: existing.pid, wsPort: existing.wsPort };
       }
@@ -80,11 +78,14 @@ export async function run(_transport, parsed = {}, _ctx = {}) {
           cause,
         });
       }
-      return { cmd: 'daemon.start', profile, status: 'started', pid: child.pid, wsPort: reg.wsPort, httpPort: reg.httpPort, daemonId: reg.daemonId };
+      if (reg.pid !== child.pid) {
+        return { cmd: 'daemon.start', profile, status: 'already_running', pid: reg.pid, wsPort: reg.wsPort, httpPort: reg.httpPort, daemonId: reg.daemonId };
+      }
+      return { cmd: 'daemon.start', profile, status: 'started', pid: reg.pid, wsPort: reg.wsPort, httpPort: reg.httpPort, daemonId: reg.daemonId };
     }
 
     case 'stop': {
-      const reg = findActiveDaemon({ profile });
+      const reg = findActiveDaemon();
       if (!reg) {
         return { cmd: 'daemon.stop', profile, status: 'not_running' };
       }
@@ -92,7 +93,6 @@ export async function run(_transport, parsed = {}, _ctx = {}) {
         process.kill(reg.pid, 'SIGTERM');
       } catch (cause) {
         if (cause.code === 'ESRCH') {
-          unregisterByPid(reg.pid);
           return { cmd: 'daemon.stop', profile, status: 'already_dead', pid: reg.pid };
         }
         throw new CamoError({
@@ -105,8 +105,10 @@ export async function run(_transport, parsed = {}, _ctx = {}) {
       while (Date.now() - start < 5000) {
         try { process.kill(reg.pid, 0); }
         catch {
-          unregisterByPid(reg.pid);
-          return { cmd: 'daemon.stop', profile, status: 'stopped', pid: reg.pid };
+          if (listRegistrations({ includeStale: true }).length === 0) {
+            return { cmd: 'daemon.stop', profile, status: 'stopped', pid: reg.pid };
+          }
+          break;
         }
         await new Promise((r) => setTimeout(r, 200));
       }
@@ -117,7 +119,7 @@ export async function run(_transport, parsed = {}, _ctx = {}) {
     }
 
     case 'status': {
-      const reg = findActiveDaemon({ profile });
+      const reg = findActiveDaemon();
       if (!reg) return { cmd: 'daemon.status', profile, status: 'not_running' };
       return { cmd: 'daemon.status', profile, status: 'running', pid: reg.pid, wsPort: reg.wsPort, httpPort: reg.httpPort, startedAt: reg.startedAt, mode: reg.mode };
     }

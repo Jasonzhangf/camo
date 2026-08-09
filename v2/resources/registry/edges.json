@@ -88,6 +88,30 @@
       "reason": "fan out ws subscriptions"
     },
     {
+      "from": "shell.daemon",
+      "to": "services.progress_event",
+      "kind": "call",
+      "reason": "append daemon lifecycle and command events"
+    },
+    {
+      "from": "shell.daemon",
+      "to": "services.browser_service",
+      "kind": "call",
+      "reason": "orchestrate profile browser lifecycle"
+    },
+    {
+      "from": "shell.daemon",
+      "to": "services.daemon_registration",
+      "kind": "call",
+      "reason": "claim, publish, and release the shared daemon endpoint"
+    },
+    {
+      "from": "shell.daemon",
+      "to": "services.page_runtime",
+      "kind": "call",
+      "reason": "dispatch serialized browser commands to page operations"
+    },
+    {
       "from": "services.browser_service",
       "to": "contracts.ws_messages",
       "kind": "call",
@@ -212,6 +236,282 @@
       "to": "transports.daemon",
       "kind": "call",
       "reason": "fan out ws subscribers"
+    },
+    {
+      "from": "commands.builtins",
+      "to": "commands.registry",
+      "kind": "load",
+      "reason": "read command schemas"
+    },
+    {
+      "from": "commands.builtins",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed command errors"
+    },
+    {
+      "from": "commands.builtins",
+      "to": "services.daemon_registration",
+      "kind": "call",
+      "reason": "operate the shared daemon registration"
+    },
+    {
+      "from": "commands.parsers",
+      "to": "commands.registry",
+      "kind": "load",
+      "reason": "parse registered command schemas"
+    },
+    {
+      "from": "commands.parsers",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed parser errors"
+    },
+    {
+      "from": "commands.registry",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed registry errors"
+    },
+    {
+      "from": "commands.registry",
+      "to": "protocol.versions",
+      "kind": "load",
+      "reason": "bind commands to protocol version"
+    },
+    {
+      "from": "contracts.http_messages",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "project malformed HTTP envelopes"
+    },
+    {
+      "from": "contracts.http_messages",
+      "to": "protocol.versions",
+      "kind": "load",
+      "reason": "bind HTTP envelope version"
+    },
+    {
+      "from": "contracts.ws_messages",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "project malformed WS envelopes"
+    },
+    {
+      "from": "contracts.ws_messages",
+      "to": "protocol.versions",
+      "kind": "load",
+      "reason": "bind WS envelope version"
+    },
+    {
+      "from": "services.autoscript",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed autoscript errors"
+    },
+    {
+      "from": "services.autoscript.actions",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed action errors"
+    },
+    {
+      "from": "services.browser_service",
+      "to": "services.browser_service.internal",
+      "kind": "call",
+      "reason": "delegate browser handles to internal owner"
+    },
+    {
+      "from": "services.browser_service",
+      "to": "services.progress_event",
+      "kind": "call",
+      "reason": "append browser lifecycle events"
+    },
+    {
+      "from": "services.browser_service.internal",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed browser runtime errors"
+    },
+    {
+      "from": "services.command_log",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed command-log errors"
+    },
+    {
+      "from": "services.container",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed container errors"
+    },
+    {
+      "from": "services.daemon_registration",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed registration errors"
+    },
+    {
+      "from": "services.display",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed display errors"
+    },
+    {
+      "from": "services.lock",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed lock errors"
+    },
+    {
+      "from": "services.page_runtime",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed page-operation errors"
+    },
+    {
+      "from": "services.page_runtime",
+      "to": "services.browser_service.internal",
+      "kind": "call",
+      "reason": "read the owned active page handle"
+    },
+    {
+      "from": "services.page_runtime",
+      "to": "services.progress_event",
+      "kind": "call",
+      "reason": "append page-operation events"
+    },
+    {
+      "from": "services.profile",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed profile errors"
+    },
+    {
+      "from": "services.progress_event",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed progress-log errors"
+    },
+    {
+      "from": "services.session",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed session errors"
+    },
+    {
+      "from": "services.subscription",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed subscription errors"
+    },
+    {
+      "from": "shell.bin_entry",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "project typed CLI entry errors"
+    },
+    {
+      "from": "shell.bin_entry",
+      "to": "services.daemon_registration",
+      "kind": "call",
+      "reason": "discover the shared daemon endpoint"
+    },
+    {
+      "from": "shell.bin_entry",
+      "to": "shell.cli",
+      "kind": "call",
+      "reason": "dispatch parsed CLI commands"
+    },
+    {
+      "from": "shell.cli",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "project typed CLI dispatch errors"
+    },
+    {
+      "from": "shell.config",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "raise typed configuration errors"
+    },
+    {
+      "from": "shell.config",
+      "to": "services.daemon_registration",
+      "kind": "call",
+      "reason": "read canonical daemon discovery truth"
+    },
+    {
+      "from": "shell.daemon",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "project typed daemon errors"
+    },
+    {
+      "from": "shell.daemon",
+      "to": "contracts.ws_messages",
+      "kind": "call",
+      "reason": "parse and build daemon WS envelopes"
+    },
+    {
+      "from": "shell.doctor",
+      "to": "commands.registry",
+      "kind": "load",
+      "reason": "inspect registered command count"
+    },
+    {
+      "from": "shell.doctor",
+      "to": "protocol.versions",
+      "kind": "load",
+      "reason": "inspect active protocol version"
+    },
+    {
+      "from": "transports.client",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "project typed client transport errors"
+    },
+    {
+      "from": "transports.client",
+      "to": "transports.http",
+      "kind": "call",
+      "reason": "send HTTP client requests"
+    },
+    {
+      "from": "transports.daemon",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "project typed daemon transport errors"
+    },
+    {
+      "from": "transports.daemon",
+      "to": "contracts.ws_messages",
+      "kind": "call",
+      "reason": "parse daemon transport envelopes"
+    },
+    {
+      "from": "transports.http",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "project typed HTTP transport errors"
+    },
+    {
+      "from": "transports.http",
+      "to": "contracts.http_messages",
+      "kind": "call",
+      "reason": "parse and build HTTP envelopes"
+    },
+    {
+      "from": "transports.ws",
+      "to": "contracts.error_envelope",
+      "kind": "call",
+      "reason": "project typed WS transport errors"
+    },
+    {
+      "from": "transports.ws",
+      "to": "contracts.ws_messages",
+      "kind": "call",
+      "reason": "parse and build WS envelopes"
     },
     {
       "from": "shell.daemon",

@@ -9,7 +9,31 @@ section { border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px; }</st
 <h1>camo v2 resources</h1>
 <p>Mirror of <code>v2/resources/registry/resources.json</code>. Status of every entry: design until its corresponding gate is green and forbidden paths are physically removed from v1.</p>
 <h2 id="resource-index">Index</h2>
-<ul><li><a href="#r-profile">profile</a></li><li><a href="#r-browser_session">browser_session</a></li><li><a href="#r-profile_lock">profile_lock</a></li><li><a href="#r-container_match">container_match</a></li><li><a href="#r-subscription">subscription</a></li><li><a href="#r-tab_pool">tab_pool</a></li><li><a href="#r-input_pipeline">input_pipeline</a></li><li><a href="#r-page_runtime">page_runtime</a></li><li><a href="#r-display_metrics">display_metrics</a></li><li><a href="#r-autoscript_run">autoscript_run</a></li><li><a href="#r-autoscript_action">autoscript_action</a></li><li><a href="#r-progress_event">progress_event</a></li><li><a href="#r-command_log">command_log</a></li><li><a href="#r-ws_message">ws_message</a></li><li><a href="#r-http_message">http_message</a></li><li><a href="#r-error_envelope">error_envelope</a></li></ul>
+<ul><li><a href="#r-browser_instance">browser_instance</a></li><li><a href="#r-daemon_registration">daemon_registration</a></li><li><a href="#r-profile">profile</a></li><li><a href="#r-browser_session">browser_session</a></li><li><a href="#r-profile_lock">profile_lock</a></li><li><a href="#r-container_match">container_match</a></li><li><a href="#r-subscription">subscription</a></li><li><a href="#r-tab_pool">tab_pool</a></li><li><a href="#r-input_pipeline">input_pipeline</a></li><li><a href="#r-page_runtime">page_runtime</a></li><li><a href="#r-display_metrics">display_metrics</a></li><li><a href="#r-autoscript_run">autoscript_run</a></li><li><a href="#r-autoscript_action">autoscript_action</a></li><li><a href="#r-progress_event">progress_event</a></li><li><a href="#r-command_log">command_log</a></li><li><a href="#r-ws_message">ws_message</a></li><li><a href="#r-http_message">http_message</a></li><li><a href="#r-error_envelope">error_envelope</a></li><li><a href="#r-pipeline_state">pipeline_state</a></li><li><a href="#r-daemon.command_handlers">daemon.command_handlers</a></li><li><a href="#r-page_ops">page_ops</a></li></ul>
+
+    <section id="r-browser_instance">
+      <h2><code>browser_instance</code></h2>
+      <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>v2/services/browser_service/internal/camoufox_bridge</code> - <strong>Store:</strong> memory_in_owner_process</p>
+
+      <h3>Reads</h3><ul><li><code>v2/services/browser_service/internal/camoufox_bridge.mjs::getPage</code></li><li><code>v2/services/browser_service/internal/camoufox_bridge.mjs::getRecord</code></li><li><code>v2/services/browser_service/internal/camoufox_bridge.mjs::getContext</code></li><li><code>v2/services/browser_service/internal/camoufox_bridge.mjs::listActive</code></li></ul>
+      <h3>Writes</h3><ul><li><code>v2/services/browser_service/internal/camoufox_bridge.mjs::launchBrowser</code></li><li><code>v2/services/browser_service/internal/camoufox_bridge.mjs::closeBrowser</code></li><li><code>v2/services/browser_service/internal/camoufox_bridge.mjs::closeAll</code></li></ul>
+      <h3>Indirect</h3><ul><li><code>v2/services/browser_service/bootstrap.mjs::startSession->launchBrowser</code></li><li><code>v2/services/browser_service/bootstrap.mjs::startSession->closeBrowser</code></li><li><code>v2/services/browser_service/bootstrap.mjs::stopSession->closeBrowser</code></li><li><code>v2/services/browser_service/internal/engine-manager.mjs::launchEngineContext</code></li><li><code>v2/services/browser_service/internal/fingerprint.mjs::loadOrGenerateFingerprint</code></li><li><code>v2/services/browser_service/internal/ProfileLock.mjs::acquire</code></li></ul>
+      <h3>Forbidden</h3><ul><li><code>v2/services/browser_service/internal/engine_manager.js::launch</code></li><li><code>v2/services/browser_service/internal/camoufox_bridge.mjs::launch</code></li><li><code>v2/services/browser_service/internal/browser_session/input_ops.js::mouseClick</code></li></ul>
+
+      <p><a href="#resource-index">back to index</a></p>
+    </section>
+
+    <section id="r-daemon_registration">
+      <h2><code>daemon_registration</code></h2>
+      <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>v2/services/daemon_registration</code> - <strong>Store:</strong> disk_json</p>
+      <p><strong>Truth path:</strong> <code>~/.camo/daemon/daemon.json</code></p>
+      <h3>Reads</h3><ul><li><code>v2/services/daemon_registration/registry.mjs::read</code></li><li><code>v2/services/daemon_registration/registry.mjs::list</code></li></ul>
+      <h3>Writes</h3><ul><li><code>v2/services/daemon_registration/registry.mjs::register</code></li><li><code>v2/services/daemon_registration/registry.mjs::unregister</code></li><li><code>v2/services/daemon_registration/registry.mjs::releaseDaemonSlot</code></li></ul>
+      <h3>Indirect</h3><ul><li><code>v2/shell/daemon/index.mjs::shutdown->releaseDaemonSlot</code></li></ul>
+      <h3>Forbidden</h3><ul><li><code>v2/shell/**::daemon_write</code></li></ul>
+
+      <p><a href="#resource-index">back to index</a></p>
+    </section>
 
     <section id="r-profile">
       <h2><code>profile</code></h2>
@@ -17,21 +41,21 @@ section { border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px; }</st
       <p><strong>Truth path:</strong> <code>~/.camo/profiles/<profile_id>/camo-profile.json</code></p>
       <h3>Reads</h3><ul><li><code>v2/services/profile/store.mjs::read</code></li><li><code>v2/services/session/manager.mjs::read</code></li><li><code>v2/services/lock/manager.mjs::read</code></li></ul>
       <h3>Writes</h3><ul><li><code>v2/services/profile/store.mjs::write</code></li><li><code>v2/services/profile/store.mjs::delete</code></li></ul>
-      
+
       <h3>Forbidden</h3><ul><li><code>v2/lifecycle/**::write</code></li><li><code>v2/commands/**::write_to_profile_meta</code></li></ul>
-      
+
       <p><a href="#resource-index">back to index</a></p>
     </section>
 
     <section id="r-browser_session">
       <h2><code>browser_session</code></h2>
       <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>v2/services/session</code> - <strong>Store:</strong> memory_in_owner_process</p>
-      
+
       <h3>Reads</h3><ul><li><code>v2/services/session/manager.mjs::read</code></li><li><code>v2/services/session/manager.mjs::list</code></li><li><code>v2/transports/ws/server.mjs::route</code></li></ul>
       <h3>Writes</h3><ul><li><code>v2/services/session/manager.mjs::create</code></li><li><code>v2/services/session/manager.mjs::delete</code></li><li><code>v2/services/session/manager.mjs::mark_closed</code></li></ul>
       <h3>Indirect</h3><ul><li><code>v2/services/lock/manager.mjs::on_session_change</code></li></ul>
       <h3>Forbidden</h3><ul><li><code>v2/lifecycle/session_registry.mjs::write</code></li><li><code>v2/commands/**::session_write</code></li></ul>
-      
+
       <p><a href="#resource-index">back to index</a></p>
     </section>
 
@@ -41,57 +65,57 @@ section { border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px; }</st
       <p><strong>Truth path:</strong> <code>~/.camo/locks/<profile_id>.lock</code></p>
       <h3>Reads</h3><ul><li><code>v2/services/lock/manager.mjs::read</code></li><li><code>v2/services/lock/manager.mjs::probe</code></li></ul>
       <h3>Writes</h3><ul><li><code>v2/services/lock/manager.mjs::acquire</code></li><li><code>v2/services/lock/manager.mjs::release</code></li><li><code>v2/services/lock/manager.mjs::force_acquire</code></li></ul>
-      
+
       <h3>Forbidden</h3><ul><li><code>v2/lifecycle/lock.mjs::write</code></li><li><code>v2/commands/**::lock_write</code></li></ul>
-      
+
       <p><a href="#resource-index">back to index</a></p>
     </section>
 
     <section id="r-container_match">
       <h2><code>container_match</code></h2>
       <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>v2/services/container</code> - <strong>Store:</strong> transient_per_request</p>
-      
+
       <h3>Reads</h3><ul><li><code>v2/services/container/matcher.mjs::match</code></li><li><code>v2/services/container/matcher.mjs::inspect</code></li></ul>
       <h3>Writes</h3><ul><li><code>v2/services/container/matcher.mjs::match</code></li></ul>
       <h3>Indirect</h3><ul><li><code>v2/runtime/page_scripts/state_bus.mjs::subscribe</code></li></ul>
       <h3>Forbidden</h3><ul><li><code>v2/container/runtime_core/search.mjs::match</code></li><li><code>v2/services/browser_service/internal/container_matcher.js::match</code></li></ul>
-      
+
       <p><a href="#resource-index">back to index</a></p>
     </section>
 
     <section id="r-subscription">
       <h2><code>subscription</code></h2>
       <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>v2/services/subscription</code> - <strong>Store:</strong> memory_in_ws_server</p>
-      
+
       <h3>Reads</h3><ul><li><code>v2/services/subscription/registry.mjs::list</code></li><li><code>v2/transports/ws/server.mjs::route</code></li></ul>
       <h3>Writes</h3><ul><li><code>v2/services/subscription/registry.mjs::register</code></li><li><code>v2/services/subscription/registry.mjs::unregister</code></li></ul>
       <h3>Indirect</h3><ul><li><code>v2/services/container/matcher.mjs::event_emit</code></li></ul>
       <h3>Forbidden</h3><ul><li><code>v2/container/subscription_registry.mjs::write</code></li></ul>
-      
+
       <p><a href="#resource-index">back to index</a></p>
     </section>
 
     <section id="r-tab_pool">
       <h2><code>tab_pool</code></h2>
       <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>v2/services/page_runtime</code> - <strong>Store:</strong> memory_per_session</p>
-      
+
       <h3>Reads</h3><ul><li><code>v2/services/page_runtime/tab_pool.mjs::list</code></li><li><code>v2/services/page_runtime/tab_pool.mjs::current</code></li></ul>
       <h3>Writes</h3><ul><li><code>v2/services/page_runtime/tab_pool.mjs::next</code></li><li><code>v2/services/page_runtime/tab_pool.mjs::set_slot</code></li></ul>
-      
+
       <h3>Forbidden</h3><ul><li><code>v2/operations/tab_pool.mjs::write</code></li></ul>
-      
+
       <p><a href="#resource-index">back to index</a></p>
     </section>
 
     <section id="r-input_pipeline">
       <h2><code>input_pipeline</code></h2>
       <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>v2/services/page_runtime</code> - <strong>Store:</strong> memory_per_session</p>
-      
-      <h3>Reads</h3><ul><li><code>v2/services/page_runtime/input_pipeline.mjs::status</code></li></ul>
-      <h3>Writes</h3><ul><li><code>v2/services/page_runtime/input_pipeline.mjs::run</code></li></ul>
-      
-      <h3>Forbidden</h3><ul><li><code>v2/services/page_runtime/input_ops.mjs::run</code></li><li><code>v2/core/actions.mjs::run</code></li></ul>
-      
+
+      <h3>Reads</h3><ul><li><code>v2/services/page_runtime/input_pipeline.mjs::status</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::goto</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::click</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::hover</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::type</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::scroll</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::screenshot</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::snapshot</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::wait</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::evaluate</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::upload</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::select</code></li></ul>
+      <h3>Writes</h3><ul><li><code>v2/services/page_runtime/input_pipeline.mjs::goto</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::click</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::hover</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::type</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::scroll</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::screenshot</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::snapshot</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::wait</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::evaluate</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::upload</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::select</code></li></ul>
+      <h3>Indirect</h3><ul><li><code>v2/shell/daemon/index.mjs::handleCommand->goto</code></li><li><code>v2/shell/daemon/index.mjs::handleCommand->click</code></li><li><code>v2/shell/daemon/index.mjs::handleCommand->hover</code></li><li><code>v2/shell/daemon/index.mjs::handleCommand->type</code></li><li><code>v2/shell/daemon/index.mjs::handleCommand->screenshot</code></li><li><code>v2/shell/daemon/index.mjs::handleCommand->scroll</code></li></ul>
+      <h3>Forbidden</h3><ul><li><code>v2/services/page_runtime/operations/page_ops.mjs::goto</code></li><li><code>v2/services/page_runtime/operations/page_ops.mjs::click</code></li><li><code>v2/services/page_runtime/operations/page_ops.mjs::type</code></li><li><code>v2/services/page_runtime/operations/page_ops.mjs::scroll</code></li><li><code>v2/services/page_runtime/operations/page_ops.mjs::screenshot</code></li><li><code>v2/services/page_runtime/operations/page_ops.mjs::snapshot</code></li><li><code>v2/services/page_runtime/operations/page_ops.mjs::wait</code></li><li><code>v2/services/page_runtime/operations/page_ops.mjs::evaluate</code></li><li><code>v2/services/page_runtime/operations/page_ops.mjs::upload</code></li><li><code>v2/services/page_runtime/operations/page_ops.mjs::select</code></li><li><code>v2/core/actions.mjs::run</code></li></ul>
+
       <p><a href="#resource-index">back to index</a></p>
     </section>
 
@@ -100,34 +124,34 @@ section { border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px; }</st
       <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>v2/runtime/page_scripts</code> - <strong>Store:</strong> compiled_page_scripts</p>
       <p><strong>Truth path:</strong> <code>v2/runtime/page_scripts/dist/<version>.bundle.js</code></p>
       <h3>Reads</h3><ul><li><code>v2/runtime/page_scripts/bootstrap.mjs::load</code></li><li><code>v2/services/page_runtime/injector.mjs::inject</code></li></ul>
-      <h3>Writes</h3><ul><li><code>v2/runtime/page_scripts/bootstrap.mjs::register</code></li></ul>
-      
+      <h3>Writes</h3><ul></ul>
+
       <h3>Forbidden</h3><ul><li><code>v2/services/browser_service/internal/page_runtime/runtime.js::write</code></li></ul>
-      
+
       <p><a href="#resource-index">back to index</a></p>
     </section>
 
     <section id="r-display_metrics">
       <h2><code>display_metrics</code></h2>
       <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>v2/services/display</code> - <strong>Store:</strong> memory_cache_per_process</p>
-      
+
       <h3>Reads</h3><ul><li><code>v2/services/display/resolver.mjs::read</code></li><li><code>v2/services/browser_service/bootstrap.mjs::read</code></li></ul>
       <h3>Writes</h3><ul><li><code>v2/services/display/resolver.mjs::refresh</code></li></ul>
-      
+
       <h3>Forbidden</h3><ul><li><code>v2/services/browser_service/index.js::osascript</code></li><li><code>v2/services/browser_service/internal/engine_manager.js::osascript</code></li><li><code>v2/services/browser_service/internal/process_cleanup.js::osascript</code></li></ul>
-      
+
       <p><a href="#resource-index">back to index</a></p>
     </section>
 
     <section id="r-autoscript_run">
       <h2><code>autoscript_run</code></h2>
       <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>v2/services/autoscript</code> - <strong>Store:</strong> memory_per_run</p>
-      
+
       <h3>Reads</h3><ul><li><code>v2/services/autoscript/runner.mjs::read</code></li><li><code>v2/services/autoscript/runner.mjs::status</code></li></ul>
       <h3>Writes</h3><ul><li><code>v2/services/autoscript/runner.mjs::start</code></li><li><code>v2/services/autoscript/runner.mjs::stop</code></li></ul>
       <h3>Indirect</h3><ul><li><code>v2/services/progress_event/log.mjs::append</code></li></ul>
       <h3>Forbidden</h3><ul><li><code>v2/commands/autoscript.mjs::state_write</code></li></ul>
-      
+
       <p><a href="#resource-index">back to index</a></p>
     </section>
 
@@ -137,9 +161,9 @@ section { border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px; }</st
       <p><strong>Truth path:</strong> <code>v2/services/autoscript/actions/<actionId>.mjs</code></p>
       <h3>Reads</h3><ul><li><code>v2/services/autoscript/runner.mjs::execute</code></li><li><code>v2/contracts/operations/registry.json::validate</code></li></ul>
       <h3>Writes</h3><ul><li><code>v2/services/autoscript/actions/<actionId>.mjs::run</code></li></ul>
-      
+
       <h3>Forbidden</h3><ul><li><code>v2/autoscript/action_providers/index.mjs::stub</code></li></ul>
-      
+
       <p><a href="#resource-index">back to index</a></p>
     </section>
 
@@ -149,9 +173,9 @@ section { border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px; }</st
       <p><strong>Truth path:</strong> <code>~/.camo/runs/<run_id>/events.jsonl</code></p>
       <h3>Reads</h3><ul><li><code>v2/services/progress_event/log.mjs::read</code></li><li><code>v2/transports/ws/server.mjs::subscribe</code></li></ul>
       <h3>Writes</h3><ul><li><code>v2/services/progress_event/log.mjs::append</code></li></ul>
-      
+
       <h3>Forbidden</h3><ul><li><code>v2/commands/**::events_append</code></li></ul>
-      
+
       <p><a href="#resource-index">back to index</a></p>
     </section>
 
@@ -161,33 +185,33 @@ section { border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px; }</st
       <p><strong>Truth path:</strong> <code>~/.camo/runs/<run_id>/commands.jsonl</code></p>
       <h3>Reads</h3><ul><li><code>v2/services/command_log/log.mjs::read</code></li></ul>
       <h3>Writes</h3><ul><li><code>v2/shell/cli/dispatch.mjs::append</code></li></ul>
-      
+
       <h3>Forbidden</h3><ul><li><code>v2/commands/**::commands_append</code></li></ul>
-      
+
       <p><a href="#resource-index">back to index</a></p>
     </section>
 
     <section id="r-ws_message">
       <h2><code>ws_message</code></h2>
       <p><strong>Layer:</strong> L0_protocol - <strong>Truth owner:</strong> <code>v2/protocol/versions</code> - <strong>Store:</strong> code_schema</p>
-      
+
       <h3>Reads</h3><ul><li><code>v2/contracts/ws_messages/<version>/envelope.mjs::parse</code></li></ul>
       <h3>Writes</h3><ul><li><code>v2/contracts/ws_messages/<version>/envelope.mjs::build</code></li></ul>
-      
+
       <h3>Forbidden</h3><ul><li><code>v2/transports/ws/server.mjs::ad_hoc_json</code></li></ul>
-      
+
       <p><a href="#resource-index">back to index</a></p>
     </section>
 
     <section id="r-http_message">
       <h2><code>http_message</code></h2>
       <p><strong>Layer:</strong> L0_protocol - <strong>Truth owner:</strong> <code>v2/protocol/versions</code> - <strong>Store:</strong> code_schema</p>
-      
+
       <h3>Reads</h3><ul><li><code>v2/contracts/http_messages/<version>/envelope.mjs::parse</code></li></ul>
       <h3>Writes</h3><ul><li><code>v2/contracts/http_messages/<version>/envelope.mjs::build</code></li></ul>
-      
+
       <h3>Forbidden</h3><ul></ul>
-      
+
       <p><a href="#resource-index">back to index</a></p>
     </section>
 
@@ -197,9 +221,45 @@ section { border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px; }</st
       <p><strong>Truth path:</strong> <code>v2/contracts/error_envelope/codes.json</code></p>
       <h3>Reads</h3><ul><li><code>v2/contracts/error_envelope/projector.mjs::project</code></li></ul>
       <h3>Writes</h3><ul><li><code>v2/contracts/error_envelope/codes.json::add</code></li></ul>
-      
+
       <h3>Forbidden</h3><ul><li><code>v2/**::throw_inline_user_message</code></li></ul>
-      
+
+      <p><a href="#resource-index">back to index</a></p>
+    </section>
+
+    <section id="r-pipeline_state">
+      <h2><code>pipeline_state</code></h2>
+      <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>services.page_runtime</code> - <strong>Store:</strong> memory_in_owner_process</p>
+
+      <h3>Reads</h3><ul><li><code>v2/services/page_runtime/input_pipeline.mjs::status</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::wrapOperation</code></li></ul>
+      <h3>Writes</h3><ul><li><code>v2/services/page_runtime/_pipeline_state.mjs::wrapOperation</code></li><li><code>v2/services/page_runtime/_pipeline_state.mjs::__resetForTest</code></li></ul>
+
+      <h3>Forbidden</h3><ul></ul>
+
+      <p><a href="#resource-index">back to index</a></p>
+    </section>
+
+    <section id="r-daemon.command_handlers">
+      <h2><code>daemon.command_handlers</code></h2>
+      <p><strong>Layer:</strong> L5_shell - <strong>Truth owner:</strong> <code>shell.daemon</code> - <strong>Store:</strong> no_persistence</p>
+
+      <h3>Reads</h3><ul><li><code>v2/shell/daemon/command_handlers.mjs::handleCommand</code></li><li><code>v2/shell/daemon/browser_commands.mjs::isBrowserCommand</code></li></ul>
+      <h3>Writes</h3><ul></ul>
+
+      <h3>Forbidden</h3><ul><li><code>v2/services/**::write</code></li></ul>
+
+      <p><a href="#resource-index">back to index</a></p>
+    </section>
+
+    <section id="r-page_ops">
+      <h2><code>page_ops</code></h2>
+      <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>services.page_runtime</code> - <strong>Store:</strong> no_persistence</p>
+
+      <h3>Reads</h3><ul><li><code>v2/services/page_runtime/input_pipeline.mjs::goto</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::newTab</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::closeTab</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::listTabs</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::click</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::hover</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::type</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::scroll</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::upload</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::select</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::screenshot</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::snapshot</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::getText</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::getPageInfo</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::findElements</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::getReadable</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::getCookies</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::setCookies</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::setUserAgent</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::setViewport</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::wait</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::waitForDomStable</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::evaluate</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::scrollAndCollect</code></li><li><code>v2/services/page_runtime/input_pipeline.mjs::fetch</code></li></ul>
+      <h3>Writes</h3><ul></ul>
+
+      <h3>Forbidden</h3><ul><li><code>v2/services/browser_service/**::launch</code></li><li><code>v2/shell/daemon/**::write</code></li></ul>
+
       <p><a href="#resource-index">back to index</a></p>
     </section>
 </body></html>

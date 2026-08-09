@@ -1,0 +1,110 @@
+{
+  "symptom": {
+    "observed": [
+      "wait --for text/selector/url returns satisfied:false after a matching condition because daemon ignores for/target/timeout",
+      "get-readable returns an empty CLI projection although the operation returns text/length",
+      "text-target actions can resolve html/body ancestors before the concrete visible interactive node"
+    ],
+    "expected": "Each command preserves its request contract through CLI, daemon, input_pipeline, and page operation; action targeting selects a visible, concrete node and protocol input remains mouse/keyboard/wheel only.",
+    "entry": "global camo CLI against canonical OneStop profile",
+    "raw_evidence": [
+      "docs/diagnostics/onestop-camo-browser-verification-20260808.md",
+      "~/.camo/runs/run-1424-1786183112752/events.jsonl",
+      "v2/shell/daemon/command_handlers.mjs",
+      "v2/services/page_runtime/operations/wait_ops.mjs",
+      "v2/services/page_runtime/operations/query_ops.mjs",
+      "v2/services/page_runtime/operations/_page_helpers.mjs"
+    ]
+  },
+  "sop_model_flow": {
+    "status": "known",
+    "flow_id": "browser.command.protocol-input",
+    "source_docs": [
+      "v2/resources/registry/resources.json",
+      "v2/docs/function_map.json",
+      "v2/docs/mainline_call_map.json",
+      "v2/docs/feature_tests.json",
+      "AGENTS.md"
+    ],
+    "lifecycle_nodes": [
+      "CLI request parse",
+      "builtin serialization",
+      "daemon command handler",
+      "input_pipeline serialization",
+      "page operation owner",
+      "protocol/browser response projection"
+    ],
+    "resource_edges": [
+      "shell.cli->commands.builtins",
+      "commands.builtins->transports.client",
+      "transports.daemon->services.page_runtime",
+      "services.page_runtime->page operation"
+    ],
+    "forbidden_edges": [
+      "calling_application->DOM injection",
+      "page operation->business payload metadata"
+    ],
+    "owner_graph": {
+      "resource": "input_pipeline",
+      "module": "services.page_runtime",
+      "direct_action_owner": "v2/services/page_runtime/operations",
+      "daemon_projection_owner": "v2/shell/daemon/command_handlers.mjs"
+    }
+  },
+  "hypotheses": [
+    {
+      "id": "H1",
+      "cause": "daemon wait handler drops condition fields and invokes duration-only wait",
+      "modules": ["v2/shell/daemon/command_handlers.mjs", "v2/services/page_runtime/operations/wait_ops.mjs"],
+      "supporting_evidence": "handler passes only ms while builtin sends for/timeout/target",
+      "counter_evidence_or_gap": "none observed",
+      "verification_action": "read-only source comparison plus red integration contract",
+      "confidence": 99
+    },
+    {
+      "id": "H2",
+      "cause": "daemon readable projection reads fields absent from operation result",
+      "modules": ["v2/shell/daemon/command_handlers.mjs"],
+      "supporting_evidence": "operation returns text/length; handler reads content/textLength",
+      "counter_evidence_or_gap": "none observed",
+      "verification_action": "red integration contract and exact CLI replay",
+      "confidence": 99
+    },
+    {
+      "id": "H3",
+      "cause": "resolveLocator uses broad getByText and first() without visibility/specificity selection",
+      "modules": ["v2/services/page_runtime/operations/_page_helpers.mjs", "v2/services/page_runtime/operations/interaction_ops.mjs"],
+      "supporting_evidence": "find-elements returns ancestor nodes and action may choose html/body",
+      "counter_evidence_or_gap": "requires candidate locator mock to prove selection order",
+      "verification_action": "red integration contract with visible concrete and hidden ancestor candidates",
+      "confidence": 95
+    }
+  ],
+  "active_hypothesis": "H1",
+  "first_divergence_node": "daemon command handler",
+  "root_cause_module": "pending red tests",
+  "unique_owner": "pending red tests",
+  "allowed_paths": [
+    "v2/shell/daemon/command_handlers.mjs",
+    "v2/services/page_runtime/operations/wait_ops.mjs",
+    "v2/services/page_runtime/operations/query_ops.mjs",
+    "v2/services/page_runtime/operations/_page_helpers.mjs",
+    "v2/services/page_runtime/operations/interaction_ops.mjs",
+    "v2/tests/integration/page-protocol-interaction.integration.test.mjs"
+  ],
+  "forbidden_paths": [
+    "apps/**",
+    "v2/commands/builtins/**",
+    "calling_application/**",
+    "DOM evaluate click/value/scroll injection"
+  ],
+  "required_verification": [
+    "red then green protocol interaction integration tests",
+    "npm run gates",
+    "npm test",
+    "npm run test:all",
+    "global install and exact source hash check",
+    "canonical OneStop desktop and mobile protocol replay"
+  ],
+  "exact_replay": "global camo profile onestop-protocol-20260808a against https://claw.codewhisper.cc/onestop/admin"
+}

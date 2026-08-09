@@ -2,6 +2,12 @@
 // Build wiki pages from registry JSON. Pure text generation.
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import {
+  renderFunctionMapHtml,
+  renderFunctionMapMarkdown,
+  renderMainlineCallMapHtml,
+  renderMainlineCallMapMarkdown,
+} from './function_map_view.mjs';
 
 const [, , REG, OUT] = process.argv;
 if (!REG || !OUT) {
@@ -63,9 +69,9 @@ section { border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px; }</st
 <p>Mirror of <code>v2/resources/registry/resources.json</code>. Status of every entry: design until its corresponding gate is green and forbidden paths are physically removed from v1.</p>
 <h2 id="resource-index">Index</h2>
 <ul>${indexList}</ul>
-${detail}
+${detail.trimEnd()}
 </body></html>`;
-  await fs.writeFile(path.join(OUT, 'resources.html'), html, 'utf8');
+  await fs.writeFile(path.join(OUT, 'resources.html'), html.replace(/[ \t]+$/gm, ''), 'utf8');
 }
 
 async function buildEdgeTable() {
@@ -93,6 +99,36 @@ async function buildEdgeTable() {
   await fs.writeFile(arch, out, 'utf8');
 }
 
+async function buildFunctionSurfaces() {
+  const docsDir = path.resolve(REG, '..', '..', 'docs');
+  const functionMap = await readJson(path.join(docsDir, 'function_map.json'));
+  const featureTests = await readJson(path.join(docsDir, 'feature_tests.json'));
+  const callMap = await readJson(path.join(docsDir, 'mainline_call_map.json'));
+  await fs.writeFile(
+    path.join(docsDir, 'migration_contracts', 'function_map.md'),
+    renderFunctionMapMarkdown(functionMap, featureTests),
+    'utf8',
+  );
+  await fs.writeFile(
+    path.join(docsDir, 'migration_contracts', 'mainline_call_map.md'),
+    renderMainlineCallMapMarkdown(callMap),
+    'utf8',
+  );
+
+  const architecturePath = path.join(OUT, 'architecture.html');
+  const architecture = await fs.readFile(architecturePath, 'utf8');
+  const withFunctionMap = architecture.replace(
+    /<!-- GENERATED:function-map:start[^]*?<!-- GENERATED:function-map:end -->/,
+    renderFunctionMapHtml(functionMap, featureTests),
+  );
+  const withCallMap = withFunctionMap.replace(
+    /<!-- GENERATED:mainline-call-map:start[^]*?<!-- GENERATED:mainline-call-map:end -->/,
+    renderMainlineCallMapHtml(callMap),
+  );
+  await fs.writeFile(architecturePath, withCallMap, 'utf8');
+}
+
 await buildResourceTable();
 await buildEdgeTable();
+await buildFunctionSurfaces();
 console.log('wiki built');

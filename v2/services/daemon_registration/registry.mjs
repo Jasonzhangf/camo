@@ -164,6 +164,7 @@ function writeExclusiveJson(file, payload) {
 function duplicateError(claim, extra = {}) {
   return new CamoError({
     code: 'E_STATE_DUPLICATE',
+    message: 'shared_daemon_already_running',
     details: {
       resource: 'shared_daemon',
       pid: claim.pid,
@@ -295,6 +296,7 @@ function activeRegistration(raw, file) {
     && Number.isInteger(raw.httpPort) && raw.httpPort > 0
     && raw.scope === 'shared'
     && typeof raw.headless === 'boolean'
+    && typeof raw.mode === 'string' && ['persistent', 'ephemeral', 'headless'].includes(raw.mode)
     && typeof raw.startedAt === 'string' && raw.startedAt.length > 0;
   if (!valid) {
     throw new CamoError({
@@ -326,7 +328,7 @@ export function findActiveDaemon({ pid } = {}) {
   return listRegistrations().find((registration) => !pid || registration.pid === pid) || null;
 }
 
-export function registerDaemon({ claim, wsPort, httpPort, headless }) {
+export function registerDaemon({ claim, wsPort, httpPort, headless, mode }) {
   const active = assertClaimOwner(claim);
   const payload = {
     ...active,
@@ -336,6 +338,7 @@ export function registerDaemon({ claim, wsPort, httpPort, headless }) {
     httpPort,
     scope: 'shared',
     headless: headless === true,
+    mode: mode || (headless === true ? 'headless' : 'persistent'),
     startedAt: new Date().toISOString(),
   };
   const file = claimPath();
