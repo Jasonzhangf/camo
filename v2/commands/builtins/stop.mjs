@@ -30,7 +30,8 @@ export async function run(transport, parsed = {}, ctx = {}) {
   });
   return {
     cmd: 'stop',
-    profile,
+    profile: reply.payload?.profile || profile,
+    ephemeral: reply.payload?.ephemeral === true,
     state: reply.payload?.state || 'stopped',
     releasedAt: new Date().toISOString(),
     traceId: ctx.traceId || null,

@@ -19,7 +19,14 @@ test('positive: start builtin roundtrips through WS', async () => {
   resetRoutes();
   registerHandler('command', async (env) => ({
     kind: 'result',
-    payload: { cmd: env.payload?.cmd || null, sessionId: 'srv-1', ok: true },
+    payload: {
+      cmd: env.payload?.cmd || null,
+      sessionId: 'srv-1',
+      profile: '_temp_123_456',
+      ephemeral: true,
+      reused: true,
+      ok: true,
+    },
   }));
   // The transport in production is a real ws; here we drive the
   // same wire path via wsSendCommand -> server.handleFrame -> handler.
@@ -38,10 +45,36 @@ test('positive: start builtin roundtrips through WS', async () => {
   const parsed = parseFlags(['--profile', 'p1', '--headless'], { cmd: 'start' });
   const out = await runBuiltin('start', transport, parsed, { traceId: 't1' });
   assert.equal(out.cmd, 'start');
-  assert.equal(out.profile, 'p1');
   assert.equal(out.headless, true);
+  assert.equal(out.profile, '_temp_123_456');
+  assert.equal(out.ephemeral, true);
+  assert.equal(out.reused, true);
   assert.match(out.issuedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/); // sanity: ISO-8601
   assert.equal(out.sessionId, 'srv-1');
+});
+
+test('positive: stop builtin projects the daemon-resolved temp profile', async () => {
+  enableWsTestRoot();
+  resetRoutes();
+  registerHandler('command', async () => ({
+    kind: 'result',
+    payload: { ok: true, stopped: true, profile: '_temp_123_456', ephemeral: true },
+  }));
+  const transport = {
+    async sendFrame(env) {
+      let out;
+      const { handleFrame } = await import('../../../transports/ws/server.mjs');
+      await handleFrame({
+        text: JSON.stringify(env),
+        send: (e) => { out = e; },
+      });
+      return out;
+    },
+  };
+  const parsed = parseFlags(['--profile', 'temp'], { cmd: 'stop' });
+  const out = await runBuiltin('stop', transport, parsed, {});
+  assert.equal(out.profile, '_temp_123_456');
+  assert.equal(out.ephemeral, true);
 });
 
 test('positive: goto builtin sends the right wire args', async () => {

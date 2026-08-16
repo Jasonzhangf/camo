@@ -78,7 +78,8 @@
         "npm run test:all"
       ],
       "positive": [
-        "v2/tests/unit/shell/daemon.temp_alias.test.mjs"
+        "v2/tests/unit/shell/daemon.temp_alias.test.mjs",
+        "v2/tests/unit/commands/builtins.roundtrip.test.mjs"
       ],
       "negative": [
         "v2/tests/unit/shell/daemon.temp_alias.test.mjs"

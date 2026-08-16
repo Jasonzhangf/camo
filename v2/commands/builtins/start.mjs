@@ -44,6 +44,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
     sessionId: reply.payload?.sessionId || null,
     profile: reply.payload?.profile || profile,
     ephemeral: reply.payload?.ephemeral === true,
+    reused: reply.payload?.reused === true,
     headless,
     url,
     issuedAt: new Date().toISOString(),
