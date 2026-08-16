@@ -262,3 +262,22 @@ Tags: camo, google, fingerprint, camoufox, firefox-ua, daemon, browserstate, dup
   automate that frontend flow and makes no auth-code change.
 
 Tags: camo, protocol, set-viewport, mobile, wheel, readable, tarball, onestop, admin-recovery
+
+## 2026-08-16: DSH follow-up release baseline
+
+- Legacy profile state now migrates under the profile owner before launch,
+  with lock serialization, exclusive targets, rollback, and typed conflicts.
+- `temp` is a daemon-owned alias: `start` returns its resolved `_temp_*`
+  profile, a second `start` reuses it, and `stop` projects the resolved profile.
+  Other browser commands intentionally require that returned concrete profile.
+- Camoufox health reports installation readiness only; browser launch truth
+  remains owned by browser-service. Invalid profile directories cannot abort
+  lock iteration.
+- Reviewed product baseline is
+  `deddbe181727e1be047a64e6c4bfda23d972408d`; DSH task
+  `camo-dsh-findings-fix-r2-20260816` returned `VERDICT: PASS`. Verified stack:
+  368 unit, 10 smoke, 40 integration, 4 e2e, strict registry 19/19, build,
+  typecheck, file-size, 324-file package, global install byte equality, and
+  live persistent/temp/legacy/invalid-input replay.
+
+Tags: camo, dsh-review, legacy-profile-migration, temp-alias, health-truth, lock-iteration, release-baseline

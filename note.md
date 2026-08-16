@@ -715,3 +715,17 @@ Stage 8: dynamic ports and daemon discovery are present in source but live CLI v
   failing closed on target conflicts or conflicting profile-root variables.
 - Worktree verification: 363 unit, 10 smoke, 40 integration, 4 e2e; strict
   registry 19/19; typecheck, build, file-size, pack, and wiki idempotency pass.
+
+## 2026-08-16 DSH follow-up closeout
+
+- Main verification at `deddbe181727e1be047a64e6c4bfda23d972408d`: 368 unit,
+  10 smoke, 40 integration, 4 e2e, strict registry 19/19, build, typecheck,
+  file-size, and 324-file package all passed.
+- Global install matched the reviewed source byte-for-byte. Persistent profile,
+  temp first-start/reuse/stop, legacy migration, and typed invalid-URL replay
+  all passed.
+- DSH task `camo-dsh-findings-fix-r2-20260816` returned `VERDICT: PASS` for
+  the same product commit. Local and remote `main` then matched that commit.
+- The follow-up worktree and branch were removed after full tracked-tree
+  equivalence was proven. The page-structure design worktree remains intact;
+  its status is still `design_pending_approval`.
