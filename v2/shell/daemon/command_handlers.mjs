@@ -62,7 +62,13 @@ export async function handleCommand(cmd, args, ctx) {
         await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
         browserState.currentBrowserProfile = aliasedProfile;
         if (allocatedProfile) ctx.ephemeralAllocations.set(requestedProfile, aliasedProfile);
-        return { ok: true, sessionId: (await getSession(aliasedProfile))?.instanceId || null, profile: aliasedProfile, reused: true };
+        return {
+          ok: true,
+          sessionId: (await getSession(aliasedProfile))?.instanceId || null,
+          profile: aliasedProfile,
+          ephemeral: allocatedProfile !== undefined,
+          reused: true,
+        };
       }
       const session = await startSession({
         profileId: requestedProfile,

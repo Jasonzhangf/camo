@@ -103,6 +103,7 @@ test('positive: first start on temp allocates a fresh _temp id and reuses it on 
 
   const second = await handleCommand('start', {}, ctx);
   assert.equal(second.profile, first.profile, 'second start must reuse the same allocated id');
+  assert.equal(second.ephemeral, true);
   assert.equal(second.reused, true);
   assert.equal(launchCount, 1, 'reuse must not launch another browser');
 });
