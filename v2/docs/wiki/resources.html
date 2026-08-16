@@ -40,8 +40,8 @@ section { border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px; }</st
       <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>v2/services/profile</code> - <strong>Store:</strong> disk_json</p>
       <p><strong>Truth path:</strong> <code>~/.camo/profiles/<profile_id>/camo-profile.json</code></p>
       <h3>Reads</h3><ul><li><code>v2/services/profile/store.mjs::read</code></li><li><code>v2/services/session/manager.mjs::read</code></li><li><code>v2/services/lock/manager.mjs::read</code></li></ul>
-      <h3>Writes</h3><ul><li><code>v2/services/profile/store.mjs::write</code></li><li><code>v2/services/profile/store.mjs::delete</code></li></ul>
-
+      <h3>Writes</h3><ul><li><code>v2/services/profile/store.mjs::write</code></li><li><code>v2/services/profile/store.mjs::delete</code></li><li><code>v2/services/profile/storage_paths.mjs::migrateLegacyProfileData</code></li></ul>
+      <h3>Indirect</h3><ul><li><code>v2/services/browser_service/bootstrap.mjs::startSession->migrateLegacyProfileData</code></li></ul>
       <h3>Forbidden</h3><ul><li><code>v2/lifecycle/**::write</code></li><li><code>v2/commands/**::write_to_profile_meta</code></li></ul>
 
       <p><a href="#resource-index">back to index</a></p>
@@ -52,8 +52,8 @@ section { border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px; }</st
       <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>v2/services/profile</code> - <strong>Store:</strong> disk_netscape</p>
       <p><strong>Truth path:</strong> <code><profiles_root>/<profile_id>/cookie-backups/<domain>.txt</code></p>
       <h3>Reads</h3><ul><li><code>v2/services/profile/cookie_store.mjs::loadCookies</code></li><li><code>v2/services/profile/cookie_store.mjs::getBackupDomains</code></li><li><code>v2/services/profile/cookie_store.mjs::getBackupSummary</code></li></ul>
-      <h3>Writes</h3><ul><li><code>v2/services/profile/cookie_store.mjs::saveCookies</code></li><li><code>v2/services/profile/cookie_store.mjs::importNetscape</code></li><li><code>v2/services/profile/cookie_store.mjs::cleanupExpiredDomains</code></li><li><code>v2/services/profile/cookie_store.mjs::clearAll</code></li></ul>
-      <h3>Indirect</h3><ul><li><code>v2/services/search/SearchEngine.mjs::injectCookies->importNetscape</code></li></ul>
+      <h3>Writes</h3><ul><li><code>v2/services/profile/cookie_store.mjs::saveCookies</code></li><li><code>v2/services/profile/cookie_store.mjs::importNetscape</code></li><li><code>v2/services/profile/cookie_store.mjs::cleanupExpiredDomains</code></li><li><code>v2/services/profile/cookie_store.mjs::clearAll</code></li><li><code>v2/services/profile/storage_paths.mjs::migrateLegacyProfileData</code></li></ul>
+      <h3>Indirect</h3><ul><li><code>v2/services/search/SearchEngine.mjs::injectCookies->importNetscape</code></li><li><code>v2/services/browser_service/bootstrap.mjs::startSession->migrateLegacyProfileData</code></li></ul>
       <h3>Forbidden</h3><ul><li><code>v2/core/browser/CookieStore.mjs</code></li><li><code>v2/core/browser/CookieStore.ts::write</code></li></ul>
 
       <p><a href="#resource-index">back to index</a></p>

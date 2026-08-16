@@ -93,6 +93,17 @@
       ]
     },
     {
+      "id": "daemon.temp_alias.lifecycle",
+      "status": "active",
+      "owner_module": "shell.daemon",
+      "entry_symbols": [
+        {
+          "path": "v2/shell/daemon/command_handlers.mjs",
+          "symbol": "handleCommand"
+        }
+      ]
+    },
+    {
       "id": "browser.lifecycle.persistent",
       "status": "active",
       "owner_module": "services.browser_service",
@@ -179,6 +190,28 @@
         {
           "path": "v2/services/profile/cookie_store.mjs",
           "symbol": "getCookieStore"
+        }
+      ]
+    },
+    {
+      "id": "profile.legacy_state_migration",
+      "status": "active",
+      "owner_module": "services.profile",
+      "entry_symbols": [
+        {
+          "path": "v2/services/profile/storage_paths.mjs",
+          "symbol": "migrateLegacyProfileData"
+        }
+      ]
+    },
+    {
+      "id": "browser.installation_readiness",
+      "status": "active",
+      "owner_module": "shell.bin_entry",
+      "entry_symbols": [
+        {
+          "path": "v2/shell/camoufox_health.mjs",
+          "symbol": "checkCamoufoxHealth"
         }
       ]
     },

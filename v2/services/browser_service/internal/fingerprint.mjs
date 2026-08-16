@@ -5,7 +5,8 @@
 //
 // Hard guards:
 //   - All fingerprint data lives under ~/.camo/profiles/<id>/.
-//   - Root-layer ~/.camo/fingerprints/ is NOT read or written.
+//   - Root-layer ~/.camo/fingerprints/ is migrated once by services.profile
+//     before launch; this owner only reads/writes the profile-owned path.
 //   - Generated locale and timezone stay stable across hosts.
 
 import { randomBytes } from 'node:crypto';

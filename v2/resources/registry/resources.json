@@ -118,9 +118,12 @@
       ],
       "write_paths": [
         "v2/services/profile/store.mjs::write",
-        "v2/services/profile/store.mjs::delete"
+        "v2/services/profile/store.mjs::delete",
+        "v2/services/profile/storage_paths.mjs::migrateLegacyProfileData"
       ],
-      "indirect_paths": [],
+      "indirect_paths": [
+        "v2/services/browser_service/bootstrap.mjs::startSession->migrateLegacyProfileData"
+      ],
       "forbidden_paths": [
         "v2/lifecycle/**::write",
         "v2/commands/**::write_to_profile_meta"
@@ -145,10 +148,12 @@
         "v2/services/profile/cookie_store.mjs::saveCookies",
         "v2/services/profile/cookie_store.mjs::importNetscape",
         "v2/services/profile/cookie_store.mjs::cleanupExpiredDomains",
-        "v2/services/profile/cookie_store.mjs::clearAll"
+        "v2/services/profile/cookie_store.mjs::clearAll",
+        "v2/services/profile/storage_paths.mjs::migrateLegacyProfileData"
       ],
       "indirect_paths": [
-        "v2/services/search/SearchEngine.mjs::injectCookies->importNetscape"
+        "v2/services/search/SearchEngine.mjs::injectCookies->importNetscape",
+        "v2/services/browser_service/bootstrap.mjs::startSession->migrateLegacyProfileData"
       ],
       "forbidden_paths": [
         "v2/core/browser/CookieStore.mjs",

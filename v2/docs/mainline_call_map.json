@@ -192,6 +192,21 @@
       "semantic_io": "explicit stop command to ephemeral profile teardown"
     },
     {
+      "feature_id": "daemon.temp_alias.lifecycle",
+      "from": "shell.daemon",
+      "to": "services.browser_service",
+      "caller": {
+        "path": "v2/shell/daemon/command_handlers.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "startSession",
+        "local_symbol": "startSession"
+      },
+      "semantic_io": "literal temp alias to one allocated ephemeral profile id"
+    },
+    {
       "feature_id": "browser.lifecycle.persistent",
       "from": "shell.daemon",
       "to": "services.browser_service",
@@ -372,6 +387,36 @@
         "local_symbol": "cookieStore.importNetscape"
       },
       "semantic_io": "validated profile id and Netscape cookie text to profile-owned backup files"
+    },
+    {
+      "feature_id": "profile.legacy_state_migration",
+      "from": "services.browser_service",
+      "to": "services.profile",
+      "caller": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "startSession"
+      },
+      "callee": {
+        "path": "v2/services/profile/storage_paths.mjs",
+        "symbol": "migrateLegacyProfileData",
+        "local_symbol": "migrateLegacyProfileData"
+      },
+      "semantic_io": "legacy profile-scoped fingerprint and cookie files to profile-owned storage before launch"
+    },
+    {
+      "feature_id": "browser.installation_readiness",
+      "from": "shell.bin_entry",
+      "to": "shell.bin_entry",
+      "caller": {
+        "path": "v2/shell/bin_entry/index.mjs",
+        "symbol": "main"
+      },
+      "callee": {
+        "path": "v2/shell/camoufox_health.mjs",
+        "symbol": "checkCamoufoxHealth",
+        "local_symbol": "checkCamoufoxHealth"
+      },
+      "semantic_io": "CLI browser command to installation readiness result with launchVerified false"
     },
     {
       "feature_id": "cmd.start.request",

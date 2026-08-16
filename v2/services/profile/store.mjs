@@ -24,8 +24,6 @@ export function __enableTestRoot() {
 
 function profilesRoot() {
   if (_overrideRoot) return _overrideRoot;
-  const envOverride = String(process.env.CAMO_PROFILE_ROOT || '').trim();
-  if (envOverride) return path.resolve(envOverride);
   return resolveProfilesRoot();
 }
 
@@ -37,7 +35,7 @@ function profileDirFor(profileId) {
   if (!PROFILE_ID_PATTERN.test(id)) {
     throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'profileId', value: id, reason: 'must match [a-zA-Z0-9._-]+' } });
   }
-  if (_overrideRoot || String(process.env.CAMO_PROFILE_ROOT || '').trim()) {
+  if (_overrideRoot) {
     return path.join(profilesRoot(), id);
   }
   return resolveProfileDir(id);

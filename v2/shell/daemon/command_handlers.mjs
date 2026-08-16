@@ -44,16 +44,25 @@ export async function handleCommand(cmd, args, ctx) {
       const requestedProfile = profile;
       const ephemeralRequested = (args && args.ephemeral === true) || requestedProfile === 'temp';
 
-      // If a browser already exists for this profile, just open a blank
-      // page on the active page instead of failing with duplicate.
-      const existing = hasBrowser(requestedProfile);
+      // Resolve temp alias to the current allocation (if any) before checking
+      // for an existing browser, otherwise hasBrowser would never see a temp
+      // session whose allocation map points at a fresh _temp_<pid>_<ts> id.
+      const allocatedProfile = ctx.ephemeralAllocations.get(requestedProfile);
+      const aliasedProfile = allocatedProfile || requestedProfile;
+      const existing = hasBrowser(aliasedProfile);
+      if (allocatedProfile && !existing) {
+        throw new CamoError({
+          code: 'E_STATE_INVALID',
+          details: { resource: 'ephemeral_allocations', alias: requestedProfile, profileId: aliasedProfile, reason: 'allocation has no active browser' },
+        });
+      }
       if (existing) {
-        const page = getCurrentPage(requestedProfile);
+        const page = getCurrentPage(aliasedProfile);
         const targetUrl = (args && typeof args.url === 'string' && args.url) ? args.url : 'about:blank';
         await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        browserState.currentBrowserProfile = requestedProfile;
-        ctx.ephemeralAllocations.set(requestedProfile, requestedProfile);
-        return { ok: true, sessionId: (await getSession(requestedProfile))?.instanceId || null, profile: requestedProfile, reused: true };
+        browserState.currentBrowserProfile = aliasedProfile;
+        if (allocatedProfile) ctx.ephemeralAllocations.set(requestedProfile, aliasedProfile);
+        return { ok: true, sessionId: (await getSession(aliasedProfile))?.instanceId || null, profile: aliasedProfile, reused: true };
       }
       const session = await startSession({
         profileId: requestedProfile,
@@ -63,7 +72,7 @@ export async function handleCommand(cmd, args, ctx) {
       const effectiveProfile = session.profileId || requestedProfile;
       browserState.currentBrowserProfile = effectiveProfile;
       browserState.browserRefCount = 1;
-      ctx.ephemeralAllocations.set(requestedProfile, effectiveProfile);
+      if (session.ephemeral === true) ctx.ephemeralAllocations.set(requestedProfile, effectiveProfile);
       if (args && typeof args.url === 'string' && args.url) {
         const fresh = getCurrentPage(effectiveProfile);
         await fresh.goto(args.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -73,10 +82,14 @@ export async function handleCommand(cmd, args, ctx) {
 
     case 'stop': {
       const { stopSession } = await import('../../services/browser_service/bootstrap.mjs');
-      // Resolve temp alias to the allocated ephemeral id; the daemon may own multiple.
-      const resolvedProfile = (profile === 'temp' || profile.startsWith('temp'))
-        ? (ctx.ephemeralAllocations.get('temp') || profile)
-        : profile;
+      // Resolve the alias 'temp' to the allocated ephemeral id; do NOT match
+      // by prefix, that would let any profile whose id starts with the
+      // literal "temp" close a different allocated session.
+      const allocated = ctx.ephemeralAllocations.get(profile);
+      let resolvedProfile = allocated || profile;
+      if (profile === 'temp' && !allocated) {
+          throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'ephemeral_allocations', alias: 'temp' } });
+      }
       const result = await stopSession(resolvedProfile);
       browserState.currentBrowserProfile = null;
       browserState.browserRefCount = 0;

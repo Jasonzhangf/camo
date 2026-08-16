@@ -280,6 +280,7 @@
       "layer": "L5_shell",
       "owned_paths": [
         "v2/shell/bin_entry/**",
+        "v2/shell/camoufox_health.mjs",
         "v2/examples/**"
       ],
       "status": "active"

@@ -56,6 +56,49 @@
       ]
     },
     {
+      "id": "profile.legacy_state_migration",
+      "owner_resource": "profile",
+      "required_commands": [
+        "npm test",
+        "npm run test:all",
+        "node v2/gates/run-all.mjs --strict"
+      ],
+      "positive": [
+        "v2/tests/unit/services/profile.legacy_migration.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/services/profile.legacy_migration.test.mjs"
+      ]
+    },
+    {
+      "id": "daemon.temp_alias.lifecycle",
+      "owner_resource": "browser_session",
+      "required_commands": [
+        "npm test",
+        "npm run test:all"
+      ],
+      "positive": [
+        "v2/tests/unit/shell/daemon.temp_alias.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/shell/daemon.temp_alias.test.mjs"
+      ]
+    },
+    {
+      "id": "browser.installation_readiness",
+      "owner_resource": "browser_instance",
+      "required_commands": [
+        "npm test",
+        "npm run test:all"
+      ],
+      "positive": [
+        "v2/tests/unit/shell/camoufox_health.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/shell/camoufox_health.test.mjs"
+      ]
+    },
+    {
       "id": "container.match",
       "owner_resource": "container_match",
       "positive": [

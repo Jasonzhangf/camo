@@ -384,7 +384,10 @@ By default, non-`events` commands auto-start the progress daemon (`/events`) in 
 
 - Config file: `~/.camo/camo-cli.json`
 - Profiles directory: `~/.camo/profiles/`
-- Fingerprints directory: `~/.camo/fingerprints/`
+- Per-profile fingerprints: `~/.camo/profiles/<id>/fingerprint.json`
+- Per-profile cookie backups: `~/.camo/profiles/<id>/cookie-backups/`
+- Legacy `~/.camo/fingerprints/<id>.json` and
+  `~/.camo/cookies/<id>/` data migrates once, before profile launch.
 - Session registry: `~/.camo/sessions/`
 - Lock files: `~/.camo/locks/`
 - GeoIP database: `~/.camo/geoip/GeoLite2-City.mmdb`

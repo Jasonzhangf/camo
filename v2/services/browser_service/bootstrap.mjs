@@ -30,6 +30,10 @@ import { append as appendProgress } from '../progress_event/log.mjs';
 import { read as readProfile, write as writeProfile, deleteProfile as deleteProfileMeta } from '../profile/store.mjs';
 import { resolveDisplayMetrics } from '../display/resolver.mjs';
 import { resolveProfileDir, resolveEphemeralTempDirName } from './internal/storage-paths.mjs';
+import { migrateLegacyProfileData } from '../profile/storage_paths.mjs';
+
+let launchBrowserOwner = launchBrowser;
+let closeBrowserOwner = closeBrowser;
 
 let _enabled = false;
 export function __enableTestRoot() {
@@ -151,38 +155,47 @@ export async function startSession({ profileId, headless, mode, viewport, epheme
 
     emit('session.start', { profileId: pid, headless: hl, mode: m, ephemeral: effectiveEphemeral });
 
-    // Ensure profile metadata exists (auto-create for ephemeral)
+    // Lock before touching any profile-owned or legacy state. This serializes
+    // migration, metadata creation, and launch under the same profile owner.
+    const { acquire: acquireLock, release: releaseLock } = await import('../lock/manager.mjs');
+    const lockHandle = acquireLock(pid, { owner: lockOwner(), pid: process.pid, mode: 'F' });
+    _lockHandles.set(pid, lockHandle);
+
+    let migration = { migrated: false };
     let profileMeta;
     let profileCreated = false;
     try {
-        profileMeta = readProfile(pid);
-    } catch (cause) {
-        if (cause.code === 'E_STATE_NOT_FOUND') {
-            profileMeta = writeProfile(pid, {});
-            profileCreated = true;
-        } else {
-            throw cause;
+        // One-shot, fail-fast. Any conflict aborts before browser launch;
+        // legacy files remain visible for explicit operator repair.
+        migration = migrateLegacyProfileData(pid);
+        try {
+            profileMeta = readProfile(pid);
+        } catch (cause) {
+            if (cause.code === 'E_STATE_NOT_FOUND') {
+                profileMeta = writeProfile(pid, {});
+                profileCreated = true;
+            } else {
+                throw cause;
+            }
         }
+    } catch (cause) {
+        releaseLock(pid, { owner: lockOwner(), pid: process.pid });
+        _lockHandles.delete(pid);
+        throw cause;
     }
-
-    // Acquire CLI-facing lock
-    const { acquire: acquireLock } = await import('../lock/manager.mjs');
-    const lockHandle = acquireLock(pid, { owner: lockOwner(), pid: process.pid, mode: 'F' });
-    _lockHandles.set(pid, lockHandle);
 
     // Launch Camoufox
     let record;
     try {
-        record = await launchBrowser(pid, {
+        record = await launchBrowserOwner(pid, {
             headless: hl,
             viewport: viewport || profileMeta.viewportSize,
             fingerprintPlatform: profileMeta.fingerprint?.platform || null,
         });
     } catch (cause) {
-        const { release: releaseLock } = await import('../lock/manager.mjs');
         releaseLock(pid, { owner: lockOwner(), pid: process.pid });
         _lockHandles.delete(pid);
-        if (profileCreated) {
+        if (profileCreated && !migration.migrated) {
             deleteProfileMeta(pid);
         }
         throw cause;
@@ -237,7 +250,7 @@ export async function stopSession(profileId) {
 
     const wasEphemeral = _ephemeralProfiles.has(pid);
 
-    await closeBrowser(pid);
+    await closeBrowserOwner(pid);
 
     const { deleteSession: deleteSession, tryRead: tryReadSession } = await import('../session/manager.mjs');
     if (tryReadSession(pid)) deleteSession(pid);
@@ -348,6 +361,12 @@ export async function __resetForTest() {
     _lockHandles.clear();
     _ephemeralProfiles.clear();
     await closeAll();
+}
+
+export function __setBrowserLifecycleForTest({ launch, close } = {}) {
+    if (!_enabled) throw new CamoError({ code: 'E_INTERNAL_UNEXPECTED', details: { op: '__setBrowserLifecycleForTest' } });
+    launchBrowserOwner = launch || launchBrowser;
+    closeBrowserOwner = close || closeBrowser;
 }
 
 export function __setOwnedProfilesForTest(profileIds) {

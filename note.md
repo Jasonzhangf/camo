@@ -699,3 +699,19 @@ Stage 8: dynamic ports and daemon discovery are present in source but live CLI v
 - Effective installed copy: `/opt/homebrew/lib/node_modules/@web-auto/camo`
   -> `/Users/fanzhang/Documents/github/camo` (real clone), byte-identical to
   `/Users/fanzhang/github/camo` for the fixed health file; verified via diff.
+
+## 2026-08-16 DSH follow-up findings repair
+
+- Round-1 DSH review failed on four gaps: no legacy profile-state migration,
+  incorrect `temp` alias reuse, installation presence presented as launch
+  health, and invalid profile directories aborting lock scans.
+- Unique owners are `services.profile::migrateLegacyProfileData`,
+  `shell.daemon::handleCommand`, `shell.bin_entry::checkCamoufoxHealth`, and
+  `services.lock::{cleanupStale,listHeld}`. No page-structure implementation is
+  included; that design remains pending approval.
+- Migration is lock-serialized before profile creation/browser launch,
+  exclusive and rollback-aware. It preserves legacy fingerprint bytes,
+  Netscape/visit files, and BrowserInstance JSON backup readability, while
+  failing closed on target conflicts or conflicting profile-root variables.
+- Worktree verification: 363 unit, 10 smoke, 40 integration, 4 e2e; strict
+  registry 19/19; typecheck, build, file-size, pack, and wiki idempotency pass.

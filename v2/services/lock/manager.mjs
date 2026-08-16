@@ -232,12 +232,17 @@ export function release(profileId, opts = {}) {
   });
 }
 
+function isLegalProfileDirName(name) {
+  return typeof name === 'string' && PROFILE_ID_PATTERN.test(name);
+}
+
 export function cleanupStale() {
   const root = locksRoot();
   if (!fs.existsSync(root)) return [];
   const removed = [];
   for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
+    if (!isLegalProfileDirName(entry.name)) continue;
     const profileId = entry.name;
     withProfileMutex(profileId, () => {
       const probeOut = probe(profileId);
@@ -256,6 +261,7 @@ export function listHeld() {
   const held = [];
   for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
+    if (!isLegalProfileDirName(entry.name)) continue;
     const profileId = entry.name;
     const p = probe(profileId);
     if (p.held) held.push(profileId);
