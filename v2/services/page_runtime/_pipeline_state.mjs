@@ -18,7 +18,7 @@ export function __resetForTest() {
   _state.clear();
 }
 
-export const ALLOWED_KINDS = new Set(['goto', 'click', 'type', 'scroll', 'screenshot', 'snapshot', 'wait', 'evaluate', 'upload', 'select', 'back', 'switchPage', 'hover', 'getText', 'getPageInfo', 'findElements', 'getReadable', 'newTab', 'closeTab', 'listTabs', 'getCookies', 'setCookies', 'setUserAgent', 'setViewport', 'waitForDomStable', 'scrollAndCollect', 'fetch']);
+export const ALLOWED_KINDS = new Set(['goto', 'click', 'type', 'scroll', 'screenshot', 'snapshot', 'wait', 'evaluate', 'upload', 'select', 'back', 'switchPage', 'hover', 'getText', 'getPageInfo', 'findElements', 'getReadable', 'newTab', 'closeTab', 'listTabs', 'switchTab', 'multiOpen', 'getCookies', 'setCookies', 'setUserAgent', 'setViewport', 'waitForDomStable', 'scrollAndCollect', 'fetch']);
 
 const _state = new Map();
 

@@ -40,34 +40,51 @@ export async function handleCommand(cmd, args, ctx) {
 
   switch (cmd) {
     case 'start': {
-      const { startSession } = await import('../../services/browser_service/bootstrap.mjs');
+      const { startSession, hasBrowser, getCurrentPage, getSession } = await import('../../services/browser_service/bootstrap.mjs');
+      const requestedProfile = profile;
+      const ephemeralRequested = (args && args.ephemeral === true) || requestedProfile === 'temp';
+
       // If a browser already exists for this profile, just open a blank
       // page on the active page instead of failing with duplicate.
-      const bridge = await import('../../services/browser_service/internal/camoufox_bridge.mjs');
-      const existing = bridge.getBrowser(profile);
+      const existing = hasBrowser(requestedProfile);
       if (existing) {
-        const page = bridge.getPage(profile);
+        const page = getCurrentPage(requestedProfile);
         const targetUrl = (args && typeof args.url === 'string' && args.url) ? args.url : 'about:blank';
         await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        browserState.currentBrowserProfile = profile;
-        return { ok: true, sessionId: existing.sessionId || null, profile, reused: true };
+        browserState.currentBrowserProfile = requestedProfile;
+        ctx.ephemeralAllocations.set(requestedProfile, requestedProfile);
+        return { ok: true, sessionId: (await getSession(requestedProfile))?.instanceId || null, profile: requestedProfile, reused: true };
       }
-      const session = await startSession({ profileId: profile, headless: opts.mode === 'headless' });
-      browserState.currentBrowserProfile = profile;
+      const session = await startSession({
+        profileId: requestedProfile,
+        headless: opts.mode === 'headless',
+        ephemeral: ephemeralRequested,
+      });
+      const effectiveProfile = session.profileId || requestedProfile;
+      browserState.currentBrowserProfile = effectiveProfile;
       browserState.browserRefCount = 1;
+      ctx.ephemeralAllocations.set(requestedProfile, effectiveProfile);
       if (args && typeof args.url === 'string' && args.url) {
-        const fresh = bridge.getPage(profile);
+        const fresh = getCurrentPage(effectiveProfile);
         await fresh.goto(args.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
       }
-      return { ok: true, sessionId: session.sessionId, profile: session.profileId };
+      return { ok: true, sessionId: session.sessionId, profile: effectiveProfile, ephemeral: session.ephemeral === true };
     }
 
     case 'stop': {
       const { stopSession } = await import('../../services/browser_service/bootstrap.mjs');
-      await stopSession(profile);
+      // Resolve temp alias to the allocated ephemeral id; the daemon may own multiple.
+      const resolvedProfile = (profile === 'temp' || profile.startsWith('temp'))
+        ? (ctx.ephemeralAllocations.get('temp') || profile)
+        : profile;
+      const result = await stopSession(resolvedProfile);
       browserState.currentBrowserProfile = null;
       browserState.browserRefCount = 0;
-      return { ok: true, stopped: true, profile };
+      // Clean up any tracked ephemeral allocation maps for this alias.
+      for (const [alias, alloc] of [...ctx.ephemeralAllocations.entries()]) {
+        if (alloc === resolvedProfile) ctx.ephemeralAllocations.delete(alias);
+      }
+      return { ok: true, stopped: true, profile: resolvedProfile, ephemeral: result && result.ephemeral === true };
     }
 
     case 'goto': {
@@ -90,7 +107,7 @@ export async function handleCommand(cmd, args, ctx) {
 
     case 'scroll': {
       const scroll = await importOp('scroll');
-      const r = await scroll({ profileId: profile, x: args.dx, y: args.dy });
+      const r = await scroll({ profileId: profile, x: args.dx, y: args.dy, atX: args.atX, atY: args.atY });
       return { ok: true, scrolled: true };
     }
 
@@ -200,6 +217,12 @@ export async function handleCommand(cmd, args, ctx) {
       return { ok: true, newTab: true, created: true, tabId: r.tabId, url: r.url };
     }
 
+    case 'multi-open': {
+      const multiOpen = await importOp('multiOpen');
+      const r = await multiOpen({ profileId: profile, urls: args.urls, outDir: args.outDir || null, prefix: args.prefix || 'multi-open' });
+      return { ok: true, opened: r.opened, screenshots: r.screenshots, errors: r.errors };
+    }
+
     case 'scroll-and-collect': {
       const scrollAndCollect = await importOp('scrollAndCollect');
       const r = await scrollAndCollect({ profileId: profile, scrollCount: args.scrollCount, scrollDelay: args.scrollDelay });
@@ -257,7 +280,7 @@ export async function handleCommand(cmd, args, ctx) {
     default:
       throw new CamoError({
         code: 'E_PROTO_NO_HANDLER',
-        details: { cmd, known: ['start', 'stop', 'close-tab', 'daemon', 'fetch-page', 'find-elements', 'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'list-tabs', 'new-tab', 'scroll-and-collect', 'set-cookies', 'set-user-agent', 'set-viewport', 'wait-dom-stable', ...browserCommandNames(), 'search'] }
+        details: { cmd, known: ['start', 'stop', 'close-tab', 'daemon', 'fetch-page', 'find-elements', 'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'list-tabs', 'new-tab', 'multi-open', 'scroll-and-collect', 'set-cookies', 'set-user-agent', 'set-viewport', 'wait-dom-stable', ...browserCommandNames(), 'search'] }
       });
   }
 }

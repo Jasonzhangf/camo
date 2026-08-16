@@ -2,19 +2,15 @@
 //
 // Generates stable Camoufox fingerprints per profile and applies them
 // to the browser context via init scripts.
+//
+// Hard guards:
+//   - All fingerprint data lives under ~/.camo/profiles/<id>/.
+//   - Root-layer ~/.camo/fingerprints/ is NOT read or written.
+//   - Generated locale and timezone stay stable across hosts.
 
 import { randomBytes } from 'node:crypto';
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { homedir } from 'node:os';
-
-function resolveFingerprintDir() {
-    const envDir = String(process.env.CAMO_PATHS_FINGERPRINTS || '').trim();
-    if (envDir) return envDir;
-    const portableRoot = String(process.env.CAMO_PORTABLE_ROOT || process.env.CAMO_ROOT || '').trim();
-    if (portableRoot) return join(portableRoot, '.camo', 'fingerprints');
-    return join(homedir(), '.camo', 'fingerprints');
-}
+import { resolveFingerprintPath, resolveProfileDir } from './storage-paths.mjs';
 
 const PLATFORM_FINGERPRINTS = {
     windows: [
@@ -126,7 +122,7 @@ export async function applyFingerprint(context, fingerprint) {
 }
 
 export function getFingerprintPath(profileId) {
-    return join(resolveFingerprintDir(), `${profileId}.json`);
+    return resolveFingerprintPath(profileId);
 }
 
 export async function loadOrGenerateFingerprint(profileId, options = {}) {
@@ -135,12 +131,16 @@ export async function loadOrGenerateFingerprint(profileId, options = {}) {
     try {
         if (existsSync(fp)) {
             fingerprint = JSON.parse(readFileSync(fp, 'utf8'));
+            if (!fingerprint || fingerprint.profileId !== profileId) {
+                fingerprint = null;
+            }
         }
     } catch {}
     if (!fingerprint) {
         fingerprint = generateFingerprint(profileId, options);
         try {
-            mkdirSync(dirname(fp), { recursive: true });
+            const dir = resolveProfileDir(profileId);
+            mkdirSync(dir, { recursive: true });
             writeFileSync(fp, JSON.stringify(fingerprint, null, 2));
         } catch (err) {
             console.warn('loadOrGenerateFingerprint: failed to save fingerprint:', err?.message || err);

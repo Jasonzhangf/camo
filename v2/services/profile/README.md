@@ -1,11 +1,12 @@
-# services-profile (design)
+# services-profile
 
-Module owner placeholder. Real implementation will live in this directory.
-See `v2/resources/registry/modules.json` for the canonical id.
+Single owner for profile metadata, profile storage paths, and profile-scoped
+cookie backup files. See `v2/resources/registry/modules.json` for the
+canonical module id.
 
-Layer: see modules.json.
+## Public owners
 
-Skeletons to land here before this module becomes active:
-- `manager.mjs` (or equivalent) with single owner of the resource(s) listed in resources.json.
-- One thin `index.mjs` re-exporting public surface.
-- Tests under `v2/tests/unit/<path>/`.
+- `store.mjs`: `camo-profile.json` read/write/delete.
+- `storage_paths.mjs`: configured profile root and profile-owned paths.
+- `cookie_store.mjs`: Netscape cookie backups under
+  `<profile-dir>/cookie-backups/`.

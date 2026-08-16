@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CookieStore, getCookieStore } from '../../../core/browser/CookieStore.mjs';
+import { CookieStore, getCookieStore } from '../../../services/profile/cookie_store.mjs';
 
 // 每次测试独立临时目录，避免污染真实 ~/.camo
 function makeStore() {
@@ -110,8 +110,8 @@ test('profile isolation: getCookieStore(profile) uses per-profile storage dir', 
     const a = getCookieStore('profile-a');
     const b = getCookieStore('profile-b');
     assert.notEqual(a.config.storageDir, b.config.storageDir, 'profiles must use different dirs');
-    assert.ok(a.config.storageDir.endsWith(path.join('.camo', 'cookies', 'profile-a')));
-    assert.ok(b.config.storageDir.endsWith(path.join('.camo', 'cookies', 'profile-b')));
+    assert.ok(a.config.storageDir.endsWith(path.join('.camo', 'profiles', 'profile-a', 'cookie-backups')));
+    assert.ok(b.config.storageDir.endsWith(path.join('.camo', 'profiles', 'profile-b', 'cookie-backups')));
 
     // profile-a 保存的 cookie 不应出现在 profile-b
     a.saveCookies('example.com', [{ name: 'x', value: '1', domain: '.example.com', path: '/', expires: 1786026438 }]);
@@ -121,6 +121,40 @@ test('profile isolation: getCookieStore(profile) uses per-profile storage dir', 
     process.env.HOME = prevHome;
     fs.rmSync(fakeHome, { recursive: true, force: true });
   }
+});
+
+test('portable root: profile cookie backups stay under the configured profile root', () => {
+  const portableProfiles = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-cookie-portable-'));
+  const previous = process.env.CAMO_PATHS_PROFILES;
+  process.env.CAMO_PATHS_PROFILES = portableProfiles;
+  try {
+    const store = getCookieStore('portable-profile');
+    assert.equal(
+      store.config.storageDir,
+      path.join(portableProfiles, 'portable-profile', 'cookie-backups'),
+    );
+    store.saveCookies('example.com', [{ name: 'portable', value: '1', domain: '.example.com', path: '/' }]);
+    assert.equal(fs.existsSync(path.join(store.config.storageDir, 'example.com.txt')), true);
+  } finally {
+    if (previous === undefined) delete process.env.CAMO_PATHS_PROFILES;
+    else process.env.CAMO_PATHS_PROFILES = previous;
+    fs.rmSync(portableProfiles, { recursive: true, force: true });
+  }
+});
+
+test('negative: clearing cookie backups preserves profile-owned runtime files', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-cookie-preserve-'));
+  const backupDir = path.join(root, 'cookie-backups');
+  const store = new CookieStore({ storageDir: backupDir });
+  fs.writeFileSync(path.join(root, 'cookies.sqlite'), 'browser cookies', 'utf8');
+  fs.writeFileSync(path.join(root, 'fingerprint.json'), '{}', 'utf8');
+  store.saveCookies('example.com', [{ name: 'backup', value: '1', domain: '.example.com', path: '/' }]);
+
+  store.clearAll();
+
+  assert.equal(fs.readFileSync(path.join(root, 'cookies.sqlite'), 'utf8'), 'browser cookies');
+  assert.equal(fs.existsSync(path.join(root, 'fingerprint.json')), true);
+  fs.rmSync(root, { recursive: true, force: true });
 });
 
 test('cleanupExpiredDomains removes stale domain files', () => {

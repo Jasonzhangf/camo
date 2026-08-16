@@ -46,21 +46,34 @@ export async function goto({ profileId, url, waitUntil = 'load' }) {
  */
 export async function newTab({ profileId, url }) {
   const pid = safeId(profileId, 'profileId');
+  const targetUrl = url == null || url === '' ? null : normalizeUrl(url);
   const bridge = await getBridge();
   const record = bridge.getBrowser(pid);
   if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
   emit(pid, 'newTab.start', { url });
+  let page = null;
   try {
-    const page = await record.context.newPage();
-    if (url && /^https?:\/\//.test(url)) {
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    page = await record.context.newPage();
+    if (targetUrl) {
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     }
-    const result = { profileId: pid, tabId: page._id || page.guid || null, url: page.url(), created: true };
+    const tabId = record.context.pages().indexOf(page);
+    if (tabId < 0) throw new Error('opened page missing from context page list');
+    const result = { profileId: pid, tabId, url: page.url(), created: true };
     emit(pid, 'newTab.done', { url: page.url() });
     return result;
   } catch (cause) {
+    let cleanupFailure = null;
+    if (page) {
+      try { await page.close(); }
+      catch (closeCause) { cleanupFailure = closeCause?.message || String(closeCause); }
+    }
     emit(pid, 'newTab.error', { url, error: cause?.message });
-    throw new CamoError({ code: 'E_BROWSER_NEWTAB_FAILED', details: { profileId: pid, url, reason: cause?.message }, cause });
+    throw new CamoError({
+      code: 'E_BROWSER_NEWTAB_FAILED',
+      details: { profileId: pid, url, reason: cause?.message, cleanupFailure },
+      cause,
+    });
   }
 }
 
@@ -107,7 +120,11 @@ export async function listTabs({ profileId }) {
   emit(pid, 'listTabs.start', {});
   try {
     const pages = record.context.pages();
-    const tabs = pages.map((p, i) => ({ tabId: i, url: p.url(), title: p._title || '' }));
+    const tabs = await Promise.all(pages.map(async (page, tabId) => ({
+      tabId,
+      url: page.url(),
+      title: await page.title(),
+    })));
     const result = { profileId: pid, count: tabs.length, tabs };
     emit(pid, 'listTabs.done', { count: tabs.length });
     return result;
@@ -140,4 +157,65 @@ export async function switchTab({ profileId, tabId }) {
     emit(pid, 'switchTab.error', { tabId, error: cause?.message });
     throw new CamoError({ code: 'E_BROWSER_SWITCHTAB_FAILED', details: { profileId: pid, tabId, reason: cause?.message }, cause });
   }
+}
+
+/**
+ * Open multiple URLs serially in deterministic tab order, then capture a
+ * screenshot of each. Successfully opened tabs remain caller-owned only when
+ * the full operation succeeds. Any failure closes all tabs created here.
+ *
+ * @param {Object} opts
+ * @param {string} opts.profileId
+ * @param {string[]} opts.urls - List of absolute http(s) URLs to open
+ * @param {string} [opts.outDir] - Directory to save screenshots (default: temp dir)
+ * @param {string} [opts.prefix] - Filename prefix for screenshots (default: 'multi-open')
+ * @returns {Object} results: { profileId, opened, screenshots: [{tabId,url,path,size}], errors: [] }
+ */
+export async function multiOpen({ profileId, urls, outDir = null, prefix = 'multi-open' }) {
+  const pid = safeId(profileId, 'profileId');
+  if (!Array.isArray(urls) || urls.length === 0) {
+    throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'urls', reason: 'at least one http(s) url required' } });
+  }
+  const list = urls.map((url) => normalizeUrl(url));
+  const bridge = await getBridge();
+  const record = bridge.getBrowser(pid);
+  if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
+  emit(pid, 'multiOpen.start', { count: list.length });
+  const opened = [];
+  const screenshots = [];
+  const createdPages = [];
+  try {
+    for (let i = 0; i < list.length; i += 1) {
+      const url = list[i];
+      const page = await record.context.newPage();
+      createdPages.push(page);
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      const tabId = record.context.pages().indexOf(page);
+      if (tabId < 0) throw new Error('opened page missing from context page list');
+      opened.push({ tabId, url: page.url() });
+      let destPath = null;
+      if (outDir) {
+        const { join } = await import('node:path');
+        const safe = String(i + 1).padStart(2, '0');
+        destPath = join(outDir, `${prefix}-${safe}.png`);
+      }
+      const buffer = await page.screenshot({ fullPage: false, type: 'png', path: destPath || undefined });
+      screenshots.push({ tabId, url: page.url(), size: buffer?.length ?? 0, path: destPath || null });
+    }
+  } catch (cause) {
+    const cleanupFailures = [];
+    for (const page of [...createdPages].reverse()) {
+      try { await page.close(); }
+      catch (closeCause) { cleanupFailures.push(closeCause?.message || String(closeCause)); }
+    }
+    emit(pid, 'multiOpen.error', { error: cause?.message, cleanupFailures });
+    throw new CamoError({
+      code: 'E_BROWSER_MULTIOPEN_FAILED',
+      details: { profileId: pid, reason: cause?.message, cleanupFailures },
+      cause,
+    });
+  }
+  const result = { profileId: pid, opened, screenshots, errors: [] };
+  emit(pid, 'multiOpen.done', { opened: opened.length, screenshots: screenshots.length, errors: 0 });
+  return result;
 }

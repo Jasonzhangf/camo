@@ -59,7 +59,7 @@ function makeWsTransport(url) {
 
 const NO_TRANSPORT_CMDS = new Set([
     '--help', '-h', 'help', 'doctor', 'usage', 'describe',
-    '--version', 'version', 'daemon', 'stop',
+    '--version', 'version', 'daemon',
     'list-profiles', 'remove-profile', 'clean', 'init',
     'search',
   ]);
@@ -133,7 +133,7 @@ async function main(argv) {
     ['goto', 'click', 'type', 'scroll', 'screenshot', 'get-page-info', 'get-cookies', 
      'set-cookies', 'evaluate', 'find-elements', 'wait', 'hover', 'select', 'upload',
      'fetch-page', 'snapshot', 'scroll-and-collect', 'get-readable', 'get-text',
-     'new-tab', 'close-tab', 'list-tabs', 'set-viewport', 'set-user-agent', 'start'].includes(args[0])
+     'new-tab', 'close-tab', 'list-tabs', 'set-viewport', 'set-user-agent', 'multi-open', 'start'].includes(args[0])
   );
   
   if (isBrowserCmd) {

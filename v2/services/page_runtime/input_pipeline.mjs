@@ -55,6 +55,7 @@ export const newTab = wrapOperation('newTab', pageOps.newTab);
 export const closeTab = wrapOperation('closeTab', pageOps.closeTab);
 export const listTabs = wrapOperation('listTabs', pageOps.listTabs);
 export const switchTab = wrapOperation('switchTab', pageOps.switchTab);
+export const multiOpen = wrapOperation('multiOpen', pageOps.multiOpen);
 export const getCookies = wrapOperation('getCookies', pageOps.getCookies);
 export const setCookies = wrapOperation('setCookies', pageOps.setCookies);
 export const setUserAgent = wrapOperation('setUserAgent', pageOps.setUserAgent);

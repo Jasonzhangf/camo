@@ -134,6 +134,55 @@
       ]
     },
     {
+      "id": "browser.lifecycle.multi_profile",
+      "status": "active",
+      "owner_module": "services.browser_service",
+      "entry_symbols": [
+        {
+          "path": "v2/services/browser_service/bootstrap.mjs",
+          "symbol": "startSession"
+        },
+        {
+          "path": "v2/services/browser_service/bootstrap.mjs",
+          "symbol": "stopSession"
+        },
+        {
+          "path": "v2/services/browser_service/bootstrap.mjs",
+          "symbol": "shutdown"
+        }
+      ]
+    },
+    {
+      "id": "profile_lock.lifecycle",
+      "status": "active",
+      "owner_module": "services.lock",
+      "entry_symbols": [
+        {
+          "path": "v2/services/lock/manager.mjs",
+          "symbol": "acquire"
+        },
+        {
+          "path": "v2/services/lock/manager.mjs",
+          "symbol": "release"
+        },
+        {
+          "path": "v2/services/lock/manager.mjs",
+          "symbol": "cleanupStale"
+        }
+      ]
+    },
+    {
+      "id": "profile.cookie_backup",
+      "status": "active",
+      "owner_module": "services.profile",
+      "entry_symbols": [
+        {
+          "path": "v2/services/profile/cookie_store.mjs",
+          "symbol": "getCookieStore"
+        }
+      ]
+    },
+    {
       "id": "cmd.start.request",
       "status": "active",
       "owner_module": "commands.builtins",
@@ -278,6 +327,32 @@
       ]
     },
     {
+      "id": "cmd.wait.request",
+      "status": "active",
+      "owner_module": "commands.builtins",
+      "entry_symbols": [
+        {
+          "path": "v2/commands/builtins/wait.mjs",
+          "symbol": "run"
+        }
+      ]
+    },
+    {
+      "id": "cmd.wait.execute",
+      "status": "active",
+      "owner_module": "services.page_runtime",
+      "entry_symbols": [
+        {
+          "path": "v2/services/page_runtime/input_pipeline.mjs",
+          "symbol": "wait"
+        },
+        {
+          "path": "v2/services/page_runtime/operations/wait_ops.mjs",
+          "symbol": "wait"
+        }
+      ]
+    },
+    {
       "id": "cmd.browser-wire.project",
       "status": "active",
       "owner_module": "shell.daemon",
@@ -386,6 +461,43 @@
         {
           "path": "v2/services/search/platforms/XHSSearch.mjs",
           "symbol": "search"
+        }
+      ]
+    },
+    {
+      "id": "cmd.login.request",
+      "status": "active",
+      "owner_module": "commands.builtins",
+      "entry_symbols": [
+        {
+          "path": "v2/commands/builtins/login.mjs",
+          "symbol": "run"
+        }
+      ]
+    },
+    {
+      "id": "cmd.multi_open.request",
+      "status": "active",
+      "owner_module": "commands.builtins",
+      "entry_symbols": [
+        {
+          "path": "v2/commands/builtins/multiOpen.mjs",
+          "symbol": "run"
+        }
+      ]
+    },
+    {
+      "id": "cmd.multi_open.execute",
+      "status": "active",
+      "owner_module": "services.page_runtime",
+      "entry_symbols": [
+        {
+          "path": "v2/services/page_runtime/input_pipeline.mjs",
+          "symbol": "multiOpen"
+        },
+        {
+          "path": "v2/services/page_runtime/operations/navigation_ops.mjs",
+          "symbol": "multiOpen"
         }
       ]
     }

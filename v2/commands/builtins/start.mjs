@@ -34,14 +34,16 @@ export async function run(transport, parsed = {}, ctx = {}) {
   const profile = safeProfile(parsed.profile);
   const url = parsed.named?.url ?? null;
   const headless = parsed.named?.headless === true;
+  const ephemeral = parsed.flags?.ephemeral === true || profile === 'temp';
   const reply = await sendCommand(transport, {
     cmd: 'start',
-    args: { profile, url, headless },
+    args: { profile, url, headless, ephemeral },
   });
   return {
     cmd: 'start',
     sessionId: reply.payload?.sessionId || null,
-    profile,
+    profile: reply.payload?.profile || profile,
+    ephemeral: reply.payload?.ephemeral === true,
     headless,
     url,
     issuedAt: new Date().toISOString(),

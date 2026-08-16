@@ -34,13 +34,25 @@
       ]
     },
     {
-      "id": "lock.acquire",
+      "id": "profile_lock.lifecycle",
       "owner_resource": "profile_lock",
       "positive": [
-        "v2/tests/unit/services/lock.acquire.test.mjs"
+        "v2/tests/unit/services/lock.acquire.test.mjs",
+        "v2/tests/unit/services/lock.identity.test.mjs"
       ],
       "negative": [
-        "v2/tests/unit/services/lock.force_acquire.test.mjs"
+        "v2/tests/unit/services/lock.force_acquire.test.mjs",
+        "v2/tests/unit/services/lock.identity.test.mjs"
+      ]
+    },
+    {
+      "id": "profile.cookie_backup",
+      "owner_resource": "profile_cookie_backup",
+      "positive": [
+        "v2/tests/unit/core/cookie_store.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/core/cookie_store.test.mjs"
       ]
     },
     {
@@ -358,6 +370,36 @@
       ],
       "negative": [
         "v2/tests/unit/services/search.engine.test.mjs"
+      ]
+    },
+    {
+      "id": "cmd.login.request",
+      "owner_resource": "command_log",
+      "positive": [
+        "v2/tests/unit/commands/builtins.index.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/commands/builtins.new-commands.test.mjs"
+      ]
+    },
+    {
+      "id": "cmd.multi_open.request",
+      "owner_resource": "command_log",
+      "positive": [
+        "v2/tests/unit/commands/multiOpen.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/commands/multiOpen.test.mjs"
+      ]
+    },
+    {
+      "id": "cmd.multi_open.execute",
+      "owner_resource": "input_pipeline",
+      "positive": [
+        "v2/tests/unit/commands/multiOpen.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/commands/multiOpen.test.mjs"
       ]
     }
   ]

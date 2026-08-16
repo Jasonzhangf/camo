@@ -207,6 +207,51 @@
       "semantic_io": "named profile to isolated browser session"
     },
     {
+      "feature_id": "profile_lock.lifecycle",
+      "from": "services.browser_service",
+      "to": "services.lock",
+      "caller": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "startSession"
+      },
+      "callee": {
+        "path": "v2/services/lock/manager.mjs",
+        "symbol": "acquire",
+        "local_symbol": "acquireLock"
+      },
+      "semantic_io": "browser-service start acquires per-profile CLI lock"
+    },
+    {
+      "feature_id": "profile_lock.lifecycle",
+      "from": "services.browser_service",
+      "to": "services.lock",
+      "caller": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "stopSession"
+      },
+      "callee": {
+        "path": "v2/services/lock/manager.mjs",
+        "symbol": "release",
+        "local_symbol": "releaseLock"
+      },
+      "semantic_io": "browser-service stop releases per-profile CLI lock"
+    },
+    {
+      "feature_id": "profile_lock.lifecycle",
+      "from": "services.browser_service",
+      "to": "services.lock",
+      "caller": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "shutdown"
+      },
+      "callee": {
+        "path": "v2/services/lock/manager.mjs",
+        "symbol": "release",
+        "local_symbol": "releaseLock"
+      },
+      "semantic_io": "browser-service shutdown releases every profile CLI lock"
+    },
+    {
       "feature_id": "browser.lifecycle.persistent",
       "from": "shell.daemon",
       "to": "services.browser_service",
@@ -222,6 +267,21 @@
       "semantic_io": "explicit stop command to named profile teardown"
     },
     {
+      "feature_id": "browser.lifecycle.multi_profile",
+      "from": "services.browser_service",
+      "to": "services.lock",
+      "caller": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "shutdown"
+      },
+      "callee": {
+        "path": "v2/services/lock/manager.mjs",
+        "symbol": "release",
+        "local_symbol": "releaseLock"
+      },
+      "semantic_io": "shutdown releases every profile-owned lock without cross-profile omission"
+    },
+    {
       "feature_id": "browser.runtime.ownership",
       "from": "services.browser_service",
       "to": "services.browser_service.internal",
@@ -234,7 +294,7 @@
         "symbol": "launchBrowser",
         "local_symbol": "launchBrowser"
       },
-        "semantic_io": "profile launch request to owned Camoufox handles"
+      "semantic_io": "profile launch request to owned Camoufox handles"
     },
     {
       "feature_id": "browser.runtime.ownership",
@@ -249,7 +309,7 @@
         "symbol": "closeBrowser",
         "local_symbol": "closeBrowser"
       },
-        "semantic_io": "failed launch cleanup to confirmed Camoufox handle closure"
+      "semantic_io": "failed launch cleanup to confirmed Camoufox handle closure"
     },
     {
       "feature_id": "browser.runtime.ownership",
@@ -264,7 +324,54 @@
         "symbol": "closeBrowser",
         "local_symbol": "closeBrowser"
       },
-        "semantic_io": "profile stop request to confirmed Camoufox handle closure"
+      "semantic_io": "profile stop request to confirmed Camoufox handle closure"
+    },
+    {
+      "feature_id": "profile_lock.lifecycle",
+      "from": "services.lock",
+      "to": "services.daemon_registration",
+      "caller": {
+        "path": "v2/services/lock/manager.mjs",
+        "symbol": "acquire",
+        "local_symbol": "acquire"
+      },
+      "callee": {
+        "path": "v2/services/daemon_registration/registry.mjs",
+        "symbol": "getProcessIdentity",
+        "local_symbol": "getProcessIdentity"
+      },
+      "semantic_io": "verify profile lock holder process generation before reclaim or rejection"
+    },
+    {
+      "feature_id": "profile_lock.lifecycle",
+      "from": "services.lock",
+      "to": "services.daemon_registration",
+      "caller": {
+        "path": "v2/services/lock/manager.mjs",
+        "symbol": "release",
+        "local_symbol": "release"
+      },
+      "callee": {
+        "path": "v2/services/daemon_registration/registry.mjs",
+        "symbol": "getProcessIdentity",
+        "local_symbol": "getProcessIdentity"
+      },
+      "semantic_io": "verify caller process generation before removing the owned lock"
+    },
+    {
+      "feature_id": "profile.cookie_backup",
+      "from": "services.search",
+      "to": "services.profile",
+      "caller": {
+        "path": "v2/services/search/SearchEngine.mjs",
+        "symbol": "injectCookies"
+      },
+      "callee": {
+        "path": "v2/services/profile/cookie_store.mjs",
+        "symbol": "importNetscape",
+        "local_symbol": "cookieStore.importNetscape"
+      },
+      "semantic_io": "validated profile id and Netscape cookie text to profile-owned backup files"
     },
     {
       "feature_id": "cmd.start.request",
@@ -660,6 +767,89 @@
       "semantic_io": "serialized target focus and text to protocol mouse and keyboard input"
     },
     {
+      "feature_id": "cmd.wait.request",
+      "from": "shell.cli",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/shell/cli/dispatch.mjs",
+        "symbol": "dispatch"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run",
+        "local_symbol": "runBuiltin"
+      },
+      "semantic_io": "validated wait condition and duration to builtin dispatch"
+    },
+    {
+      "feature_id": "cmd.wait.request",
+      "from": "commands.builtins",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/wait.mjs",
+        "symbol": "run",
+        "local_symbol": "wait.run"
+      },
+      "invocation": {
+        "kind": "registry_dispatch",
+        "registry_object": "BUILTINS",
+        "command_id": "wait",
+        "builtin_namespace": "wait",
+        "dispatch_local_symbol": "mod",
+        "method": "run"
+      },
+      "semantic_io": "registry-selected wait command to concrete builtin owner"
+    },
+    {
+      "feature_id": "cmd.wait.request",
+      "from": "commands.builtins",
+      "to": "transports.client",
+      "caller": {
+        "path": "v2/commands/builtins/wait.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/transports/client/api.mjs",
+        "symbol": "sendCommand",
+        "local_symbol": "sendCommand"
+      },
+      "semantic_io": "wait condition, timeout, target, and ms projected unchanged into command payload"
+    },
+    {
+      "feature_id": "cmd.wait.execute",
+      "from": "shell.daemon",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/shell/daemon/command_handlers.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "wait",
+        "local_symbol": "wait"
+      },
+      "semantic_io": "profile-scoped wait request to page runtime with exact duration projection"
+    },
+    {
+      "feature_id": "cmd.wait.execute",
+      "from": "services.page_runtime",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "wait"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/operations/wait_ops.mjs",
+        "symbol": "wait",
+        "local_symbol": "pageOps.wait"
+      },
+      "semantic_io": "serialized wait contract to existing condition/timer owner"
+    },
+    {
       "feature_id": "cmd.browser-wire.project",
       "from": "shell.daemon",
       "to": "shell.daemon",
@@ -929,6 +1119,82 @@
         "local_symbol": "runSearch"
       },
       "semantic_io": "daemon search request to search builtin"
+    },
+    {
+      "feature_id": "cmd.login.request",
+      "from": "commands.builtins",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/login.mjs",
+        "symbol": "run",
+        "local_symbol": "login.run"
+      },
+      "invocation": {
+        "kind": "registry_dispatch",
+        "registry_object": "BUILTINS",
+        "command_id": "login",
+        "builtin_namespace": "login",
+        "dispatch_local_symbol": "mod",
+        "method": "run"
+      },
+      "semantic_io": "registry-selected login command to concrete builtin owner"
+    },
+    {
+      "feature_id": "cmd.login.execute",
+      "from": "commands.builtins",
+      "to": "transports.client",
+      "caller": {
+        "path": "v2/commands/builtins/login.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/transports/client/api.mjs",
+        "symbol": "sendCommand",
+        "local_symbol": "sendCommand"
+      },
+      "semantic_io": "start, page-info, and cookie polling requests use the canonical transport"
+    },
+    {
+      "feature_id": "cmd.multi_open.request",
+      "from": "commands.builtins",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/multiOpen.mjs",
+        "symbol": "run",
+        "local_symbol": "multiOpen.run"
+      },
+      "invocation": {
+        "kind": "registry_dispatch",
+        "registry_object": "BUILTINS",
+        "command_id": "multi-open",
+        "builtin_namespace": "multiOpen",
+        "dispatch_local_symbol": "mod",
+        "method": "run"
+      },
+      "semantic_io": "registry-selected multi-open command to concrete builtin owner"
+    },
+    {
+      "feature_id": "cmd.multi_open.execute",
+      "from": "shell.daemon",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/shell/daemon/command_handlers.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "multiOpen",
+        "local_symbol": "multiOpen"
+      },
+      "semantic_io": "validated URLs to serialized multi-tab navigation and screenshots"
     }
   ]
 }

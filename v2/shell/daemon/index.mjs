@@ -24,6 +24,7 @@ import {
   startSession, 
   stopSession, 
   getSession,
+  hasBrowser,
   shutdown as shutdownBrowserService,
   __enableTestRoot as enableBrowserServiceTest,
   enableAllOwners as enableAllBrowserOwners
@@ -89,7 +90,6 @@ let browserOwnersEnabled = false;
 
 async function ensureBrowser(profile, forcePersistent) {
   const targetProfile = profile || opts.profile;
-  const { getBrowser } = await import('../../services/browser_service/internal/camoufox_bridge.mjs');
   
   if (opts.mode === 'ephemeral' || forcePersistent) {
     if (currentBrowserProfile !== targetProfile || browserRefCount === 0) {
@@ -106,7 +106,7 @@ async function ensureBrowser(profile, forcePersistent) {
   }
   
   if (!currentBrowserProfile || currentBrowserProfile !== targetProfile) {
-    if (!getBrowser(targetProfile)) {
+    if (!hasBrowser(targetProfile)) {
       await startSession({ profileId: targetProfile, headless: opts.mode === 'headless' });
     }
     currentBrowserProfile = targetProfile;
@@ -134,6 +134,7 @@ async function releaseBrowser(forceClose) {
 }
 
 // --- Command dispatch ---
+const ephemeralAllocations = new Map();   // requested alias -> allocated profile id
 async function handleCommand(env) {
   const { cmd, args = {} } = env.payload || {};
   const profile = args.profile || opts.profile;
@@ -154,6 +155,7 @@ async function handleCommand(env) {
       ensureBrowser,
       releaseBrowser,
       browserState,
+      ephemeralAllocations,
     });
 
     // Sync back browser state changes

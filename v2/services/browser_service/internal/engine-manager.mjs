@@ -202,6 +202,7 @@ export async function launchEngineContext(opts) {
         'screen.availHeight': Math.floor(workH),
         'window.screenX':     0,
         'window.screenY':     0,
+        ...(opts.timezoneId ? { timezone: opts.timezoneId } : {}),
     };
 
     const firefox_user_prefs = useMinimalWindowsOptions ? null : {

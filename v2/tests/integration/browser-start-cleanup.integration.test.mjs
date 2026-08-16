@@ -33,7 +33,7 @@ test('negative: failed launch releases lock and only removes metadata created by
       const root = path.join(process.env.HOME, '.camo');
       const result = {
         code,
-        lockExists: fs.existsSync(path.join(root, 'locks', ${JSON.stringify(`${profile}.lock.json`)})),
+        lockExists: fs.existsSync(path.join(root, 'profiles', ${JSON.stringify(profile)}, 'lock.json')),
         profileExists: fs.existsSync(path.join(root, 'profiles', ${JSON.stringify(profile)})),
       };
       process.stdout.write(JSON.stringify(result));

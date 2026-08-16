@@ -35,7 +35,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
 
   const reply = await sendCommand(transport, {
     cmd: 'upload',
-    args: { profile, selector, file },
+    args: { profile, selector, files: [file] },
   });
   return {
     cmd: 'upload',

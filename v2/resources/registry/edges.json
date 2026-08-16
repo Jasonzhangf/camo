@@ -334,6 +334,12 @@
       "reason": "raise typed browser runtime errors"
     },
     {
+      "from": "services.browser_service.internal",
+      "to": "services.profile",
+      "kind": "call",
+      "reason": "resolve profile-owned storage paths"
+    },
+    {
       "from": "services.command_log",
       "to": "contracts.error_envelope",
       "kind": "call",
@@ -364,6 +370,18 @@
       "reason": "raise typed lock errors"
     },
     {
+      "from": "services.lock",
+      "to": "services.daemon_registration",
+      "kind": "call",
+      "reason": "verify process-generation identity for profile lock ownership"
+    },
+    {
+      "from": "services.lock",
+      "to": "services.profile",
+      "kind": "call",
+      "reason": "resolve the profile-owned lock path"
+    },
+    {
       "from": "services.page_runtime",
       "to": "contracts.error_envelope",
       "kind": "call",
@@ -386,6 +404,12 @@
       "to": "contracts.error_envelope",
       "kind": "call",
       "reason": "raise typed profile errors"
+    },
+    {
+      "from": "services.search",
+      "to": "services.profile",
+      "kind": "call",
+      "reason": "read and write profile-owned cookie backups"
     },
     {
       "from": "services.progress_event",

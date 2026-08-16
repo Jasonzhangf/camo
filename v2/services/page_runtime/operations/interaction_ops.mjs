@@ -117,7 +117,7 @@ export async function click({ profileId, selector, text, button = 'left' }) {
     return result;
   } catch (cause) {
     emit(pid, 'click.error', { selector, text, error: cause?.message });
-    throw new CamoError({ code: 'E_BROWSER_CLICK_FAILED', details: { profileId: pid, selector, text, reason: cause?.message }, cause });
+    throw new CamoError({ code: 'E_BROWSER_CLICK_FAILED', details: { profileId: pid, selector, text, reason: cause?.details?.reason || cause?.message }, cause });
   }
 }
 
@@ -198,7 +198,7 @@ export async function type({ profileId, text, selector, delay }) {
  * @param {number} [opts.y] - Y offset
  * @returns {Object} scroll result
  */
-export async function scroll({ profileId, x = 0, y = 0 }) {
+export async function scroll({ profileId, x = 0, y = 0, atX = null, atY = null }) {
   const pid = safeId(profileId, 'profileId');
   const page = getPageOrThrow(pid);
   const scrollX = typeof x === 'number' ? x : 0;
@@ -209,11 +209,11 @@ export async function scroll({ profileId, x = 0, y = 0 }) {
     // window.scrollTo hack. Move the pointer into the viewport first so the
     // wheel event targets the scrolling region.
     const viewport = page.viewportSize() || { width: 800, height: 600 };
-    const cx = Math.floor(viewport.width / 2);
-    const cy = Math.floor(viewport.height / 2);
+    const cx = Number.isFinite(atX) ? Math.max(0, Math.min(viewport.width - 1, Math.floor(atX))) : Math.floor(viewport.width / 2);
+    const cy = Number.isFinite(atY) ? Math.max(0, Math.min(viewport.height - 1, Math.floor(atY))) : Math.floor(viewport.height / 2);
     await page.mouse.move(cx, cy);
     await page.mouse.wheel(scrollX, scrollY);
-    const result = { profileId: pid, scrolled: true, x: scrollX, y: scrollY };
+    const result = { profileId: pid, scrolled: true, x: scrollX, y: scrollY, atX: cx, atY: cy };
     emit(pid, 'scroll.done', result);
     return result;
   } catch (cause) {

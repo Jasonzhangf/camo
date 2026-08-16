@@ -93,6 +93,6 @@ test('installed package: pack, global install, version, ephemeral cleanup', { ti
   fs.unlinkSync(screenshotPath);
   assert.deepEqual(registrationsFor(runtimeHome), [], 'ephemeral daemon registration must be removed by daemon owner');
   assert.equal(fs.existsSync(path.join(runtimeHome, '.camo', 'profiles', snap.profile)), false, 'ephemeral profile must be deleted');
-  assert.equal(fs.existsSync(path.join(runtimeHome, '.camo', 'locks', `${snap.profile}.lock.json`)), false, 'ephemeral lock must be released');
+  assert.equal(fs.existsSync(path.join(runtimeHome, '.camo', 'profiles', snap.profile, 'lock.json')), false, 'ephemeral lock must be released');
 
 });

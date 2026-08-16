@@ -9,8 +9,7 @@ Single truth owner for Camoufox (Firefox) browser lifecycle.
 | `camoufox_bridge.mjs` | Single owner for browser instances per profile |
 | `engine-manager.mjs` | Camoufox context launch with display metrics |
 | `fingerprint.mjs` | Stable fingerprint generation and application |
-| `ProfileLock.mjs` | PID-based profile lock file |
-| `storage-paths.mjs` | Data directory resolution |
+| `storage-paths.mjs` | Compatibility projection of profile-owned paths |
 
 ## Engine Policy
 
@@ -22,7 +21,6 @@ Single truth owner for Camoufox (Firefox) browser lifecycle.
 
 ```
 launchBrowser(pid, opts)
-  -> ProfileLock.acquire()
   -> loadOrGenerateFingerprint(pid)
   -> launchEngineContext({ engine:'camoufox', ... })
   -> applyFingerprint(context, fingerprint)
@@ -31,6 +29,8 @@ launchBrowser(pid, opts)
 
 closeBrowser(pid)
   -> context.close()
-  -> ProfileLock.release()
   -> _records.delete(pid)
 ```
+
+Profile ownership is acquired and released only by
+`v2/services/lock/manager.mjs`, orchestrated by browser-service bootstrap.

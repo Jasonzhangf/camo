@@ -1,6 +1,7 @@
-// camo v2 builtin: `camo scroll --x <dx> --y <dy> [--profile <id>]`
+// camo v2 builtin: `camo scroll --x <dx> --y <dy> [--at-x <px>] [--at-y <px>] [--profile <id>]`
 //
-// Scroll the active page by delta pixels. At least one of x/y must be non-zero.
+// Scroll the active page by delta pixels at the given pointer position
+// (default: viewport center). At least one of x/y must be non-zero.
 
 import { CamoError } from '../../contracts/error_envelope/projector.mjs';
 import { sendCommand } from '../../transports/client/api.mjs';
@@ -25,6 +26,8 @@ export async function run(transport, parsed = {}, ctx = {}) {
   const profile = safeProfile(parsed.profile);
   const dx = parsed.named?.x ?? 0;
   const dy = parsed.named?.y ?? 0;
+  const atX = parsed.named?.atX != null ? Number(parsed.named.atX) : null;
+  const atY = parsed.named?.atY != null ? Number(parsed.named.atY) : null;
 
   if (typeof dx !== 'number' || !Number.isFinite(dx)) {
     throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'x', value: dx } });
@@ -38,16 +41,23 @@ export async function run(transport, parsed = {}, ctx = {}) {
       details: { field: 'x|y', reason: 'at least one of --x or --y must be non-zero' },
     });
   }
+  for (const [flag, value] of [['at-x', atX], ['at-y', atY]]) {
+    if (value !== null && (!Number.isFinite(value) || value < 0)) {
+      throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: flag, value } });
+    }
+  }
 
   const reply = await sendCommand(transport, {
     cmd: 'scroll',
-    args: { profile, dx, dy },
+    args: { profile, dx, dy, atX, atY },
   });
   return {
     cmd: 'scroll',
     profile,
     dx,
     dy,
+    atX,
+    atY,
     scrolled: reply.payload?.scrolled === true,
     issuedAt: new Date().toISOString(),
     traceId: ctx.traceId || null,

@@ -1,4 +1,4 @@
-// camo v2 builtin: `camo wait [--for <selector|text|url>] [--timeout <ms>] [--profile <id>]`
+// camo v2 builtin: `camo wait [--for <selector|text|url>] [--timeout <ms>] [--ms <ms>] [--profile <id>]`
 //
 // Wait for a condition to be satisfied. Default timeout 30000ms.
 
@@ -25,6 +25,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
   const profile = safeProfile(parsed.profile);
   const for_ = parsed.named?.for || 'load';
   const timeout = parsed.named?.timeout ?? 30000;
+  const ms = parsed.named?.ms ?? null;
 
   const validForValues = ['load', 'domcontentloaded', 'networkidle', 'selector', 'text', 'url'];
   if (!validForValues.includes(for_)) {
@@ -42,13 +43,14 @@ export async function run(transport, parsed = {}, ctx = {}) {
 
   const reply = await sendCommand(transport, {
     cmd: 'wait',
-    args: { profile, for: for_, timeout, target },
+    args: { profile, for: for_, timeout, target, ms },
   });
   return {
     cmd: 'wait',
     profile,
     for: for_,
     timeout,
+    ms,
     target,
     satisfied: reply.payload?.satisfied === true,
     issuedAt: new Date().toISOString(),

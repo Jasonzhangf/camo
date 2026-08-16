@@ -101,6 +101,186 @@
       "default_user_message": "Failed to launch browser."
     },
     {
+      "code": "E_BROWSER_CLICK_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to click the target."
+    },
+    {
+      "code": "E_BROWSER_TYPE_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to type into the target."
+    },
+    {
+      "code": "E_BROWSER_HOVER_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to hover the target."
+    },
+    {
+      "code": "E_BROWSER_SCROLL_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to scroll the page."
+    },
+    {
+      "code": "E_BROWSER_SCROLLANDCOLLECT_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to scroll and collect page content."
+    },
+    {
+      "code": "E_BROWSER_UPLOAD_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to upload files."
+    },
+    {
+      "code": "E_BROWSER_SELECT_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to select the option."
+    },
+    {
+      "code": "E_BROWSER_SCREENSHOT_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to take a screenshot."
+    },
+    {
+      "code": "E_BROWSER_SNAPSHOT_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to capture the page snapshot."
+    },
+    {
+      "code": "E_BROWSER_GETTEXT_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to read page text."
+    },
+    {
+      "code": "E_BROWSER_GETREADABLE_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to read readable page content."
+    },
+    {
+      "code": "E_BROWSER_GETPAGEINFO_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to read page info."
+    },
+    {
+      "code": "E_BROWSER_FINDELEMENTS_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to find page elements."
+    },
+    {
+      "code": "E_BROWSER_NAVIGATION_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to navigate the page."
+    },
+    {
+      "code": "E_BROWSER_NEWTAB_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to open a new tab."
+    },
+    {
+      "code": "E_BROWSER_CLOSETAB_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to close the tab."
+    },
+    {
+      "code": "E_BROWSER_LISTTABS_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to list tabs."
+    },
+    {
+      "code": "E_BROWSER_MULTIOPEN_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to open all requested tabs."
+    },
+    {
+      "code": "E_BROWSER_SWITCHTAB_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to switch tabs."
+    },
+    {
+      "code": "E_BROWSER_EVALUATE_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to evaluate in the page."
+    },
+    {
+      "code": "E_BROWSER_FETCH_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to fetch the resource."
+    },
+    {
+      "code": "E_BROWSER_GETCOOKIES_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to read cookies."
+    },
+    {
+      "code": "E_BROWSER_SETCOOKIES_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to write cookies."
+    },
+    {
+      "code": "E_BROWSER_SETUSERAGENT_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to set the user agent."
+    },
+    {
+      "code": "E_BROWSER_SETVIEWPORT_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to set the viewport."
+    },
+    {
+      "code": "E_BROWSER_WAITFORDOMSTABLE_FAILED",
+      "category": "io",
+      "default_user_message": "Page did not become stable."
+    },
+    {
+      "code": "E_BROWSER_UNSUPPORTED_ENGINE",
+      "category": "state",
+      "default_user_message": "Unsupported browser engine."
+    },
+    {
+      "code": "E_BROWSER_SHUTDOWN_PARTIAL",
+      "category": "io",
+      "default_user_message": "Browser shutdown completed with errors."
+    },
+    {
+      "code": "E_BROWSER_HEARTBEAT",
+      "category": "io",
+      "default_user_message": "Browser heartbeat failed."
+    },
+    {
+      "code": "E_IO_PROCESS",
+      "category": "io",
+      "default_user_message": "Process operation failed."
+    },
+    {
+      "code": "E_DAEMON_STOP_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to stop the daemon."
+    },
+    {
+      "code": "E_STATE_INVALID",
+      "category": "state",
+      "default_user_message": "Invalid state."
+    },
+    {
+      "code": "E_PROTO_NO_CMD",
+      "category": "protocol",
+      "default_user_message": "No command specified."
+    },
+    {
+      "code": "E_LOGIN_TIMEOUT",
+      "category": "io",
+      "default_user_message": "Login detection timed out."
+    },
+    {
+      "code": "E_IMPL_MISSING",
+      "category": "internal",
+      "default_user_message": "Required implementation is missing."
+    },
+    {
+      "code": "E_DISPLAY_RESOLVE_FAILED",
+      "category": "internal",
+      "default_user_message": "Failed to resolve the display."
+    },
+    {
       "code": "E_CONFIG_INVALID",
       "category": "input",
       "default_user_message": "Invalid configuration."

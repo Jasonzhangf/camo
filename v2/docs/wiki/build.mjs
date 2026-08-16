@@ -91,7 +91,13 @@ async function buildEdgeTable() {
     </tr>`).join('\n');
   const arch = path.join(OUT, 'architecture.html');
   const text = await fs.readFile(arch, 'utf8');
-  const withForbidden = text.replace(
+  // Idempotent injection: remove any previously generated table first, then
+  // inject exactly one. Re-running the generator must not duplicate rows.
+  const stripped = text.replace(
+    /<h3>Forbidden edges<\/h3><table><thead><tr><th>from<\/th><th>to<\/th><th>reason<\/th><\/tr><\/thead><tbody>[\s\S]*?<\/tbody><\/table><\/ul>\s*<h2>Checklist/,
+    '</ul><h2>Checklist'
+  );
+  const withForbidden = stripped.replace(
     /<\/ul>\s*<h2>Checklist/,
     `<h3>Forbidden edges</h3><table><thead><tr><th>from</th><th>to</th><th>reason</th></tr></thead><tbody>${forb}</tbody></table></ul><h2>Checklist`
   );

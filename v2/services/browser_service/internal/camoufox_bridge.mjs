@@ -9,16 +9,12 @@
 //   - Graceful SIGTERM handling.
 //   - No fallback; Camoufox unavailable = fatal error.
 
-import path from 'node:path';
-import fs from 'node:fs';
-import os from 'node:os';
 import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
 import { launchEngineContext } from './engine-manager.mjs';
 import { loadOrGenerateFingerprint, applyFingerprint } from './fingerprint.mjs';
-import { ProfileLock } from './ProfileLock.mjs';
-import { resolveProfilesRoot } from './storage-paths.mjs';
+import { resolveProfileDir } from './storage-paths.mjs';
 
-const _records = new Map();  // profileId -> { context, browser, page, lock, fingerprint, createdAt }
+const _records = new Map();  // profileId -> { context, browser, page, fingerprint, createdAt }
 let _enabled = false;
 
 export function __enableTestRoot() { _enabled = true; }
@@ -30,7 +26,7 @@ function ensureWritable() {
 }
 
 function profileDir(profileId) {
-    return path.join(resolveProfilesRoot(), String(profileId || '').trim());
+    return resolveProfileDir(profileId);
 }
 
 /**
@@ -56,12 +52,6 @@ export async function launchBrowser(profileId, opts = {}) {
         platform: opts.fingerprintPlatform || null,
     });
 
-    // Acquire profile lock
-    const lock = new ProfileLock(pid);
-    if (!lock.acquire()) {
-        throw new CamoError({ code: 'E_STATE_LOCKED', details: { resource: 'profile', profileId: pid } });
-    }
-
     // Launch Camoufox context
     const fallbackViewport = { width: 1440, height: 1100 };
     const explicitViewport = opts.viewport
@@ -81,9 +71,7 @@ export async function launchBrowser(profileId, opts = {}) {
             userAgent: fingerprint?.userAgent,
             locale: fingerprint?.language || 'zh-CN',
             timezoneId: fingerprint?.timezoneId || 'Asia/Shanghai',
-        });
-    } catch (cause) {
-        lock.release();
+        });    } catch (cause) {
         throw new CamoError({
             code: 'E_BROWSER_LAUNCH_FAILED',
             details: { profileId: pid, reason: cause?.message || String(cause) },
@@ -104,7 +92,6 @@ export async function launchBrowser(profileId, opts = {}) {
         context,
         browser,
         page,
-        lock,
         fingerprint,
         createdAt: new Date().toISOString(),
         profileId: pid,
@@ -132,7 +119,6 @@ export async function closeBrowser(profileId) {
         console.error(`closeBrowser(${pid}): ${cause?.message || cause}`);
     }
 
-    record.lock.release();
     _records.delete(pid);
     return true;
 }

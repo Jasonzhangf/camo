@@ -55,6 +55,7 @@ export function getProcessIdentity(pid) {
   if (process.platform === 'darwin') {
     const result = spawnSync('/bin/ps', ['-p', String(value), '-o', 'lstart='], {
       encoding: 'utf8',
+      env: { ...process.env, LANG: 'C', LC_ALL: 'C', LC_CTYPE: 'C' },
     });
     const started = result.stdout?.trim();
     if (result.status !== 0 || !started) {

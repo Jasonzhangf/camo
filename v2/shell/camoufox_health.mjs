@@ -6,7 +6,6 @@ async function checkCamoufoxHealth() {
   const os = await import('node:os');
   const path = await import('node:path');
   const fs = await import('node:fs');
-  const { spawnSync } = await import('node:child_process');
 
   const homedir = os.homedir();
   const isWin = os.platform() === 'win32';
@@ -31,32 +30,14 @@ async function checkCamoufoxHealth() {
     } catch {}
   }
 
-  // Check 3: verify Camoufox can actually launch
-  try {
-    const testScript = `
-      const { Camoufox } = require('camoufox');
-      (async () => {
-        const browser = await Camoufox({ headless: true, iKnowWhatImDoing: true });
-        const page = await browser.newPage();
-        await page.goto('https://example.com');
-        await browser.close();
-        process.exit(0);
-      })().catch(e => { process.exit(1); });
-    `;
-    const result = spawnSync(process.execPath, ['-e', testScript], {
-      stdio: 'pipe',
-      timeout: 30000,
-      cwd: process.env.CAMO_PKG_ROOT || process.cwd(),
-    });
-    if (result.status === 0) {
-      return { ok: true };
-    } else {
-      const err = result.stderr?.toString() || 'Unknown error';
-      return { ok: false, error: 'Camoufox launch failed: ' + err.slice(0, 200) };
-    }
-  } catch (err) {
-    return { ok: false, error: 'Camoufox check failed: ' + err.message };
-  }
+  // Check 3: installation is present. Actual launch correctness is owned by
+  // the daemon browser-service, which surfaces launch failures with proper
+  // error envelopes. Launching a full browser synchronously here, on every
+  // CLI browser command, caused repeated browser spawn/teardown and could
+  // block forever: spawnSync timeout kills the probe child, but the probe's
+  // Camoufox grandchild keeps the inherited stdout/stderr pipes open, so the
+  // CLI waits on pipe EOF indefinitely before ever reaching the daemon.
+  return { ok: true };
 }
 
 /**

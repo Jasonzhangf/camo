@@ -1,7 +1,7 @@
 // Search Engine - 平台无关的搜索接口
 
 import { BrowserPoolRegistry } from '../../resources/browser/BrowserPool.mjs';
-import { CookieStore, getCookieStore } from '../../core/browser/CookieStore.mjs';
+import { CookieStore, getCookieStore } from '../profile/cookie_store.mjs';
 
 export class SearchPlatform {
   constructor(config = { profile: 'mobile_safari' }) {

@@ -53,3 +53,19 @@ test('positive: process identity binds the claim to this process generation', ()
 test('negative: invalid process ids have no identity', () => {
   assert.equal(getProcessIdentity(0), null);
 });
+
+test('positive: process identity probe preserves the configured C locale', (t) => {
+  if (process.platform !== 'darwin') {
+    t.skip('Darwin-specific process identity environment');
+    return;
+  }
+  const original = process.env.LANG;
+  process.env.LANG = 'zh_CN.UTF-8';
+  try {
+    const identity = getProcessIdentity(process.pid);
+    assert.match(identity, /^darwin:[A-Z][a-z]{2} [A-Z][a-z]{2} \d{1,2} \d{2}:\d{2}:\d{2} \d{4}$/);
+  } finally {
+    if (original === undefined) delete process.env.LANG;
+    else process.env.LANG = original;
+  }
+});

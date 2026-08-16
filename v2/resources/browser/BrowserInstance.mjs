@@ -5,8 +5,7 @@ const { Camoufox } = require('camoufox');
 const fs = require('fs');
 const path = require('path');
 
-const COOKIE_DIR = path.join(process.env.HOME || '/tmp', '.camo', 'cookies');
-const LOCK_DIR = path.join(process.env.HOME || '/tmp', '.camo', 'locks');
+const COOKIE_DIR = path.join(process.env.HOME || '/tmp', '.camo', 'profiles');
 const PROFILE_LOCK_DIR = path.join(process.env.HOME || '/tmp', '.camo', 'profile-locks');
 // 持久化浏览器数据目录：localStorage/cookie/指纹随 profile 保留，登录态可跨实例恢复
 const PROFILE_DATA_DIR = path.join(process.env.HOME || '/tmp', '.camo', 'profiles');

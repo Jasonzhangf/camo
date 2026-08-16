@@ -514,3 +514,188 @@ Stage 8: dynamic ports and daemon discovery are present in source but live CLI v
   the live options, with no fallback.
 - Admin backend recovery/reset remains supported; this camo closeout does not
   automate that frontend flow and does not change OneStop auth code.
+
+## 2026-08-09 final review invalid and lifecycle diagnosis
+
+- Review of pushed commit `f4663a0` is not a PASS: cc produced no final output,
+  asxs returned 503, and tcm exited with analysis text only. The final review
+  file has no verdict and no review exit marker.
+- Isolated worktree `/private/tmp/camo-review-findings-exp-20260809` reproduced
+  the multi-profile lock leak with real Camoufox: A and B both held manager
+  locks before shutdown, but baseline shutdown left A's lock file behind.
+- A profile-keyed lock-map intervention made the red test pass; reverting only
+  that intervention made it red again. Unique owner is browser-service
+  bootstrap lifecycle state.
+- `wait --ms` is used by repository business tests but absent from the command
+  registry and builtin wire payload. Contract tests proved the parser keeps it
+  as an unvalidated string and accepts a negative duration. Registry + builtin
+  projection intervention made both tests green; reverting made both red.
+- Fix design `FIX-camo-lifecycle-review-gaps-20260809-r1` is pending Jason's
+  approval. Main worktree implementation remains unchanged.
+- Codex channels all lacked a valid verdict, so the required OpenCode fallback
+  was run against commit `f4663a0`. It returned `VERDICT: FAIL` with two P1s:
+  daemon `ensureBrowser` dynamically crosses into browser-service internal
+  state without a registered edge, and `shell/config/daemon_finder.mjs` is an
+  unreferenced compatibility facade that silently drops documented filter
+  semantics. Both are added to the same pending design because they directly
+  block this closeout review.
+## 2026-08-10 Camoufox startup crash diagnosis
+
+- Debug contract: `DEBUG-camoufox-transformprocess-crash-20260810-r1`.
+- Canonical source remains read-only at `f4663a0`; experiment worktree is
+  `/private/tmp/camo-crash-debug-20260810`.
+- 28 macOS reports share the startup SIGABRT stack
+  `abort -> _RegisterApplication -> TransformProcessType`; the system log
+  states that LaunchServices could not provide the required application ASN.
+- The strongest correlated sample is the 2026-08-10 03:03-03:07 burst:
+  repeated `session.start` for profile `default`, no matching
+  `session.started`, while a distinct fresh profile starts successfully.
+- Active H1: internal `ProfileLock.acquire()` destroys a live holder and
+  immediately reuses the same persistent profile directory. The next step is
+  an isolated same-profile baseline plus a reject-live-holder intervention;
+  H2/H3 remain inactive until H1 is confirmed or falsified.
+
+## 2026-08-10 Crash root cause and operational rule (continued)
+
+- System-log correlation for 06:05:22 and 08:59:37:
+  `launchd: denied lookup name=com.apple.coreservices.launchservicesd requestor=node[<parent>] error=159 Sandbox restriction`,
+  then the same denial for `camoufox[<child>]`, then `_RegisterApplication` abort.
+  Node parent was alive; H2 (parent death during registration) falsified.
+- H1 (ProfileLock kills live foreign holder) confirmed as ownership-contract
+  defect only; it is not sufficient for the macOS abort.
+- `~/.camo/profiles/default/camo-profile.json` was polluted to
+  `profileId=onestop-canonical`, producing the `E_IO_FILESYSTEM profileId mismatch`
+  flood; not the crash root cause.
+- Operational rule: real-browser camo must be launched from an unsandboxed host
+  (Claw canonical or terminal); the codex sandbox denies launchservicesd, so any
+  Camoufox start from this agent session will abort. Use Claw for live browser
+  verification.
+
+## 2026-08-10 Fix design approval gate
+
+- `FIX-camoufox-transformprocess-crash-20260810-r1` status
+  `APPROVED_BY_JASON` (approved 2026-08-10).
+- Formal code scope is only the confirmed `ProfileLock.acquire` ownership defect:
+  live foreign holder -> typed `E_STATE_LOCKED`; dead PID -> reclaim; release
+  only by current owner; review-driven hardening adds process-generation
+  identity to the lock payload so a reused PID cannot block reclaim. No
+  LaunchServices/TCC bypass, caller fallback, or OneStop changes.
+- Implementation, tests, install, and live replay are unlocked; the exact
+  review-driven closeout additions stay inside the same ProfileLock owner,
+  paired tests, and map-truth lockstep (edges, feature tests, mainline call
+  map, wiki projections).
+
+## 2026-08-10 review-driven closeout (round 2)
+
+- First `codex -p cc review` produced no VERDICT line (invalid PASS) with
+  P2 findings: PID-reuse availability hole, ProfileLock tests absent from
+  `feature_tests.json`, contradictory approval state in `note.md`, and
+  untracked direct-browser scratch scripts.
+- Resolutions (same approved design id):
+  - `ProfileLock.acquire` now records `processIdentity` (daemon_registration
+    `getProcessIdentity`) and reclaims a live-but-generation-mismatched PID
+    only when the recorded identity proves the original holder is gone;
+    legacy locks without identity still fail closed for live PIDs.
+  - New paired tests cover reused-PID reclaim and same-generation rejection.
+  - `v2/resources/registry/edges.json` declares
+    `services.browser_service.internal -> services.daemon_registration`;
+    `feature_tests.json` registers `browser.runtime.ownership` positive and
+    negative; `mainline_call_map.json` records `ProfileLock.acquire ->
+    getProcessIdentity`; wiki projections regenerated.
+  - `_diag_weibo2.mjs` / `test-camoufox-direct.mjs` moved out of the worktree
+    (backup `/tmp/camo-scratch-remove-20260810/`); they are not part of the
+    commit and were never used as release evidence.
+
+## 2026-08-11 review-driven closeout (round 3) — r4 canonical replay PASS
+
+- Round-3 review red light was `cli_profile_lock.indirect_paths` missing the
+  `->acquire` / `->release` suffixes; fixed in `v2/resources/registry/resources.json`
+  (exact two-line node-verified replacement, diff confirmed).
+- Full stack verified: generated_maps 8/8, test:all unit 334 + smoke 10 +
+  integration 40 + e2e 4 all PASS, gates (registry integrity + per-resource
+  19/19 + strict) PASS, wiki build idempotent, build / file-size / pack dry-run PASS.
+- Global install 0.4.2 (linked to repo) re-verified by cmp on bin/camo.mjs,
+  package.json, ProfileLock.mjs. Canonical daemon restarted on new code
+  (PID 76664, HTTP 60475 / WS 60476, headless, profile onestop-closeout-20260810,
+  HOME=/tmp/camo-closeout-home-20260810, LANG/LC_ALL=zh_CN.UTF-8).
+- r4 canonical replay (OneStop admin, https://claw.codewhisper.cc/onestop/admin):
+  login type+selector submit OK; orders search filters list to the order id;
+  status filter select `shipped` → 11 orders; sort select `created_asc` →
+  oldest first; batch mode toggle → select-visible → "批量签收" enabled
+  (not submitted; read-only). Products: bulk price/order inputs accept values,
+  select bulk → buttons change to 批量修改价格（1）/批量连续排序（1）; card
+  direct edit entry present. Mobile 390x844: wheel scroll changed screenshots
+  (products and orders, SHA-256 before/after differ); order entry needed
+  scroll-to-visible first (known mobile nav pattern).
+- Camoufox nuance re-confirmed: "更新物流" opens `global.prompt()` native
+  dialog (admin-order-management.js L241-243), which headless cannot fill;
+  this is OneStop page design, not a camo defect. Protocol click events are
+  delivered (trusted click + document delegation observed).
+- Daemon stability: 27+ min continuous, 30+ protocol ops, no crash, no
+  E_STATE_DUPLICATE, lock files consistent. ProfileLock generation-safe
+  acquire/release verified under real canonical browser load.
+
+## 2026-08-11 review round 3 — tcm FAIL -> sandbox identity gap
+
+- tcm review returned no PASS: P1 (3 ProfileLock tests fail + 3 skip inside
+  the codex sandbox because `/bin/ps` is EPERM-denied), P2 (claimed
+  function_map.json drift), P3 (wiki idempotency).
+- P2 falsified: `owner_resource` + paired tests live in feature_tests.json;
+  build.mjs joins it with function_map.json; generated row is correct and
+  strict gates pass. P3 not reproduced: two consecutive wiki builds
+  byte-identical.
+- P1 confirmed with a playground preload that denies only `/bin/ps`:
+  host 9/9 -> EPERM sim 3 fail + 3 skip; full unit suite 327 pass / 4 fail /
+  3 skip; reverse intervention restores 9/9. Experiment evidence:
+  playground/camoufox-transformprocess-crash/review-sandbox-eperm-20260811.md.
+- Root cause: parent design made `getProcessIdentity(process.pid)` a
+  mandatory precondition of acquire/release; restricted hosts cannot read
+  cross-process identity, so identity-independent lifecycle fails.
+  `ProfileLock.isProcessRunning` is also a divergent duplicate of
+  `daemon_registration.isProcessAlive` that treats EPERM as dead.
+- Proposed fix `FIX-camoufox-profile-lock-sandbox-identity-20260811-r1`
+  (AWAITING_APPROVAL): shared isProcessAlive import; typed `fallback:pid:uuid`
+  self-only token when identity unreadable; live foreign holder with
+  unverifiable identity stays fail-closed; release compares the self token;
+  pre-existing daemon-registration identity test skips when unavailable.
+- After approval: implement, host + EPERM-sim verification, gates, global
+  install, canonical daemon restart, r4-style replay, then re-review
+  (cc -> asxs -> tcm -> opencode fallback).
+
+## 2026-08-12 profile scope and cleanup
+
+- Confirmed profile policy: omitted commands use persistent `default` only for
+  intentional login-state reuse; validation runs use isolated `camo-test` for
+  multi-command state or generated `_ephemeral_*` for one-command checks.
+- Cleaned the stale `onestop-closeout-20260809` profile after verifying no
+  owning daemon or lock remained; retained a recoverable archive under `/tmp`.
+- Repaired local `default/camo-profile.json` metadata whose `profileId` had
+  incorrectly drifted to `onestop-canonical`. Canonical health/admin replay
+  still passed with global `camo 0.4.2`; the default daemon was stopped and
+  its lock/registration were absent after cleanup.
+
+## 2026-08-14 CLI hang root cause: spawnSync health probe blocks on pipe EOF
+
+- Symptom: every camo CLI browser command looked like it kept starting and
+  froze (~30s+); OneStop verifier is a linear flow, not a loop — it was stuck
+  on one CLI call. Run logs showed the daemon stayed healthy and commands
+  completed once the CLI finally reached it.
+- Root cause (camo, not the verifier): `v2/shell/camoufox_health.mjs` Check 3
+  launched a full Camoufox probe synchronously on every CLI browser command
+  via `spawnSync(..., { timeout: 30000 })`. When the probe timed out, Node
+  killed the probe child, but the probe's Camoufox grandchild kept the
+  inherited stdout/stderr pipes open, so `spawnSync` never returned (it waits
+  for pipe EOF). The CLI blocked before ever reaching the daemon.
+- Fix applied: removed the synchronous full-browser launch probe; health now
+  only validates binary presence. Real launch correctness is owned by the
+  daemon browser-service, which surfaces launch failures with proper error
+  envelopes. OneStop verifier additionally has a 60s `SIGKILL` outer guard on
+  each camo call as a last-resort bound.
+- Evidence: manual `camo start --profile temp` returned in 3.7s (previously
+  hung); `camo stop` in 0.65s; OneStop capability gate passed with 12
+  capabilities at 390x844 + 1440x1000; run events show every `command.done`
+  with short durations and `daemon.shutdown` code 0; no leftover daemon or
+  browser processes after the run.
+- Effective installed copy: `/opt/homebrew/lib/node_modules/@web-auto/camo`
+  -> `/Users/fanzhang/Documents/github/camo` (real clone), byte-identical to
+  `/Users/fanzhang/github/camo` for the fixed health file; verified via diff.

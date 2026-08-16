@@ -67,8 +67,7 @@
         "v2/services/browser_service/bootstrap.mjs::startSession->closeBrowser",
         "v2/services/browser_service/bootstrap.mjs::stopSession->closeBrowser",
         "v2/services/browser_service/internal/engine-manager.mjs::launchEngineContext",
-        "v2/services/browser_service/internal/fingerprint.mjs::loadOrGenerateFingerprint",
-        "v2/services/browser_service/internal/ProfileLock.mjs::acquire"
+        "v2/services/browser_service/internal/fingerprint.mjs::loadOrGenerateFingerprint"
       ],
       "forbidden_paths": [
         "v2/services/browser_service/internal/engine_manager.js::launch",
@@ -131,6 +130,35 @@
       "status": "active"
     },
     {
+      "resource_id": "profile_cookie_backup",
+      "display_name": "Profile cookie backup",
+      "layer": "L2_service",
+      "truth_owner": "v2/services/profile",
+      "truth_store": "disk_netscape",
+      "truth_path": "<profiles_root>/<profile_id>/cookie-backups/<domain>.txt",
+      "read_paths": [
+        "v2/services/profile/cookie_store.mjs::loadCookies",
+        "v2/services/profile/cookie_store.mjs::getBackupDomains",
+        "v2/services/profile/cookie_store.mjs::getBackupSummary"
+      ],
+      "write_paths": [
+        "v2/services/profile/cookie_store.mjs::saveCookies",
+        "v2/services/profile/cookie_store.mjs::importNetscape",
+        "v2/services/profile/cookie_store.mjs::cleanupExpiredDomains",
+        "v2/services/profile/cookie_store.mjs::clearAll"
+      ],
+      "indirect_paths": [
+        "v2/services/search/SearchEngine.mjs::injectCookies->importNetscape"
+      ],
+      "forbidden_paths": [
+        "v2/core/browser/CookieStore.mjs",
+        "v2/core/browser/CookieStore.ts::write"
+      ],
+      "verification_gate": "registry.resources.profile_cookie_backup",
+      "policy_id": "single-truth",
+      "status": "active"
+    },
+    {
       "resource_id": "browser_session",
       "display_name": "Browser session",
       "layer": "L2_service",
@@ -163,7 +191,7 @@
       "layer": "L2_service",
       "truth_owner": "v2/services/lock",
       "truth_store": "disk_json_with_sigterm",
-      "truth_path": "~/.camo/locks/<profile_id>.lock",
+      "truth_path": "~/.camo/profiles/<profile_id>/lock.json",
       "read_paths": [
         "v2/services/lock/manager.mjs::read",
         "v2/services/lock/manager.mjs::probe"
@@ -171,9 +199,13 @@
       "write_paths": [
         "v2/services/lock/manager.mjs::acquire",
         "v2/services/lock/manager.mjs::release",
-        "v2/services/lock/manager.mjs::force_acquire"
+        "v2/services/lock/manager.mjs::forceAcquire"
       ],
-      "indirect_paths": [],
+      "indirect_paths": [
+        "v2/services/browser_service/bootstrap.mjs::startSession->acquire",
+        "v2/services/browser_service/bootstrap.mjs::stopSession->release",
+        "v2/services/browser_service/bootstrap.mjs::shutdown->release"
+      ],
       "forbidden_paths": [
         "v2/lifecycle/lock.mjs::write",
         "v2/commands/**::lock_write"
@@ -286,6 +318,10 @@
         "v2/services/page_runtime/input_pipeline.mjs::select"
       ],
       "indirect_paths": [
+        "v2/shell/daemon/command_handlers.mjs::handleCommand->getCookies",
+        "v2/shell/daemon/command_handlers.mjs::handleCommand->getPageInfo",
+        "v2/shell/daemon/command_handlers.mjs::handleCommand->wait",
+        "v2/shell/daemon/index.mjs::handleCommand->wait",
         "v2/shell/daemon/index.mjs::handleCommand->goto",
         "v2/shell/daemon/index.mjs::handleCommand->click",
         "v2/shell/daemon/index.mjs::handleCommand->hover",

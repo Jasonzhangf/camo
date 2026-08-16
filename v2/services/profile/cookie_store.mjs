@@ -1,15 +1,18 @@
-// Cookie Store - ITP 防护、Netscape 格式
-// Profile 隔离：每个 profile 一个独立存储目录（~/.camo/cookies/<profile>/）
+// Cookie Store - ITP protection and Netscape-format backups.
+// Profile isolation: each profile owns a dedicated cookie-backups directory.
 
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
+import {
+  PROFILE_ID_PATTERN,
+  resolveCookieBackupDir,
+} from './storage_paths.mjs';
 
 const DEFAULT_CONFIG = {
   syncInterval: 60 * 1000,
   domainRetention: 30 * 24 * 3600 * 1000,
   maxDomains: 1000,
-  storageDir: path.join(os.homedir(), '.camo', 'cookies'),
+  storageDir: resolveCookieBackupDir(),
 };
 
 export class CookieStore {
@@ -184,7 +187,7 @@ const profileStores = new Map();
 /**
  * 获取 CookieStore 实例。
  * @param {string} [profile] - profile 名；传入时使用 profile 隔离的存储目录
- *   （~/.camo/cookies/<profile>/），与 BrowserInstance 的 cookie 目录保持一致。
+ *   (`<profile-dir>/cookie-backups/`).
  *   不传时返回全局共享实例（向后兼容）。
  */
 export function getCookieStore(profile) {
@@ -194,12 +197,12 @@ export function getCookieStore(profile) {
     return globalCookieStore;
   }
   // 与 BrowserInstance 一致的 profile 白名单校验：拒绝路径穿越/绝对路径
-  if (!/^[a-zA-Z0-9_-]+$/.test(pid)) {
-    throw new Error(`E_INVALID_PROFILE: profile must match ^[a-zA-Z0-9_-]+$, got "${pid}"`);
+  if (!PROFILE_ID_PATTERN.test(pid)) {
+    throw new Error(`E_INVALID_PROFILE: invalid profile "${pid}"`);
   }
   let store = profileStores.get(pid);
   if (!store) {
-    store = new CookieStore({ storageDir: path.join(os.homedir(), '.camo', 'cookies', pid) });
+    store = new CookieStore({ storageDir: resolveCookieBackupDir(pid) });
     profileStores.set(pid, store);
   }
   return store;

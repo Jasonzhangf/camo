@@ -17,7 +17,7 @@
             "type": "string",
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
-            "doc": "profile id (defaults to $CAMO_PROFILE or 'default')"
+            "doc": "profile id (defaults to $CAMO_PROFILE or 'default'; 'temp' allocates a fresh ephemeral profile each start and removes it on stop)"
           },
           "url": {
             "type": "string",
@@ -29,6 +29,11 @@
             "type": "boolean",
             "required": false,
             "doc": "run without foreground window"
+          },
+          "ephemeral": {
+            "type": "boolean",
+            "required": false,
+            "doc": "allocate a fresh ephemeral profile directory under ~/.camo/profiles/_temp_<pid>_<ts>/; directory is removed on stop"
           }
         },
         "positional": []
@@ -50,6 +55,44 @@
         "positional": []
       },
       "docstring": "commands/docstrings/stop.md"
+    },
+    {
+      "cmd": "login",
+      "module": "commands/builtins/login.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id to persist login state under (default 'default')"
+          },
+          "url": {
+            "type": "string",
+            "pattern": "^https?://",
+            "required": true,
+            "doc": "login URL to navigate to (e.g. https://example.com/sign-in)"
+          },
+          "untilUrl": {
+            "type": "string",
+            "required": false,
+            "doc": "URL substring that signals login completion (e.g. '/dashboard'); required unless --until-cookie-name is set"
+          },
+          "untilCookieName": {
+            "type": "string",
+            "required": false,
+            "doc": "cookie name that signals login completion (e.g. 'authorization'); required unless --until-url is set"
+          },
+          "timeout": {
+            "type": "integer",
+            "min": 1000,
+            "required": false,
+            "doc": "max ms to wait for login completion (default 300000 = 5 minutes)"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/login.md"
     },
     {
       "cmd": "goto",
@@ -204,6 +247,16 @@
             "type": "integer",
             "required": false,
             "doc": "vertical scroll delta in pixels"
+          },
+          "atX": {
+            "type": "integer",
+            "required": false,
+            "doc": "pointer x for the wheel event (default: viewport center)"
+          },
+          "atY": {
+            "type": "integer",
+            "required": false,
+            "doc": "pointer y for the wheel event (default: viewport center)"
           }
         },
         "positional": []
@@ -260,6 +313,12 @@
             "min": 0,
             "required": false,
             "doc": "timeout in ms (default 30000)"
+          },
+          "ms": {
+            "type": "integer",
+            "min": 0,
+            "required": false,
+            "doc": "duration in ms"
           },
           "target": {
             "type": "string",
@@ -788,6 +847,37 @@
         ]
       },
       "docstring": "commands/docstrings/fetch-page.md"
+    },
+    {
+      "cmd": "multi-open",
+      "module": "commands/builtins/multiOpen.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "urls": {
+            "type": "string",
+            "required": true,
+            "doc": "comma-separated http(s) urls to open"
+          },
+          "outDir": {
+            "type": "string",
+            "required": false,
+            "doc": "output directory for screenshots"
+          },
+          "prefix": {
+            "type": "string",
+            "required": false,
+            "doc": "screenshot filename prefix"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/multi-open.md"
     }
   ]
 }

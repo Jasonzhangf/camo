@@ -17,12 +17,12 @@ test('positive: acquire on free profile writes lock file', () => {
   assert.equal(r.profileId, 'p1');
   assert.equal(r.owner, 'browser-service');
   assert.equal(r.mode, 'F');
-  assert.ok(fs.existsSync(path.join(tmpRoot, 'p1.lock.json')));
+  assert.ok(fs.existsSync(path.join(tmpRoot, 'p1', 'lock.json')));
 });
 
 test('positive: same owner re-acquire is a no-op', () => {
-  const a = lock.acquire('p2', { owner: 'browser-service', pid: 99002 });
-  const b = lock.acquire('p2', { owner: 'browser-service', pid: 99002 });
+  const a = lock.acquire('p2', { owner: 'browser-service', pid: process.pid });
+  const b = lock.acquire('p2', { owner: 'browser-service', pid: process.pid });
   assert.deepEqual(b, a);
 });
 
@@ -30,7 +30,7 @@ test('positive: release by holder removes file', () => {
   lock.acquire('p3', { owner: 'browser-service', pid: 99003 });
   const ok = lock.release('p3', { owner: 'browser-service', pid: 99003 });
   assert.equal(ok, true);
-  assert.equal(fs.existsSync(path.join(tmpRoot, 'p3.lock.json')), false);
+  assert.equal(fs.existsSync(path.join(tmpRoot, 'p3', 'lock.json')), false);
 });
 
 test('positive: probe returns stale=true for dead pid and held=false', () => {

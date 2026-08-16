@@ -1,9 +1,9 @@
 // Profile store. Single truth_owner for resource_id=profile.
 
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { CamoError } from '../../contracts/error_envelope/projector.mjs';
+import { PROFILE_ID_PATTERN, resolveProfileDir, resolveProfilesRoot } from './storage_paths.mjs';
 
 const PROFILE_FILE = 'camo-profile.json';
 let _overrideRoot = null;
@@ -24,14 +24,9 @@ export function __enableTestRoot() {
 
 function profilesRoot() {
   if (_overrideRoot) return _overrideRoot;
-  const home = os.homedir();
-  if (process.platform === 'win32') {
-    const hasD = (() => { try { return fs.existsSync('D:\\'); } catch { return false; } })();
-    return hasD ? path.join('D:\\', 'camo', 'profiles') : path.join(home, '.camo', 'profiles');
-  }
-  const envOverride = (process.env.CAMO_PROFILE_ROOT || process.env.CAMO_PATHS_PROFILES || '').trim();
+  const envOverride = String(process.env.CAMO_PROFILE_ROOT || '').trim();
   if (envOverride) return path.resolve(envOverride);
-  return path.join(home, '.camo', 'profiles');
+  return resolveProfilesRoot();
 }
 
 function profileDirFor(profileId) {
@@ -39,10 +34,13 @@ function profileDirFor(profileId) {
   if (!id) {
     throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'profileId' } });
   }
-  if (!/^[a-zA-Z0-9._-]+$/.test(id)) {
+  if (!PROFILE_ID_PATTERN.test(id)) {
     throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'profileId', value: id, reason: 'must match [a-zA-Z0-9._-]+' } });
   }
-  return path.join(profilesRoot(), id);
+  if (_overrideRoot || String(process.env.CAMO_PROFILE_ROOT || '').trim()) {
+    return path.join(profilesRoot(), id);
+  }
+  return resolveProfileDir(id);
 }
 
 function profileFileFor(profileId) {

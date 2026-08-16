@@ -5,7 +5,7 @@ Wait for a condition to be satisfied.
 ## Usage
 
 ```
-camo wait [--for <condition>] [--timeout <ms>] [--target <value>] [--profile <id>]
+camo wait [--for <condition>] [--timeout <ms>] [--ms <ms>] [--target <value>] [--profile <id>]
 ```
 
 ## Arguments
@@ -14,6 +14,7 @@ camo wait [--for <condition>] [--timeout <ms>] [--target <value>] [--profile <id
 |------|------|----------|-------------|
 | `--for` | enum | No | Condition: load, domcontentloaded, networkidle, selector, text, url (default: load) |
 | `--timeout` | integer | No | Timeout in ms (default: 30000) |
+| `--ms` | integer | No | Duration in ms |
 | `--target` | string | No | Target value for selector/text/url conditions |
 | `--profile` | string | No | Profile id (default: $CAMO_PROFILE or 'default') |
 
