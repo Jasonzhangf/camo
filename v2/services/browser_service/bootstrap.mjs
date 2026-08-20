@@ -322,6 +322,36 @@ export function listSessions() {
     return listActive();
 }
 
+export async function listSessionDetails() {
+    const { list: listSessionsDetailed } = await import('../session/manager.mjs');
+    return listSessionsDetailed();
+}
+
+export async function touchSession(profileId) {
+    ensureWritable();
+    const pid = safeId(profileId, 'profileId');
+    const { tryRead: tryReadSession, touch: touchSessionRecord } = await import('../session/manager.mjs');
+    if (!tryReadSession(pid)) return null;
+    return touchSessionRecord(pid);
+}
+
+export async function sweepIdleSessions(timeoutMs = 1800000, opts = {}) {
+    ensureWritable();
+    const { list: listSessionsDetailed } = await import('../session/manager.mjs');
+    const threshold = Date.now() - Number(timeoutMs || 0);
+    const skip = new Set((opts.skipProfiles || []).map(String));
+    const stopped = [];
+    for (const session of listSessionsDetailed()) {
+        if (session.status !== 'active') continue;
+        if (skip.has(session.profileId)) continue;
+        const updatedAt = Date.parse(session.updatedAt);
+        if (!Number.isFinite(updatedAt) || updatedAt > threshold) continue;
+        await stopSession(session.profileId);
+        stopped.push(session.profileId);
+    }
+    return { stopped };
+}
+
 export function hasBrowser(profileId) {
     const pid = safeId(profileId, 'profileId');
     return listActive().includes(pid);

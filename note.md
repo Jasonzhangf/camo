@@ -729,3 +729,11 @@ Stage 8: dynamic ports and daemon discovery are present in source but live CLI v
 - The follow-up worktree and branch were removed after full tracked-tree
   equivalence was proven. The page-structure design worktree remains intact;
   its status is still `design_pending_approval`.
+# 2026-08-20 camo multi-profile idle reclaim
+
+- Target: one daemon must host multiple concurrent profiles, profile commands must stay isolated by explicit profile id, and idle profiles must auto-reclaim after 30 minutes without deleting persistent profile data.
+- Code owner: `v2/shell/daemon/index.mjs` orchestrates profile activity tracking and the periodic sweep; `v2/services/browser_service/bootstrap.mjs` owns session detail/touch/reclaim operations; `v2/services/session/manager.mjs` owns `updatedAt` truth.
+- Implementation: `inFlightProfiles` is a per-profile counter, so overlapping commands on the same profile cannot clear the sweep guard early. Activity touches run after successful profile-scoped commands, excluding global `daemon` status. Idle defaults are `CAMO_PROFILE_IDLE_TIMEOUT_MS=1800000` and `CAMO_PROFILE_IDLE_SWEEP_INTERVAL_MS=60000`.
+- Tests: targeted 7/7; full `npm run test:all` 372 unit, 10 smoke, 40 integration, 4 e2e passed; strict registry 19/19; file-size check passed.
+- Release state: implementation committed on branch `codex/camo-multi-profile-idle-20260820` as `c35b851`; skill documentation was updated in the main working tree but production installation/restart and DSH review remain pending.
+- Boundary: no live daemon was stopped or started during this work. Only the approved restart path may be used for deployment; the existing production daemon remains untouched until the runtime verification step.

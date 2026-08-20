@@ -160,6 +160,33 @@
         {
           "path": "v2/services/browser_service/bootstrap.mjs",
           "symbol": "shutdown"
+        },
+        {
+          "path": "v2/services/browser_service/bootstrap.mjs",
+          "symbol": "touchSession"
+        },
+        {
+          "path": "v2/services/browser_service/bootstrap.mjs",
+          "symbol": "sweepIdleSessions"
+        },
+        {
+          "path": "v2/services/browser_service/bootstrap.mjs",
+          "symbol": "listSessionDetails"
+        }
+      ]
+    },
+    {
+      "id": "browser.lifecycle.idle_reclaim",
+      "status": "active",
+      "owner_module": "services.browser_service",
+      "entry_symbols": [
+        {
+          "path": "v2/services/browser_service/bootstrap.mjs",
+          "symbol": "touchSession"
+        },
+        {
+          "path": "v2/services/browser_service/bootstrap.mjs",
+          "symbol": "sweepIdleSessions"
         }
       ]
     },

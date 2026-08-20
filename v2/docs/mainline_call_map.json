@@ -1240,6 +1240,96 @@
         "local_symbol": "multiOpen"
       },
       "semantic_io": "validated URLs to serialized multi-tab navigation and screenshots"
+    },
+    {
+      "feature_id": "browser.lifecycle.idle_reclaim",
+      "from": "shell.daemon",
+      "to": "services.browser_service",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "touchSession",
+        "local_symbol": "touchSession"
+      },
+      "semantic_io": "successful per-profile command to session activity timestamp"
+    },
+    {
+      "feature_id": "browser.lifecycle.idle_reclaim",
+      "from": "shell.daemon",
+      "to": "services.browser_service",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "main"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "sweepIdleSessions",
+        "local_symbol": "sweepIdleSessions"
+      },
+      "semantic_io": "periodic sweep to close profiles idle past the configured timeout"
+    },
+    {
+      "feature_id": "browser.lifecycle.multi_profile",
+      "from": "shell.daemon",
+      "to": "services.browser_service",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "createHttpServer"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "listSessionDetails",
+        "local_symbol": "listSessionDetails"
+      },
+      "semantic_io": "health endpoint projection of all active profile sessions"
+    },
+    {
+      "feature_id": "browser.lifecycle.multi_profile",
+      "from": "shell.daemon",
+      "to": "services.browser_service",
+      "caller": {
+        "path": "v2/shell/daemon/command_handlers.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "listSessionDetails",
+        "local_symbol": "listSessionDetails"
+      },
+      "semantic_io": "daemon status projection of every live profile"
+    },
+    {
+      "feature_id": "browser.lifecycle.idle_reclaim",
+      "from": "services.browser_service",
+      "to": "services.session",
+      "caller": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "touchSession"
+      },
+      "callee": {
+        "path": "v2/services/session/manager.mjs",
+        "symbol": "touch",
+        "local_symbol": "touch"
+      },
+      "semantic_io": "profile command activity to session owner timestamp update"
+    },
+    {
+      "feature_id": "browser.lifecycle.idle_reclaim",
+      "from": "services.browser_service",
+      "to": "services.session",
+      "caller": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "sweepIdleSessions"
+      },
+      "callee": {
+        "path": "v2/services/session/manager.mjs",
+        "symbol": "list",
+        "local_symbol": "list"
+      },
+      "semantic_io": "session owner snapshots to identify expired profiles"
     }
   ]
 }

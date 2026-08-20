@@ -62,4 +62,7 @@ test('smoke: browser_service bootstrap exposes session API', async () => {
   assert.ok(typeof bs.shutdown === 'function');
   assert.ok(typeof bs.boot === 'function');
   assert.ok(typeof bs.describe === 'function');
+  assert.ok(typeof bs.touchSession === 'function');
+  assert.ok(typeof bs.sweepIdleSessions === 'function');
+  assert.ok(typeof bs.listSessionDetails === 'function');
 });

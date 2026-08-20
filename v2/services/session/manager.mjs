@@ -95,6 +95,17 @@ export function tryRead(profileId) {
   return _state.get(id) || null;
 }
 
+export function touch(profileId) {
+  ensureWritable();
+  const id = String(profileId || '').trim();
+  if (!id) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'profileId' } });
+  const cur = _state.get(id);
+  if (!cur) return null;
+  cur.updatedAt = nowIso();
+  _lifecycle.push({ kind: 'touch', profileId: id, at: cur.updatedAt });
+  return cur;
+}
+
 export function list() {
   return [..._state.values()].sort((a, b) => a.startedAt < b.startedAt ? -1 : 1);
 }

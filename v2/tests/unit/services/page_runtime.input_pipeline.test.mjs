@@ -69,3 +69,19 @@ test('negative: executor throws → wrapped in E_INTERNAL_UNEXPECTED, running cl
   assert.equal(inp.status('p5').running, false);
   assert.ok(inp.status('p5').lastError);
 });
+
+test('positive: concurrent operations on different profiles are isolated', async () => {
+  inp.__resetForTest();
+  let releaseA;
+  const gateA = new Promise((resolve) => { releaseA = resolve; });
+  const a = inp.run('agent-a', { kind: 'click' }, async () => {
+    await gateA;
+    return { agent: 'a' };
+  });
+  const b = inp.run('agent-b', { kind: 'type' }, async () => ({ agent: 'b' }));
+  assert.deepEqual(await b, { agent: 'b' });
+  assert.equal(inp.status('agent-b').running, false);
+  releaseA();
+  assert.deepEqual(await a, { agent: 'a' });
+  assert.equal(inp.status('agent-a').running, false);
+});

@@ -100,6 +100,38 @@
       ]
     },
     {
+      "id": "browser.lifecycle.multi_profile",
+      "owner_resource": "browser_session",
+      "required_commands": [
+        "npm test",
+        "npm run test:all",
+        "node v2/gates/run-all.mjs --strict"
+      ],
+      "positive": [
+        "v2/tests/unit/shell/daemon.multi_profile.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/shell/daemon.multi_profile.test.mjs"
+      ]
+    },
+    {
+      "id": "browser.lifecycle.idle_reclaim",
+      "owner_resource": "browser_session",
+      "required_commands": [
+        "npm test",
+        "npm run test:all",
+        "node v2/gates/run-all.mjs --strict"
+      ],
+      "positive": [
+        "v2/tests/unit/shell/daemon.multi_profile.test.mjs",
+        "v2/tests/unit/services/session.touch.test.mjs",
+        "v2/tests/unit/shell/daemon.activity_touch.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/shell/daemon.multi_profile.test.mjs"
+      ]
+    },
+    {
       "id": "container.match",
       "owner_resource": "container_match",
       "positive": [

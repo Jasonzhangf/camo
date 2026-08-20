@@ -179,7 +179,16 @@ export async function handleCommand(cmd, args, ctx) {
     }
 
     case 'daemon': {
-      return { ok: true, daemonId: opts.daemonId, mode: opts.mode, profile: opts.profile };
+      const { listSessionDetails } = await import('../../services/browser_service/bootstrap.mjs');
+      const sessions = await listSessionDetails();
+      return {
+        ok: true,
+        daemonId: opts.daemonId,
+        mode: opts.mode,
+        profile: opts.profile,
+        profiles: sessions.map((s) => s.profileId),
+        browserCount: sessions.length,
+      };
     }
 
     case 'fetch-page': {

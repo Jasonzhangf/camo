@@ -26,6 +26,9 @@ import {
   getSession,
   hasBrowser,
   shutdown as shutdownBrowserService,
+  touchSession,
+  listSessionDetails,
+  sweepIdleSessions,
   __enableTestRoot as enableBrowserServiceTest,
   enableAllOwners as enableAllBrowserOwners
 } from '../../services/browser_service/bootstrap.mjs';
@@ -135,60 +138,78 @@ async function releaseBrowser(forceClose) {
 
 // --- Command dispatch ---
 const ephemeralAllocations = new Map();   // requested alias -> allocated profile id
+const inFlightProfiles = new Map();
 async function handleCommand(env) {
   const { cmd, args = {} } = env.payload || {};
   const profile = args.profile || opts.profile;
   const isEphemeral = profile.startsWith('_ephemeral_') || opts.mode === 'ephemeral';
   const startedAt = Date.now();
+  if (profile) inFlightProfiles.set(profile, (inFlightProfiles.get(profile) || 0) + 1);
 
   emit('command.start', { cmd, args, profile, ephemeral: isEphemeral });
 
-  let result = null;
-  let commandError = null;
   try {
-    const browserState = { currentBrowserProfile, browserRefCount };
-    _currentBrowserState = browserState;
-    const commandResult = await dispatchCommand(cmd, args, {
-      profile,
-      isEphemeral,
-      opts,
-      ensureBrowser,
-      releaseBrowser,
-      browserState,
-      ephemeralAllocations,
-    });
-
-    // Sync back browser state changes
-    currentBrowserProfile = browserState.currentBrowserProfile;
-    browserRefCount = browserState.browserRefCount;
-
-    result = { kind: 'result', payload: { cmd, ...commandResult } };
-  } catch (cause) {
-    commandError = cause;
-  }
-
-  if (isEphemeral && isBrowserCommand(cmd)) {
+    let result = null;
+    let commandError = null;
     try {
-      await releaseBrowser(true);
+      const browserState = { currentBrowserProfile, browserRefCount };
+      _currentBrowserState = browserState;
+      const commandResult = await dispatchCommand(cmd, args, {
+        profile,
+        isEphemeral,
+        opts,
+        ensureBrowser,
+        releaseBrowser,
+        browserState,
+        ephemeralAllocations,
+      });
+
+      // Sync back browser state changes
+      currentBrowserProfile = browserState.currentBrowserProfile;
+      browserRefCount = browserState.browserRefCount;
+
+      result = { kind: 'result', payload: { cmd, ...commandResult } };
     } catch (cause) {
-      commandError ||= cause;
-      result = null;
+      commandError = cause;
+    }
+
+    if (isEphemeral && isBrowserCommand(cmd)) {
+      try {
+        await releaseBrowser(true);
+      } catch (cause) {
+        commandError ||= cause;
+        result = null;
+      }
+    }
+
+    if (commandError) {
+      const proj = commandError instanceof CamoError ? commandError : new CamoError({
+        code: 'E_INTERNAL_UNEXPECTED',
+        message: commandError?.message || String(commandError),
+        cause: commandError,
+      });
+      const projected = projectError(proj);
+      emit('command.error', { cmd, profile, error: projected });
+      return { kind: 'error', payload: projected };
+    }
+
+    if (profile && cmd !== 'daemon') {
+      try {
+        await touchSession(profile);
+      } catch (cause) {
+        emit('command.activity_touch_error', { cmd, profile, error: cause?.message || String(cause) });
+      }
+    }
+
+    emit('command.done', { cmd, profile, durationMs: Date.now() - startedAt });
+    return result;
+  } finally {
+    if (profile) {
+      const remaining = (inFlightProfiles.get(profile) || 1) - 1;
+      if (remaining === 0) inFlightProfiles.delete(profile);
+      else inFlightProfiles.set(profile, remaining);
     }
   }
-
-  if (commandError) {
-    const proj = commandError instanceof CamoError ? commandError : new CamoError({
-      code: 'E_INTERNAL_UNEXPECTED',
-      message: commandError?.message || String(commandError),
-      cause: commandError,
-    });
-    const projected = projectError(proj);
-    emit('command.error', { cmd, profile, error: projected });
-    return { kind: 'error', payload: projected };
-  }
-
-  emit('command.done', { cmd, profile, durationMs: Date.now() - startedAt });
-  return result;
 }
 
 // --- HTTP server ---
@@ -198,13 +219,15 @@ function createHttpServer() {
     const method = req.method;
 
     if (parsedUrl.pathname === '/health') {
+      const sessions = await listSessionDetails();
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         ok: true, 
         daemon: opts.daemonId || RUN_ID, 
         profile: currentBrowserProfile || 'idle',
         mode: opts.mode,
-        browserCount: browserRefCount,
+        browserCount: sessions.length,
+        profiles: sessions.map((s) => s.profileId),
         ts: new Date().toISOString() 
       }));
       return;
@@ -288,6 +311,14 @@ let wsServer = null;
 let httpServer = null;
 let shuttingDown = false;
 let daemonClaim = null;
+let profileIdleSweepTimer = null;
+
+function positiveMs(value, fallback) {
+  const parsed = Number.parseInt(value || '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+const PROFILE_IDLE_TIMEOUT_MS = positiveMs(process.env.CAMO_PROFILE_IDLE_TIMEOUT_MS, 1800000);
+const PROFILE_IDLE_SWEEP_INTERVAL_MS = positiveMs(process.env.CAMO_PROFILE_IDLE_SWEEP_INTERVAL_MS, 60000);
 
 function closeServer(server) {
   if (!server) return Promise.resolve();
@@ -311,6 +342,11 @@ export async function closeProtocolServers() {
 async function shutdown(code = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
+
+  if (profileIdleSweepTimer) {
+    clearInterval(profileIdleSweepTimer);
+    profileIdleSweepTimer = null;
+  }
   
   emit('daemon.shutdown', { code });
   
@@ -404,6 +440,20 @@ async function main(argv) {
       opts.daemonId = reg.daemonId;
       opts.daemonRegistration = reg;
       
+      profileIdleSweepTimer = setInterval(async () => {
+        try {
+          const result = await sweepIdleSessions(PROFILE_IDLE_TIMEOUT_MS, {
+            skipProfiles: [...inFlightProfiles.keys()],
+          });
+          if (result.stopped.length > 0) {
+            emit('profile.idle_recycled', { profiles: result.stopped });
+          }
+        } catch (cause) {
+          emit('profile.idle_recycle.error', { error: cause?.message || String(cause) });
+        }
+      }, Math.max(1, PROFILE_IDLE_SWEEP_INTERVAL_MS));
+      profileIdleSweepTimer.unref?.();
+
       emit('ws.start', { port: actualWsPort });
       console.error(`[camo daemon] WS ws://localhost:${actualWsPort}`);
       console.error(`[camo daemon] Mode=${opts.mode}, Profile=${opts.profile}, DaemonId=${reg.daemonId}`);

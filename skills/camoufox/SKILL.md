@@ -14,13 +14,15 @@ description: |
   camo snapshot --profile mytask
   camo click --selector "h1" --profile mytask
 
-  # 3) Switch profile inside the SAME daemon (stop old, start new)
-  camo stop --profile mytask
+  # 3) Start another isolated profile in the SAME daemon; mytask stays active
   camo start --profile othertask --url https://opencode.ai/go
 
   # 4) Cleanup: stop the last profile, then stop the daemon
   camo stop --profile othertask
   camo daemon stop
+
+  Profiles idle for 30 minutes auto-close their browser, but keep data under
+  ~/.camo/profiles/<id>/; the shared daemon stays running.
 
   All browser operations go through `camo <cmd>`.
 ---
@@ -41,7 +43,8 @@ Use the installed `camo` binary only. This skill targets the installed
 - **Every command selects a profile.** Profile default resolution:
   explicit `--profile <id>` > `CAMO_PROFILE` env > `default`.
 - **No `--profile` means `default`**, including `camo daemon start` and `camo start`.
-  `default` is a persistent profile and is never auto-cleaned.
+  `default` profile data is persistent; its browser follows the same idle reclaim
+  policy as other persistent profiles.
 - **Multiple profiles live inside one daemon.** The daemon owns a profile-keyed
   browser registry (`_records` in `browser_service/internal/camoufox_bridge.mjs`).
   `camo start --profile <id>` creates/resumes that profile's browser and
@@ -59,20 +62,26 @@ Use the installed `camo` binary only. This skill targets the installed
   reuses the same fingerprint and cookies; do not manually copy or inject cookies.
 - **Every new named profile is isolated**: `~/.camo/profiles/<id>/` gets its own
   fingerprint and login state. Never mix cookies between profiles.
-- **One daemon, explicit profile switching.** `shell.daemon` tracks one
-  `currentBrowserProfile` scalar (`v2/shell/daemon/index.mjs`). To switch profile
-  use `camo stop --profile <old>` then `camo start --profile <new>`; do not rely on
-  implicit auto-close. Persistent browsers can also coexist in the daemon's
-  profile-keyed registry and commands operate on the profile named by `--profile`,
-  but the common deterministic flow is stop-old + start-new.
+- **One daemon, concurrent profile isolation.** The browser registry is keyed by
+  profile id; multiple persistent profiles can remain active concurrently in the
+  same daemon. Every agent command must pass its exact `--profile <id>` and never
+  depend on the daemon's scalar `currentBrowserProfile` bookkeeping. Use
+  `camo stop --profile <id>` only to close that profile; it must not be used to
+  switch profiles or stop another agent's session.
 - **A session is started with `camo start` and stopped with `camo stop`.**
   Do not invent extra start/stop variants.
 - **Login verification is evidence-based**: `camo get-cookies --profile <id>` must
   show the expected site cookies after login, and a stop/start cycle on the same
   profile must show them again. A URL alone is not proof of login.
-- **Daemon autoshutdown**: persistent mode never idles out; ephemeral mode
-  (`camo daemon start --ephemeral` or `camo daemon start --profile <id> --ephemeral`)
-  auto-shuts after `CAMO_EPHEMERAL_IDLE_TIMEOUT` (default 30000 ms) of idle.
+- **Daemon autoshutdown**: ephemeral mode (`camo daemon start --ephemeral` or
+  `camo daemon start --profile <id> --ephemeral`) auto-shuts after
+  `CAMO_EPHEMERAL_IDLE_TIMEOUT` (default 30000 ms) of idle.
+- **Per-profile idle auto-reclaim**: persistent profiles auto-close their browser
+  after `CAMO_PROFILE_IDLE_TIMEOUT_MS` (default 1800000 ms / 30 min) without a
+  command. The daemon stays alive; profile data under `~/.camo/profiles/<id>/`
+  is preserved and the browser restarts on the next command. Sweep runs every
+  `CAMO_PROFILE_IDLE_SWEEP_INTERVAL_MS`
+  (default 60000 ms) and skips profiles with in-flight commands.
 - **`camo doctor` is supported** for environment sanity checks; its JSON output
   reports the CLI version, protocol, and registry counts.
 
@@ -82,10 +91,9 @@ Use the installed `camo` binary only. This skill targets the installed
    isolated login state. Never create a named profile just to "keep clean".
 2. **One task = one profile.** Reuse the exact same `--profile` on every command.
    If a command fails, diagnose on the same profile; do not retry on a second profile.
-3. **Multi-profile runs are explicit**: reuse `camo stop --profile <old>` and
-   `camo start --profile <new>` for a clean task transition, or keep distinct
-   `--profile` sessions alive and always pass `--profile` on every command.
-   Never depend on implicit auto-close.
+3. **Multi-profile runs are explicit**: keep distinct `--profile` sessions alive
+   concurrently and always pass `--profile` on every command. Starting a new
+   profile must not stop the previous profile.
 4. **Do not delete `default`.** Do not `rm -rf` profile directories unless the user
    explicitly asked to reset that exact profile.
 5. **Never use positional profile arguments** (`camo goto <profile> <url>` is v1 syntax
@@ -132,13 +140,13 @@ camo daemon stop
 ```
 
 For multi-profile runs (one daemon), keep the profiles alive and always pass
-`--profile`, or use the deterministic stop-old/start-new transition:
+`--profile`:
 
 ```bash
 camo daemon start --profile taskA
-camo start --profile taskA --url https://example.com
-# ... use taskA ...
-# ... use taskB (pass --profile explicitly; taskA may stay alive) ...
+camo start --profile taskA --url https://example.com/a
+camo start --profile taskB --url https://example.com/b
+camo get-page-info --profile taskA
 camo get-page-info --profile taskB
 camo stop --profile taskA
 camo stop --profile taskB
@@ -347,6 +355,8 @@ Common errors and the correct response:
 | `CAMO_AUTOSTART=1` | Auto-start daemon if not running |
 | `CAMO_WS_PORT` / `CAMO_HTTP_PORT` | Daemon ports (default 0 = auto-assign) |
 | `CAMO_EPHEMERAL_IDLE_TIMEOUT` | ms before ephemeral daemon auto-shuts (default 30000) |
+| `CAMO_PROFILE_IDLE_TIMEOUT_MS` | ms before a persistent profile browser auto-closes when idle (default 1800000) |
+| `CAMO_PROFILE_IDLE_SWEEP_INTERVAL_MS` | ms between idle profile sweep checks (default 60000) |
 
 ## Daemon / Profile Model (hard truth)
 
@@ -356,10 +366,8 @@ Common errors and the correct response:
 - Multiple profiles are hosted by that one daemon: `~/.camo/profiles/<id>/` is the
   per-profile data/persistence unit; the daemon's browser-service registry is
   keyed by profile id.
-- For a clean per-task handoff use `camo stop --profile <old>` then
-  `camo start --profile <new>` on the same daemon. For genuinely parallel
-  profile state, keep both alive and always qualify every command with
-  `--profile <id>`.
+- Keep parallel profile state alive in the same daemon and always qualify every
+  command with `--profile <id>`. Stop only the exact profile being retired.
 - Source truth: `v2/commands/builtins/daemon.mjs`, `v2/services/browser_service/
   internal/camoufox_bridge.mjs`, `v2/shell/daemon/index.mjs`.
 
@@ -371,6 +379,9 @@ Common errors and the correct response:
   can own multiple profiles. `shell.daemon` still tracks a single
   `currentBrowserProfile` for lifecycle bookkeeping, so use `--profile` explicitly
   and stop profiles you no longer need.
+- Idle persistent profiles are auto-reclaimed: the daemon closes a profile's
+  browser after the configured idle timeout and preserves its profile data. A
+  later `camo start --profile <id>` reopens the same profile.
 - Profile lock prevents two runtimes on the same profile; stale locks are cleaned
   automatically by the daemon.
 - Do not delete or "repair" `~/.camo/daemon/*.json` by hand. Use
