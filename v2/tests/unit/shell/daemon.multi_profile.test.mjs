@@ -9,9 +9,11 @@ import * as session from '../../../services/session/manager.mjs';
 import * as profileStore from '../../../services/profile/store.mjs';
 import * as lockManager from '../../../services/lock/manager.mjs';
 import * as tabPool from '../../../services/page_runtime/tab_pool.mjs';
+import * as progressLog from '../../../services/progress_event/log.mjs';
 import { handleCommand } from '../../../shell/daemon/command_handlers.mjs';
 
 const profileRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-multi-profile-idle-'));
+const runsRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-multi-profile-runs-'));
 
 bootstrap.__enableTestRoot();
 await bootstrap.enableAllOwners();
@@ -20,9 +22,11 @@ session.__enableTestRoot();
 profileStore.__enableTestRoot();
 lockManager.__enableTestRoot();
 tabPool.__enableTestRoot();
+progressLog.__enableTestRoot();
 
 profileStore.__setProfilesRootForTest(profileRoot);
 lockManager.__setLocksRootForTest(profileRoot);
+progressLog.__setRunsRootForTest(runsRoot);
 process.env.CAMO_PATHS_PROFILES = profileRoot;
 
 function stubPage() {
@@ -58,11 +62,8 @@ bootstrap.__setBrowserLifecycleForTest({ launch, close });
 function makeCtx(profile) {
   return {
     profile,
-    isEphemeral: false,
     opts: { mode: 'persistent', daemonId: `test-${profile}` },
     ensureBrowser: async () => {},
-    releaseBrowser: async () => {},
-    browserState: { currentBrowserProfile: null, browserRefCount: 0 },
     ephemeralAllocations: new Map(),
   };
 }
@@ -77,6 +78,7 @@ test.after(() => {
   bootstrap.__setBrowserLifecycleForTest({});
   delete process.env.CAMO_PATHS_PROFILES;
   fs.rmSync(profileRoot, { recursive: true, force: true });
+  fs.rmSync(runsRoot, { recursive: true, force: true });
 });
 
 test('positive: starting profile B does not close profile A', async () => {

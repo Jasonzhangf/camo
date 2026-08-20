@@ -15,6 +15,7 @@ import crypto from 'node:crypto';
 import { CamoError } from '../../contracts/error_envelope/projector.mjs';
 
 const ALLOWED_STATUS = new Set(['active', 'reconnecting', 'closed']);
+const MAX_LIFECYCLE_EVENTS = 4096;
 
 const _state = new Map();     // profileId -> session
 const _lifecycle = [];        // append-only event list (read-only access for tools)
@@ -33,6 +34,13 @@ function nowIso() { return new Date().toISOString(); }
 
 function genInstanceId() {
   return `inst_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
+}
+
+function pushLifecycle(event) {
+  _lifecycle.push(event);
+  if (_lifecycle.length > MAX_LIFECYCLE_EVENTS) {
+    _lifecycle.splice(0, _lifecycle.length - MAX_LIFECYCLE_EVENTS);
+  }
 }
 
 function normalizeStatus(s) {
@@ -78,7 +86,7 @@ export function create(profileId, info = {}) {
     metadata: info.metadata && typeof info.metadata === 'object' ? info.metadata : {},
   };
   _state.set(id, record);
-  _lifecycle.push({ kind: 'create', profileId: id, at: now, alias });
+  pushLifecycle({ kind: 'create', profileId: id, at: now, alias });
   return record;
 }
 
@@ -102,7 +110,7 @@ export function touch(profileId) {
   const cur = _state.get(id);
   if (!cur) return null;
   cur.updatedAt = nowIso();
-  _lifecycle.push({ kind: 'touch', profileId: id, at: cur.updatedAt });
+  pushLifecycle({ kind: 'touch', profileId: id, at: cur.updatedAt });
   return cur;
 }
 
@@ -123,7 +131,7 @@ export function update(profileId, patch = {}) {
   if (patch.status != null) next.status = normalizeStatus(patch.status);
   if (Object.prototype.hasOwnProperty.call(patch, 'alias')) next.alias = normalizeAlias(patch.alias);
   _state.set(cur.profileId, next);
-  _lifecycle.push({ kind: 'update', profileId: cur.profileId, at: next.updatedAt, patchKeys: Object.keys(patch) });
+  pushLifecycle({ kind: 'update', profileId: cur.profileId, at: next.updatedAt, patchKeys: Object.keys(patch) });
   return next;
 }
 
@@ -140,7 +148,7 @@ export function deleteSession(profileId) {
   }
   const removed = _state.get(id);
   _state.delete(id);
-  _lifecycle.push({ kind: 'delete', profileId: id, at: nowIso() });
+  pushLifecycle({ kind: 'delete', profileId: id, at: nowIso() });
   return removed;
 }
 

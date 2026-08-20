@@ -1,238 +1,162 @@
-# camo CLI Usage (synced from local `camo --help`)
+# camo CLI Usage (camo 0.4.2)
 
 ## 0. Enforcement
 
-Use `camo` commands only.
+Use `camo` commands only. No `curl` API calls, no `node scripts/...`
+browser-control scripts, no ad-hoc wrappers that bypass `camo`.
 
-Do not use:
-- `curl` direct API calls
-- `node scripts/...` browser-control scripts
-- ad-hoc wrappers that bypass `camo`
-
-If command is uncertain, check:
+If a command is uncertain, check the installed CLI:
 
 ```bash
 camo --help
 camo <command> --help
 ```
 
+Any command not listed by `camo --help` does not exist in this installed build.
+Do not use v1 leftovers (`init`, `profile create`, `sessions`, `status`,
+`cleanup`, `force-stop`, `shutdown`, `back`, `new-page`, `container`,
+`autoscript`, `events`, `highlight`, `mouse`, `window`, `cookies save/load`, ...).
+
 ## 1. Quick Start
 
 ```bash
-# 1) Bootstrap camoufox + browser-service
-camo init
+# 1) Start the shared daemon (persistent default profile)
+camo daemon start --profile default
 
-# 2) Create profile and set default
-camo profile create xhs-main
-camo profile default xhs-main
+# 2) Start a browser session
+camo start --profile default --url https://example.com
 
-# 3) Start browser
-camo start xhs-main --url https://www.xiaohongshu.com
+# 3) Inspect the page
+camo get-page-info --profile default
+camo snapshot --profile default
 
-# 4) Check status
-camo status xhs-main
-
-# 5) Stop browser
-camo stop xhs-main
+# 4) Stop the session, then the daemon
+camo stop --profile default
+camo daemon stop
 ```
 
 ## 2. Command Map
 
-### Profile management
+All `--profile` flags are `--profile <id>`; there are no positional profile
+arguments in 0.4.2.
+
+### Daemon and session lifecycle
 
 ```bash
-camo profiles
-camo profile list
-camo profile create <profileId>
-camo profile delete <profileId>
-camo profile default [profileId]
+camo daemon start [--profile <id>] [--ephemeral]
+camo daemon status [--profile <id>]
+camo daemon stop  [--profile <id>]
+camo start [--profile <id>] [--url <url>] [--headless]
+camo stop  [--profile <id>]
 ```
 
-### Initialization/config
+Profile resolution: explicit `--profile` > `CAMO_PROFILE` > `default`.
+Ephemeral requires an explicit `--ephemeral` on the daemon command;
+`camo start` without `--profile` uses persistent `default`.
+
+### Navigation / page state
 
 ```bash
-camo init
-camo init geoip
-camo init list
-camo create fingerprint --os <os> --region <region>
-camo create profile <profileId>
-camo config repo-root [path]
+camo goto <url> [--profile <id>] [--waitUntil load|domcontentloaded|networkidle]
+camo fetch-page <url> [--profile <id>] [--timeout <ms>]
+camo get-page-info [--profile <id>]
+camo get-text [--selector <css>] [--profile <id>]
+camo get-readable [--maxLength <n>] [--profile <id>]
+camo find-elements [--selector <css>|--text <text>] [--profile <id>]
+camo snapshot [--format json|yaml] [--profile <id>]
+camo screenshot [--profile <id>] [--path <file>]
 ```
 
-### Browser/session lifecycle
+### Interaction
 
 ```bash
-camo start [profileId] [--url <url>] [--headless]
-camo stop [profileId]
-camo status [profileId]
-camo list
-camo sessions
-camo cleanup [profileId]
-camo cleanup all
-camo cleanup locks
-camo force-stop [profileId]
-camo lock list
-camo lock [profileId]
-camo unlock [profileId]
+camo click (--selector <css>|--text <text>) [--button left|middle|right] [--profile <id>]
+camo hover (--selector <css>|--text <text>) [--profile <id>]
+camo type <text> [--selector <css>] [--delay <ms>] [--profile <id>]
+camo scroll [--x <px>] [--y <px>] [--profile <id>]
+camo select --selector <css> --value <value> [--profile <id>]
+camo upload --selector <css> --file <path> [--profile <id>]
+camo wait [--for load|domcontentloaded|networkidle|selector|text|url] \
+  [--target <value>] [--timeout <ms>] [--ms <ms>] [--profile <id>]
+camo wait-dom-stable [--timeout <ms>] [--poll <ms>] [--profile <id>]
+camo scroll-and-collect [--scrollCount <n>] [--delay <ms>] [--profile <id>]
 ```
 
-Session isolation notes:
-- `profileId` is the lifecycle primary key.
-- `stop/cleanup/force-stop <profileId>` must only affect that exact profile.
-- `stop --id` and `stop --alias` are allowed only for `stop`; `cleanup` and `force-stop` reject indirect targeting.
-- `status`, `sessions`, and `instances` read one shared resolved session view.
-
-Examples:
+### Tabs / cookies / browser settings
 
 ```bash
-camo sessions
-camo status finger
-camo stop finger
-camo status xhs-qa-1
-camo cleanup finger
-camo force-stop finger
-
-# invalid examples
-camo cleanup --alias shard1
-camo force-stop --id inst_xxxxxxxx
+camo new-tab [--url <url>] [--profile <id>]
+camo list-tabs [--profile <id>]
+camo switch-tab --tabId <index> [--profile <id>]
+camo close-tab --tabId <index> [--profile <id>]
+camo get-cookies [--profile <id>]
+camo set-cookies --cookies '<json-array>' [--profile <id>]
+camo set-user-agent --ua <string> [--profile <id>]
+camo set-viewport --width <px> --height <px> [--profile <id>]
 ```
 
-### Navigation/actions
+### Search
 
 ```bash
-camo goto [profileId] <url>
-camo back [profileId]
-camo screenshot [profileId] [--output <file>] [--full]
-camo scroll [profileId] [--down|--up|--left|--right] [--amount <px>]
-camo click [profileId] <selector>
-camo type [profileId] <selector> <text>
-camo highlight [profileId] <selector>
-camo clear-highlight [profileId]
-camo viewport [profileId] --width <w> --height <h>
-```
-
-### Pages/tabs
-
-```bash
-camo new-page [profileId] [--url <url>]
-camo close-page [profileId] [index]
-camo switch-page [profileId] <index>
-camo list-pages [profileId]
-```
-
-`list-pages` requires the target profile to be `live=true`; it should fail fast instead of probing other profiles.
-
-### Cookies/window/mouse/system
-
-```bash
-camo cookies get [profileId]
-camo cookies save [profileId] --path <file>
-camo cookies load [profileId] --path <file>
-camo cookies auto start [profileId] [--interval <ms>]
-camo cookies auto stop [profileId]
-camo cookies auto status [profileId]
-
-camo window move [profileId] --x <x> --y <y>
-camo window resize [profileId] --width <w> --height <h>
-
-camo mouse click [profileId] --x <x> --y <y> [--button left|right|middle] [--clicks <n>] [--delay <ms>]
-camo mouse wheel [profileId] [--deltax <px>] [--deltay <px>]
-
-camo system display
-camo shutdown
-```
-
-### Container subscription layer
-
-```bash
-camo container init [--source <container-library-dir>] [--force]
-camo container sets [--site <siteKey>]
-camo container register [profileId] <setId...> [--append]
-camo container targets [profileId]
-camo container filter [profileId] <selector...>
-camo container watch [profileId] [--selector <css>] [--throttle <ms>]
-camo container list [profileId]
-```
-
-### Autoscript strategy layer
-
-```bash
-camo autoscript scaffold xhs-unified [--output <file>]
-camo autoscript validate <file>
-camo autoscript explain <file>
-camo autoscript snapshot <jsonl-file> [--out <snapshot-file>]
-camo autoscript replay <jsonl-file> [--summary-file <path>]
-camo autoscript run <file> [--profile <id>] [--jsonl-file <path>] [--summary-file <path>]
-camo autoscript resume <file> --snapshot <snapshot-file> [--from-node <nodeId>] [--profile <id>] [--jsonl-file <path>] [--summary-file <path>]
-camo autoscript mock-run <file> --fixture <fixture.json> [--profile <id>] [--jsonl-file <path>] [--summary-file <path>]
-```
-
-### Progress events
-
-```bash
-camo events serve [--host 127.0.0.1] [--port 7788] [--poll-ms 220] [--from-start]
-camo events tail [--host 127.0.0.1] [--port 7788] [--profile <id>] [--run-id <id>] [--mode <normal|autoscript>] [--events e1,e2] [--replay 50]
-camo events recent [--limit 50]
-camo events emit --event <name> [--mode <normal|autoscript>] [--profile <id>] [--run-id <id>] [--payload '{"k":"v"}']
+camo search <platform> <query> [--profile <id>] [--max-results <n>] [--cookies <file>]
 ```
 
 ## 3. Practical Flows
 
-### A) XHS search bootstrap
+### A) Headless page verification
 
 ```bash
-camo init
-camo profile default xhs-main
-camo start --url https://www.xiaohongshu.com
-camo type "#search-input" "工作服定制"
-camo click "#search-input"
+camo daemon start --profile default
+camo start --profile default --headless --url https://example.com
+camo get-page-info --profile default
+camo screenshot --profile default --path /tmp/example.png
+camo stop --profile default
+camo daemon stop
 ```
 
-### B) Container subscription setup
+### B) Search bootstrap (in-process search command)
 
 ```bash
-camo container init
-camo container sets --site xiaohongshu
-camo container register xhs-main xiaohongshu_home.search_input xiaohongshu_search.search_result_item
-camo container targets xhs-main
-camo container watch xhs-main --throttle 500
+camo daemon start --profile default
+camo search xhs "咖啡探店" --profile default --max-results 20
+camo stop --profile default
+camo daemon stop
 ```
 
-### C) Autoscript dry-run and validation
+### C) Isolated multi-command check (ephemeral daemon)
 
 ```bash
-camo autoscript scaffold xhs-unified --output /tmp/xhs-unified.json
-camo autoscript validate /tmp/xhs-unified.json
-camo autoscript explain /tmp/xhs-unified.json
-camo autoscript mock-run /tmp/xhs-unified.json --fixture tests/fixtures/autoscript-events.json
+camo daemon start --profile skill-check --ephemeral
+camo start --profile skill-check --url https://example.com
+camo get-page-info --profile skill-check
+camo stop --profile skill-check
+camo daemon stop
 ```
 
-### D) Progress event diagnostics
+### D) Failure evidence
 
 ```bash
-camo events recent --limit 30
-camo events tail --mode autoscript --replay 20
+camo get-page-info --profile <id>
+camo snapshot --profile <id>
+camo screenshot --profile <id> --path /tmp/camo-failure.png
+grep command.error "$(ls -dt ~/.camo/runs/run-*/events.jsonl | head -1)"
 ```
 
-### E) Stuck session recovery
-
-```bash
-camo sessions
-camo lock list
-camo cleanup locks
-camo force-stop xhs-main
-camo shutdown
-```
+Cleanup is sequential: wait for `camo stop` to return, then run
+`camo daemon stop`. Do not run them concurrently.
 
 ## 4. Troubleshooting
 
-- Browser service connection failure:
-  - run `camo init`
-  - verify `CAMO_BROWSER_URL`
-- Session lock conflict:
-  - `camo lock list`
-  - `camo cleanup locks` or `camo unlock <profileId>`
-- Autoscript run failed:
-  - `camo autoscript validate <file>`
-  - `camo events recent --limit 80`
-  - `camo events tail --mode autoscript --replay 50`
+- No active daemon: run `camo daemon start --profile <id>` first, or set
+  `CAMO_AUTOSTART=1` when calling `camo start`.
+- `E_STATE_DUPLICATE`: the profile already has a session. Inspect it on the same
+  profile; only then decide to `camo stop` and start fresh. Never start a second
+  session for the same profile.
+- Invalid selector: use CSS syntax; do not pass v1 pseudo-selectors like `:visible`.
+- `goto` timeout: retry with `--waitUntil domcontentloaded` on the same profile;
+  do not switch profiles or fall back to `evaluate`.
+- Daemon lifecycle: use `camo daemon status` / `camo daemon stop`, never edit
+  `~/.camo/daemon/*.json` by hand.
+- `E_DAEMON_STOP_FAILED ... pid still alive after SIGTERM + 5s`: browser teardown
+  can exceed 5s. Check `camo daemon status`; `not_running` means shutdown succeeded,
+  otherwise re-run `camo daemon stop` once.

@@ -65,7 +65,7 @@ Use the installed `camo` binary only. This skill targets the installed
 - **One daemon, concurrent profile isolation.** The browser registry is keyed by
   profile id; multiple persistent profiles can remain active concurrently in the
   same daemon. Every agent command must pass its exact `--profile <id>` and never
-  depend on the daemon's scalar `currentBrowserProfile` bookkeeping. Use
+  depend on daemon-global current-profile state. Use
   `camo stop --profile <id>` only to close that profile; it must not be used to
   switch profiles or stop another agent's session.
 - **A session is started with `camo start` and stopped with `camo stop`.**
@@ -376,12 +376,17 @@ Common errors and the correct response:
 - Browser data lives in `~/.camo/profiles/<profile>/` and is persistent per profile.
 - One daemon at a time: `~/.camo/daemon/.shared-daemon.claim` records the active PID.
 - The browser registry inside one daemon is keyed by `profileId`, so the daemon
-  can own multiple profiles. `shell.daemon` still tracks a single
-  `currentBrowserProfile` for lifecycle bookkeeping, so use `--profile` explicitly
-  and stop profiles you no longer need.
+  can own multiple profiles. `shell.daemon` does not stop or replace another
+  profile when a new profile command arrives; use `--profile` explicitly and stop
+  only profiles you no longer need.
 - Idle persistent profiles are auto-reclaimed: the daemon closes a profile's
   browser after the configured idle timeout and preserves its profile data. A
   later `camo start --profile <id>` reopens the same profile.
+- `camo daemon status` and `/health` report `browserCount` as the number of
+  distinct active profile sessions, not a browser reference count; `/health`
+  also lists `profiles`. Long-lived tasks that do not issue commands for the
+  full idle timeout can be reclaimed by design; raise
+  `CAMO_PROFILE_IDLE_TIMEOUT_MS` for such workloads.
 - Profile lock prevents two runtimes on the same profile; stale locks are cleaned
   automatically by the daemon.
 - Do not delete or "repair" `~/.camo/daemon/*.json` by hand. Use

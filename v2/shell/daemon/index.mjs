@@ -23,7 +23,6 @@ import { append as appendProgress } from '../../services/progress_event/log.mjs'
 import { 
   startSession, 
   stopSession, 
-  getSession,
   hasBrowser,
   shutdown as shutdownBrowserService,
   touchSession,
@@ -86,54 +85,26 @@ function emit(type, payload) {
 }
 
 // --- Browser lifecycle management ---
-let currentBrowserProfile = null;
-let browserRefCount = 0;
-let _currentBrowserState = null;
+// The browser_service registry is profile-keyed and is the only truth for
+// live browser instances. The daemon never stops a different profile when a
+// command targets a new one.
 let browserOwnersEnabled = false;
 
-async function ensureBrowser(profile, forcePersistent) {
+async function ensureBrowser(profile) {
   const targetProfile = profile || opts.profile;
-  
-  if (opts.mode === 'ephemeral' || forcePersistent) {
-    if (currentBrowserProfile !== targetProfile || browserRefCount === 0) {
-      if (currentBrowserProfile && currentBrowserProfile !== targetProfile) {
-        await stopSession(currentBrowserProfile);
-      }
-      await startSession({ profileId: targetProfile, headless: opts.mode === 'headless' });
-      currentBrowserProfile = targetProfile;
-      if (_currentBrowserState) _currentBrowserState.currentBrowserProfile = targetProfile;
-    }
-    browserRefCount++;
-    if (_currentBrowserState) _currentBrowserState.browserRefCount = browserRefCount;
-    return targetProfile;
+  if (!hasBrowser(targetProfile)) {
+    await startSession({ profileId: targetProfile, headless: opts.mode === 'headless' });
   }
-  
-  if (!currentBrowserProfile || currentBrowserProfile !== targetProfile) {
-    if (!hasBrowser(targetProfile)) {
-      await startSession({ profileId: targetProfile, headless: opts.mode === 'headless' });
-    }
-    currentBrowserProfile = targetProfile;
-    browserRefCount = 1;
-    if (_currentBrowserState) _currentBrowserState.currentBrowserProfile = targetProfile;
-  } else {
-    browserRefCount++;
-  }
-  if (_currentBrowserState) _currentBrowserState.browserRefCount = browserRefCount;
-  return currentBrowserProfile;
+  return targetProfile;
 }
 
-async function releaseBrowser(forceClose) {
+async function releaseProfileBrowser(profile, forceClose) {
+  const targetProfile = profile || opts.profile;
   if (opts.mode === 'ephemeral' || forceClose) {
-    if (currentBrowserProfile) {
-      await stopSession(currentBrowserProfile);
-      currentBrowserProfile = null;
-      browserRefCount = 0;
-      if (_currentBrowserState) _currentBrowserState.currentBrowserProfile = null;
+    if (targetProfile) {
+      await stopSession(targetProfile);
     }
-  } else {
-    browserRefCount = Math.max(0, browserRefCount - 1);
   }
-  if (_currentBrowserState) _currentBrowserState.browserRefCount = browserRefCount;
 }
 
 // --- Command dispatch ---
@@ -147,26 +118,18 @@ async function handleCommand(env) {
   if (profile) inFlightProfiles.set(profile, (inFlightProfiles.get(profile) || 0) + 1);
 
   emit('command.start', { cmd, args, profile, ephemeral: isEphemeral });
+  const releaseBrowser = (forceClose) => releaseProfileBrowser(profile, forceClose);
 
   try {
     let result = null;
     let commandError = null;
     try {
-      const browserState = { currentBrowserProfile, browserRefCount };
-      _currentBrowserState = browserState;
       const commandResult = await dispatchCommand(cmd, args, {
         profile,
-        isEphemeral,
         opts,
         ensureBrowser,
-        releaseBrowser,
-        browserState,
         ephemeralAllocations,
       });
-
-      // Sync back browser state changes
-      currentBrowserProfile = browserState.currentBrowserProfile;
-      browserRefCount = browserState.browserRefCount;
 
       result = { kind: 'result', payload: { cmd, ...commandResult } };
     } catch (cause) {
@@ -219,12 +182,23 @@ function createHttpServer() {
     const method = req.method;
 
     if (parsedUrl.pathname === '/health') {
-      const sessions = await listSessionDetails();
+      let sessions;
+      try {
+        sessions = await listSessionDetails();
+      } catch (cause) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: false,
+          error: cause?.message || String(cause),
+          ts: new Date().toISOString(),
+        }));
+        return;
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         ok: true, 
         daemon: opts.daemonId || RUN_ID, 
-        profile: currentBrowserProfile || 'idle',
+        profile: sessions.map((s) => s.profileId).join(',') || 'idle',
         mode: opts.mode,
         browserCount: sessions.length,
         profiles: sessions.map((s) => s.profileId),
@@ -242,14 +216,28 @@ function createHttpServer() {
     }
 
     if (parsedUrl.pathname === '/status' && method === 'GET') {
-      const session = await getSession(opts.profile);
+      let sessions;
+      try {
+        sessions = await listSessionDetails();
+      } catch (cause) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          ok: false,
+          error: cause?.message || String(cause),
+          ts: new Date().toISOString(),
+        }));
+        return;
+      }
+      const session = sessions.find((entry) => entry.profileId === opts.profile) || null;
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         ok: true, 
         profile: opts.profile,
         mode: opts.mode,
-        browserActive: !!currentBrowserProfile,
-        session: session || null 
+        browserActive: sessions.length > 0,
+        browserCount: sessions.length,
+        profiles: sessions.map((entry) => entry.profileId),
+        session,
       }));
       return;
     }
@@ -355,9 +343,7 @@ async function shutdown(code = 0) {
       if (browserOwnersEnabled) await shutdownBrowserService();
     },
     clearBrowserTruth: () => {
-      currentBrowserProfile = null;
-      browserRefCount = 0;
-      _currentBrowserState = null;
+      // Browser-service owns the live profile registry.
     },
     closeServers: closeProtocolServers,
     releaseRegistration: () => {
@@ -467,7 +453,7 @@ async function main(argv) {
   if (opts.mode === 'ephemeral') {
     const idleTimeout = parseInt(process.env.CAMO_EPHEMERAL_IDLE_TIMEOUT || '30000', 10);
     let idleTimer = setTimeout(() => {
-      if (browserRefCount === 0) {
+      if (inFlightProfiles.size === 0) {
         shutdown(0);
       }
     }, idleTimeout);

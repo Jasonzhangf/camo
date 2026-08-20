@@ -22,20 +22,15 @@ async function importOp(opName) {
  * @param {Object} args - command arguments
  * @param {Object} ctx - execution context
  * @param {string} ctx.profile - profile identifier
- * @param {boolean} ctx.isEphemeral - whether the session is ephemeral
  * @param {Object} ctx.opts - daemon options (for browser lifecycle)
  * @param {Function} ctx.ensureBrowser - browser ensure function
- * @param {Function} ctx.releaseBrowser - browser release function
- * @param {Object} ctx.browserState - { currentBrowserProfile, browserRefCount }
  * @returns {Object} command result { ok, ... }
  */
 export async function handleCommand(cmd, args, ctx) {
-  const { profile, isEphemeral, opts, ensureBrowser, releaseBrowser, browserState } = ctx;
-  let closeAfter = false;
+  const { profile, opts, ensureBrowser } = ctx;
 
   if (isBrowserCommand(cmd)) {
-    await ensureBrowser(profile, false);
-    closeAfter = isEphemeral;
+    await ensureBrowser(profile);
   }
 
   switch (cmd) {
@@ -60,7 +55,6 @@ export async function handleCommand(cmd, args, ctx) {
         const page = getCurrentPage(aliasedProfile);
         const targetUrl = (args && typeof args.url === 'string' && args.url) ? args.url : 'about:blank';
         await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        browserState.currentBrowserProfile = aliasedProfile;
         if (allocatedProfile) ctx.ephemeralAllocations.set(requestedProfile, aliasedProfile);
         return {
           ok: true,
@@ -76,8 +70,6 @@ export async function handleCommand(cmd, args, ctx) {
         ephemeral: ephemeralRequested,
       });
       const effectiveProfile = session.profileId || requestedProfile;
-      browserState.currentBrowserProfile = effectiveProfile;
-      browserState.browserRefCount = 1;
       if (session.ephemeral === true) ctx.ephemeralAllocations.set(requestedProfile, effectiveProfile);
       if (args && typeof args.url === 'string' && args.url) {
         const fresh = getCurrentPage(effectiveProfile);
@@ -97,8 +89,6 @@ export async function handleCommand(cmd, args, ctx) {
           throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'ephemeral_allocations', alias: 'temp' } });
       }
       const result = await stopSession(resolvedProfile);
-      browserState.currentBrowserProfile = null;
-      browserState.browserRefCount = 0;
       // Clean up any tracked ephemeral allocation maps for this alias.
       for (const [alias, alloc] of [...ctx.ephemeralAllocations.entries()]) {
         if (alloc === resolvedProfile) ctx.ephemeralAllocations.delete(alias);

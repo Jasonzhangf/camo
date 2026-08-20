@@ -19,3 +19,12 @@ test('negative: touch on a missing session returns null without creating a recor
   assert.equal(session.touch('touch-missing'), null);
   assert.equal(session.tryRead('touch-missing'), null);
 });
+
+test('positive: touch lifecycle telemetry is capped to prevent unbounded growth', () => {
+  session.__resetForTest();
+  session.create('touch-cap', {});
+  for (let i = 0; i < 4200; i += 1) session.touch('touch-cap');
+  const events = session.lifecycle();
+  assert.ok(events.length <= 4096, 'lifecycle log must stay bounded');
+  assert.ok(events.every((event) => typeof event.profileId === 'string'));
+});

@@ -30,6 +30,7 @@ import {
   __enableTestRoot as enableTabPool,
   __resetForTest as resetTabPool,
 } from '../../../services/page_runtime/tab_pool.mjs';
+import * as progressLog from '../../../services/progress_event/log.mjs';
 
 bootstrap.__enableTestRoot();
 enableBridgeTestRoot();
@@ -37,10 +38,13 @@ session.__enableTestRoot();
 enableProfileRoot();
 enableLockRoot();
 enableTabPool();
+progressLog.__enableTestRoot();
 
 const profileRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-temp-alias-'));
+const runsRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-temp-alias-runs-'));
 __setProfilesRootForTest(profileRoot);
 __setLocksRootForTest(profileRoot);
+progressLog.__setRunsRootForTest(runsRoot);
 process.env.CAMO_PATHS_PROFILES = profileRoot;
 
 let launchCount = 0;
@@ -57,14 +61,10 @@ const close = async (profileId) => {
 bootstrap.__setBrowserLifecycleForTest({ launch, close });
 
 function fakeCtx({ allocations }) {
-  const browserState = { currentBrowserProfile: null, browserRefCount: 0 };
   return {
     profile: 'temp',
-    isEphemeral: true,
     opts: { mode: 'persistent', daemonId: 'temp-alias-test' },
     ensureBrowser: async () => {},
-    releaseBrowser: async () => {},
-    browserState,
     ephemeralAllocations: allocations,
   };
 }
@@ -89,6 +89,7 @@ test.after(() => {
   bootstrap.__setBrowserLifecycleForTest({});
   delete process.env.CAMO_PATHS_PROFILES;
   fs.rmSync(profileRoot, { recursive: true, force: true });
+  fs.rmSync(runsRoot, { recursive: true, force: true });
 });
 
 test('positive: first start on temp allocates a fresh _temp id and reuses it on the second start', async () => {
@@ -141,7 +142,7 @@ test('negative: stale temp allocation fails closed instead of allocating another
 
 test('negative: reusing a named persistent profile never creates a temp alias', async () => {
   const allocations = new Map();
-  const ctx = { ...fakeCtx({ allocations }), profile: 'named-profile', isEphemeral: false };
+  const ctx = { ...fakeCtx({ allocations }), profile: 'named-profile' };
 
   const first = await handleCommand('start', {}, ctx);
   assert.equal(first.profile, 'named-profile');

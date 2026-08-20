@@ -64,8 +64,8 @@ section { border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px; }</st
       <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>v2/services/session</code> - <strong>Store:</strong> memory_in_owner_process</p>
 
       <h3>Reads</h3><ul><li><code>v2/services/session/manager.mjs::read</code></li><li><code>v2/services/session/manager.mjs::list</code></li><li><code>v2/transports/ws/server.mjs::route</code></li></ul>
-      <h3>Writes</h3><ul><li><code>v2/services/session/manager.mjs::create</code></li><li><code>v2/services/session/manager.mjs::delete</code></li><li><code>v2/services/session/manager.mjs::mark_closed</code></li></ul>
-      <h3>Indirect</h3><ul><li><code>v2/services/lock/manager.mjs::on_session_change</code></li></ul>
+      <h3>Writes</h3><ul><li><code>v2/services/session/manager.mjs::create</code></li><li><code>v2/services/session/manager.mjs::deleteSession</code></li><li><code>v2/services/session/manager.mjs::markClosed</code></li><li><code>v2/services/session/manager.mjs::touch</code></li></ul>
+      <h3>Indirect</h3><ul><li><code>v2/services/browser_service/bootstrap.mjs::touchSession->touch</code></li><li><code>v2/services/browser_service/bootstrap.mjs::sweepIdleSessions->stopSession</code></li></ul>
       <h3>Forbidden</h3><ul><li><code>v2/lifecycle/session_registry.mjs::write</code></li><li><code>v2/commands/**::session_write</code></li></ul>
 
       <p><a href="#resource-index">back to index</a></p>

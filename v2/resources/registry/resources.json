@@ -176,12 +176,11 @@
       ],
       "write_paths": [
         "v2/services/session/manager.mjs::create",
-        "v2/services/session/manager.mjs::delete",
-        "v2/services/session/manager.mjs::mark_closed",
+        "v2/services/session/manager.mjs::deleteSession",
+        "v2/services/session/manager.mjs::markClosed",
         "v2/services/session/manager.mjs::touch"
       ],
       "indirect_paths": [
-        "v2/services/lock/manager.mjs::on_session_change",
         "v2/services/browser_service/bootstrap.mjs::touchSession->touch",
         "v2/services/browser_service/bootstrap.mjs::sweepIdleSessions->stopSession"
       ],

@@ -167,7 +167,7 @@
       "to": "services.browser_service",
       "caller": {
         "path": "v2/shell/daemon/index.mjs",
-        "symbol": "releaseBrowser"
+        "symbol": "releaseProfileBrowser"
       },
       "callee": {
         "path": "v2/services/browser_service/bootstrap.mjs",

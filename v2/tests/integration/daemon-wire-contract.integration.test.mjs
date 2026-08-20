@@ -22,11 +22,8 @@ function wireTransport(handler) {
 function daemonContext(profile) {
   return {
     profile,
-    isEphemeral: false,
     opts: { mode: 'persistent', daemonId: 'wire-test' },
-    browserState: {},
     ensureBrowser: async () => {},
-    releaseBrowser: async () => {},
   };
 }
 

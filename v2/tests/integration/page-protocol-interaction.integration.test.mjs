@@ -171,7 +171,7 @@ test('positive: wait/readable command projections preserve operation fields', ()
       evaluate: async () => 'readable body',
     };
     __setBrowserForTest('protocol_projection', { page });
-    const ctx = { profile: 'protocol_projection', isEphemeral: false, opts: { mode: 'persistent', daemonId: 'test' }, browserState: {}, ensureBrowser: async () => {}, releaseBrowser: async () => {}, operationLoader: async (name) => {
+    const ctx = { profile: 'protocol_projection', opts: { mode: 'persistent', daemonId: 'test' }, ensureBrowser: async () => {}, operationLoader: async (name) => {
       const ops = await import('./v2/services/page_runtime/input_pipeline.mjs');
       return ops[name];
     } };
