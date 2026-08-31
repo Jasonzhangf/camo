@@ -141,4 +141,86 @@ describe('page_runtime.multiOpen-operation', () => {
     assert.deepEqual(closed, [1, 0]);
     resetBridge();
   });
+
+  test('positive: listTabs filters browser-managed blank placeholders and reindexes', async () => {
+    enableBridge();
+    const pages = [
+      { url: () => 'https://example.com/', title: async () => 'Example', isClosed: () => false },
+      { url: () => 'about:newtab', title: async () => '', isClosed: () => false },
+      { url: () => 'about:blank', title: async () => '', isClosed: () => false },
+      { url: () => 'https://news.ycombinator.com/', title: async () => 'Hacker News', isClosed: () => false },
+      { url: () => 'https://closed.example/', title: async () => 'Closed', isClosed: () => true },
+    ];
+    __setBrowserForTest('list-tabs-placeholders', {
+      context: { pages: () => pages },
+      page: pages[0],
+    });
+    const { listTabs } = await import('../../../services/page_runtime/operations/navigation_ops.mjs');
+
+    const result = await listTabs({ profileId: 'list-tabs-placeholders' });
+
+    assert.equal(result.count, 2);
+    assert.deepEqual(result.tabs, [
+      { tabId: 0, url: 'https://example.com/', title: 'Example' },
+      { tabId: 1, url: 'https://news.ycombinator.com/', title: 'Hacker News' },
+    ]);
+    resetBridge();
+  });
+
+  test('positive: newTab returns the caller-visible tab id after a blank placeholder', async () => {
+    enableBridge();
+    const placeholder = { url: () => 'about:newtab' };
+    const page = {
+      url: () => 'https://example.com/new',
+      async goto() {},
+      async close() {},
+    };
+    const pages = [placeholder];
+    __setBrowserForTest('new-tab-visible-index', {
+      context: {
+        pages: () => pages,
+        async newPage() {
+          pages.push(page);
+          return page;
+        },
+      },
+    });
+    const { newTab } = await import('../../../services/page_runtime/operations/navigation_ops.mjs');
+
+    const result = await newTab({ profileId: 'new-tab-visible-index', url: 'https://example.com/new' });
+
+    assert.equal(result.tabId, 0);
+    resetBridge();
+  });
+
+  test('positive: multiOpen returns caller-visible tab ids after a blank placeholder', async () => {
+    enableBridge();
+    const pages = [{ url: () => 'about:newtab' }];
+    const openedPages = [];
+    const context = {
+      pages: () => pages,
+      async newPage() {
+        const page = {
+          url: () => `https://example.com/${openedPages.length + 1}`,
+          async goto() {},
+          async screenshot() { return Buffer.from('png'); },
+          async close() {},
+        };
+        openedPages.push(page);
+        pages.push(page);
+        return page;
+      },
+    };
+    __setBrowserForTest('multi-open-visible-index', { context, page: null });
+    const { multiOpen } = await import('../../../services/page_runtime/operations/navigation_ops.mjs');
+
+    const result = await multiOpen({
+      profileId: 'multi-open-visible-index',
+      urls: ['https://example.com/a', 'https://example.com/b'],
+    });
+
+    assert.deepEqual(result.opened.map((entry) => entry.tabId), [0, 1]);
+    assert.deepEqual(result.screenshots.map((entry) => entry.tabId), [0, 1]);
+    resetBridge();
+  });
 });

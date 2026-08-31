@@ -57,7 +57,7 @@ export async function newTab({ profileId, url }) {
     if (targetUrl) {
       await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     }
-    const tabId = record.context.pages().indexOf(page);
+    const tabId = bridge.getTabPages(pid).indexOf(page);
     if (tabId < 0) throw new Error('opened page missing from context page list');
     const result = { profileId: pid, tabId, url: page.url(), created: true };
     emit(pid, 'newTab.done', { url: page.url() });
@@ -91,9 +91,9 @@ export async function closeTab({ profileId, tabId }) {
   if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
   emit(pid, 'closeTab.start', { tabId });
   try {
-    const pages = record.context.pages();
+    const pages = bridge.getTabPages(pid);
     if (typeof tabId === 'number' && tabId >= 0 && tabId < pages.length) {
-      await pages[tabId].close();
+      await pages[tabId].close({ runBeforeUnload: false });
     } else {
       throw new CamoError({ code: 'E_INPUT_OUT_OF_RANGE', details: { field: 'tabId', value: tabId, available: pages.length } });
     }
@@ -119,7 +119,7 @@ export async function listTabs({ profileId }) {
   if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
   emit(pid, 'listTabs.start', {});
   try {
-    const pages = record.context.pages();
+    const pages = bridge.getTabPages(pid);
     const tabs = await Promise.all(pages.map(async (page, tabId) => ({
       tabId,
       url: page.url(),
@@ -190,7 +190,7 @@ export async function multiOpen({ profileId, urls, outDir = null, prefix = 'mult
       const page = await record.context.newPage();
       createdPages.push(page);
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      const tabId = record.context.pages().indexOf(page);
+      const tabId = bridge.getTabPages(pid).indexOf(page);
       if (tabId < 0) throw new Error('opened page missing from context page list');
       opened.push({ tabId, url: page.url() });
       let destPath = null;

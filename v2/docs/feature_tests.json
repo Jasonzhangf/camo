@@ -439,6 +439,23 @@
       ]
     },
     {
+      "id": "cmd.snapshot.payload",
+      "owner_resource": "input_pipeline",
+      "required_commands": [
+        "npm test",
+        "npm run test:all",
+        "node v2/gates/run-all.mjs --strict"
+      ],
+      "positive": [
+        "v2/tests/unit/commands/builtins.roundtrip.test.mjs",
+        "v2/tests/integration/daemon-wire-contract.integration.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/commands/builtins.roundtrip.test.mjs",
+        "v2/tests/integration/daemon-wire-contract.integration.test.mjs"
+      ]
+    },
+    {
       "id": "cmd.wait",
       "owner_resource": "command_log",
       "positive": [

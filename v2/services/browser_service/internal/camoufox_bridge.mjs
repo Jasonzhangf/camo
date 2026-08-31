@@ -201,8 +201,22 @@ export function getPage(profileId) {
 }
 
 /**
+ * Get browser-managed visible tabs in the same order exposed to callers.
+ */
+export function getTabPages(profileId) {
+    const pid = String(profileId || '').trim();
+    const record = _records.get(pid);
+    if (!record) return [];
+    return record.context.pages().filter((page) => {
+        if (typeof page.isClosed === 'function' && page.isClosed()) return false;
+        const url = page.url();
+        return url !== 'about:newtab' && url !== 'about:blank';
+    });
+}
+
+/**
  * Switch the active page for a profile to the tab at the given index.
- * tabId is the zero-based index into context.pages() (same as listTabs).
+ * tabId is the zero-based index into getTabPages() (same as listTabs).
  * Protocol-level: brings the target tab to front and updates the active
  * page handle so subsequent operations target it.
  */
@@ -212,7 +226,7 @@ export async function switchPage(profileId, tabId) {
     if (!pid) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'profileId' } });
     const record = _records.get(pid);
     if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
-    const pages = record.context.pages();
+    const pages = getTabPages(pid);
     const idx = Number(tabId);
     if (!Number.isInteger(idx) || idx < 0 || idx >= pages.length) {
         throw new CamoError({ code: 'E_INPUT_OUT_OF_RANGE', details: { field: 'tabId', value: tabId, available: pages.length } });

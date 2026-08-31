@@ -55,6 +55,7 @@
         "v2/services/browser_service/internal/camoufox_bridge.mjs::getPage",
         "v2/services/browser_service/internal/camoufox_bridge.mjs::getRecord",
         "v2/services/browser_service/internal/camoufox_bridge.mjs::getContext",
+        "v2/services/browser_service/internal/camoufox_bridge.mjs::getTabPages",
         "v2/services/browser_service/internal/camoufox_bridge.mjs::listActive"
       ],
       "write_paths": [
@@ -355,6 +356,7 @@
       "indirect_paths": [
         "v2/shell/daemon/command_handlers.mjs::handleCommand->getCookies",
         "v2/shell/daemon/command_handlers.mjs::handleCommand->getPageInfo",
+        "v2/shell/daemon/command_handlers.mjs::handleCommand->snapshot",
         "v2/shell/daemon/command_handlers.mjs::handleCommand->wait",
         "v2/shell/daemon/command_handlers.mjs::handleCommand->run",
         "v2/shell/daemon/index.mjs::handleCommand->wait",
@@ -623,6 +625,7 @@
         "v2/services/page_runtime/input_pipeline.mjs::newTab",
         "v2/services/page_runtime/input_pipeline.mjs::closeTab",
         "v2/services/page_runtime/input_pipeline.mjs::listTabs",
+        "v2/services/page_runtime/input_pipeline.mjs::switchTab",
         "v2/services/page_runtime/input_pipeline.mjs::click",
         "v2/services/page_runtime/input_pipeline.mjs::hover",
         "v2/services/page_runtime/input_pipeline.mjs::type",

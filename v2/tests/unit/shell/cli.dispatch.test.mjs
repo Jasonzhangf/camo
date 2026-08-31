@@ -36,6 +36,27 @@ test('negative: goto without url surfaces E_INPUT_MISSING_FIELD', async () => {
   }
 });
 
+test('positive: validateOnly validates a valid command without a transport', async () => {
+  const out = await dispatch(['goto', 'https://example.com'], { validateOnly: true });
+  assert.equal(out.kind, 'validated');
+  assert.equal(out.cmd, 'goto');
+});
+
+test('negative: validateOnly surfaces input errors without touching transport', async () => {
+  try {
+    await dispatch(['goto'], { validateOnly: true });
+    assert.fail('expected error');
+  } catch (err) {
+    assert.equal(err.code, 'E_INPUT_MISSING_FIELD');
+  }
+});
+
+test('positive: validateOnly resolves help kind without a transport', async () => {
+  const out = await dispatch(['goto', '--help'], { validateOnly: true });
+  assert.equal(out.kind, 'help');
+  assert.match(out.usage, /goto/);
+});
+
 test('negative: click without selector|text surfaces E_INPUT_INVALID', async () => {
   const fake = makeFakeTransport();
   try {

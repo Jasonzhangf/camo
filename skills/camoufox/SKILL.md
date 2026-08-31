@@ -1,23 +1,27 @@
 ---
 name: camoufox
 description: |
-  Use the installed `camo` CLI for browser automation via one shared daemon. That daemon can host multiple named profiles; every `camo <cmd> --profile <id>` targets a profile inside the single daemon. Verified against `camo 0.4.2` (`camo --help` lists 32 commands).
+  Use the installed `camo` CLI for browser automation via one shared daemon. That daemon can host multiple named profiles; every `camo <cmd> --profile <id>` targets a profile inside the single daemon. Verified against `camo 0.4.3` (`camo --help` lists 32 commands).
 
   How to run camo (copy-paste, no need to read the body):
 
-  # 1) Start the shared daemon (one process, hosts every profile)
-  camo daemon start --profile mytask
-  camo start --profile mytask --url https://example.com
+  # 1) Start the shared daemon and persistent default profile
+  camo daemon start
+  camo start --url https://example.com
 
-  # 2) Use the profile for as many commands as you need
-  camo get-page-info --profile mytask
-  camo snapshot --profile mytask
-  camo click --selector "h1" --profile mytask
+  # 2) Use the implicit default profile for as many commands as you need
+  camo get-page-info
+  camo snapshot
+  camo click --selector "h1"
 
-  # 3) Start another isolated profile in the SAME daemon; mytask stays active
+  # 3) Stop the default session, then the daemon
+  camo stop
+  camo daemon stop
+
+  # For a concrete isolated task, use an explicit profile in the SAME daemon
   camo start --profile othertask --url https://opencode.ai/go
 
-  # 4) Cleanup: stop the last profile, then stop the daemon
+  # Cleanup the isolated profile, then stop the daemon
   camo stop --profile othertask
   camo daemon stop
 
@@ -30,10 +34,10 @@ description: |
 # Camo Browser CLI (Camoufox)
 
 Use the installed `camo` binary only. This skill targets the installed
-`camo` v2 / `0.4.2+` CLI. The single truth for command shape is
+`camo` v2 / `0.4.3+` CLI. The single truth for command shape is
 `camo --help` and `camo <cmd> --help`.
 
-## Ground Truth (camo 0.4.2)
+## Ground Truth (camo 0.4.3)
 
 - **One shared daemon** (`camo daemon`) owns every browser session. `camo daemon start`
   must run before any browser command; `camo daemon stop` shuts the whole daemon down.
@@ -43,6 +47,9 @@ Use the installed `camo` binary only. This skill targets the installed
 - **Every command selects a profile.** Profile default resolution:
   explicit `--profile <id>` > `CAMO_PROFILE` env > `default`.
 - **No `--profile` means `default`**, including `camo daemon start` and `camo start`.
+  This is an implicit profile parameter: omission resolves to the literal
+  `default` profile. An explicit `--profile <id>` always wins and must never
+  inherit or copy state from `default`.
   `default` profile data is persistent; its browser follows the same idle reclaim
   policy as other persistent profiles.
 - **Multiple profiles live inside one daemon.** The daemon owns a profile-keyed
@@ -56,12 +63,35 @@ Use the installed `camo` binary only. This skill targets the installed
   `cookies.sqlite`, localStorage, browser state, and profile lock files.
   Root-layer `~/.camo/fingerprints/`, `~/.camo/cookies/<profile>/`, and
   `~/.camo/locks/` are legacy paths and must not be read or written.
-- **Default login reuse is the recommended flow**: use `default` for the normal
-  OpenCode + Google login. Keep the same `--profile default` for every login,
-  navigation, stop, and restart command. After restart, the profile automatically
-  reuses the same fingerprint and cookies; do not manually copy or inject cookies.
+- **Default profile is the implicit `default` parameter**: when `--profile` is
+  omitted, the command targets the persistent `default` profile as an implicit
+  parameter. This does NOT identify the profile as "the Weibo profile" or
+  "the Xiaohongshu profile" — `default` is simply the persistent default profile
+  whose persisted state currently holds Weibo (微博) and Xiaohongshu / XHS
+  (小红书) login cookies. Persisted cookies alone are not a live login guarantee:
+  before relying on the Weibo or Xiaohongshu session, re-verify via
+  `camo get-cookies --profile default` plus a page-state check
+  (`camo goto https://weibo.com/newlogin` or
+  `camo goto https://www.xiaohongshu.com/explore`), or re-run `camo login`
+  against the same implicit default. The default profile may also hold
+  login cookies for other platforms (e.g. OpenCode, Google); treat those the
+  same way. Keep the same implicit default selection for login, navigation,
+  stop, and restart; after restart, the profile reuses its fingerprint and
+  cookies automatically. Do not manually copy or inject cookies from `default`
+  into another profile. An explicit `--profile <id>` is authoritative and
+  never inherits or copies these sessions.
 - **Every new named profile is isolated**: `~/.camo/profiles/<id>/` gets its own
   fingerprint and login state. Never mix cookies between profiles.
+- **Temporary profiles are disposable and Camo-self-cleaned**: use
+  `--profile temp` or explicit `--ephemeral` only for a concrete isolated
+  or one-shot task. Camo allocates and returns the actual
+  `_temp_<pid>_<timestamp>` profile id (the `start` response is the source
+  of truth for the id; do not reconstruct it). Use that returned id for
+  every subsequent command, then run `camo stop --profile temp`. Camo owns
+  deletion of the temporary profile directory and does not retain residual
+  `_temp_*` data: cleanup failures are errors, not successful stops.
+  Verify by running `test ! -e "$HOME/.camo/profiles/<returned-id>"` after
+  `camo stop --profile temp` — a missing directory is the only valid outcome.
 - **One daemon, concurrent profile isolation.** The browser registry is keyed by
   profile id; multiple persistent profiles can remain active concurrently in the
   same daemon. Every agent command must pass its exact `--profile <id>` and never
@@ -87,8 +117,14 @@ Use the installed `camo` binary only. This skill targets the installed
 
 ## Profile Rules（强制）
 
-1. **Default to `default`** for login reuse unless the task explicitly needs an
-   isolated login state. Never create a named profile just to "keep clean".
+1. **Reuse an existing profile by default.** Unless the task explicitly
+   requires isolated credentials, concurrent data boundaries, or another
+   concrete profile-specific reason, do not create a new profile. In
+   particular, do not create a new profile merely to use a platform that is
+   already covered by the persistent `default` profile. Prefer `default` when
+   its persisted state is the intended target. When `--profile` is omitted,
+   `default` is selected implicitly; an explicit `--profile <id>` remains
+   authoritative and does not inherit `default` login state.
 2. **One task = one profile.** Reuse the exact same `--profile` on every command.
    If a command fails, diagnose on the same profile; do not retry on a second profile.
 3. **Multi-profile runs are explicit**: keep distinct `--profile` sessions alive
@@ -96,8 +132,15 @@ Use the installed `camo` binary only. This skill targets the installed
    profile must not stop the previous profile.
 4. **Do not delete `default`.** Do not `rm -rf` profile directories unless the user
    explicitly asked to reset that exact profile.
-5. **Never use positional profile arguments** (`camo goto <profile> <url>` is v1 syntax
-   and does not exist in 0.4.2). Profile is always `--profile <id>`.
+5. **Temporary profile cleanup is mandatory and self-owned.** A temporary
+   profile is disposable and Camo owns its cleanup: after the task, stop it
+   through Camo and verify the returned `_temp_*` directory is absent. Do not
+   manually delete it, do not treat a cleanup exception as success, and do not
+   accept a successful result that leaves residual temporary data. The
+   temporary-profile path is valid only when both the requested operation and
+   cleanup have been verified.
+6. **Never use positional profile arguments** (`camo goto <profile> <url>` is v1 syntax
+   and does not exist in 0.4.3). Profile is always `--profile <id>`.
 
 ## Hard Constraints
 
@@ -112,7 +155,7 @@ Use the installed `camo` binary only. This skill targets the installed
   `autoscript`, `cleanup`, `force-stop`, `shutdown`, `back`, `new-page`,
   `cookies save`, `cookies load`, `viewport`, `highlight`, `clear-highlight`,
   `mouse click`, `mouse wheel`, ...) is suggested anywhere, it is stale and
-  must be rewritten to the 0.4.2 command.
+  must be rewritten to the 0.4.3 command.
 
 ## Verify First
 
@@ -122,20 +165,20 @@ camo --help
 camo doctor
 ```
 
-Expected version: `0.4.2+`. `camo doctor` writes JSON with the CLI count,
+Expected version: `0.4.3+`. `camo doctor` writes JSON with the CLI count,
 protocol id, and any v1 leftovers.
 
 ## Standard Execution Order
 
-Use one profile throughout. For OpenCode + Google login, the default
-profile is the persistent target.
+Use one profile throughout. For the normal logged-in flow, omit `--profile`
+and use the persistent `default` profile implicitly.
 
 ```bash
-camo daemon start --profile default
-camo start --profile default --url https://example.com
-camo get-page-info --profile default
-camo snapshot --profile default
-camo stop --profile default
+camo daemon start
+camo start --url https://example.com
+camo get-page-info
+camo snapshot
+camo stop
 camo daemon stop
 ```
 
@@ -154,20 +197,25 @@ camo stop --profile taskB
 camo daemon stop
 ```
 
-For an isolated disposable run, use an explicit ephemeral daemon:
+For an isolated disposable run, use a temporary profile:
 
 ```bash
-camo daemon start --profile disposable-check --ephemeral
-camo start --profile disposable-check --url https://example.com
-camo get-page-info --profile disposable-check
-camo stop --profile disposable-check
+camo daemon start
+camo start --profile temp --headless --url https://example.com
+# Save the returned profile, for example: _temp_12345_1735689600000
+camo get-page-info --profile <returned-temp-id>
+camo snapshot --profile <returned-temp-id>
+camo stop --profile temp
+test ! -e "$HOME/.camo/profiles/<returned-temp-id>"
 camo daemon stop
 ```
 
 Notes:
-- `camo daemon start --ephemeral` creates an `_ephemeral_*` profile; commands must
-  still pass the exact generated profile id (from the daemon result) if they target it.
-  Prefer the explicit named form above for multi-command checks.
+- `camo start --profile temp` creates a disposable `_temp_<pid>_<timestamp>`
+  profile. The `start` response is the source of truth for the allocated id;
+  do not reconstruct it.
+- `camo stop --profile temp` resolves the current allocation and removes its
+  profile directory. If removal fails, the command must fail visibly.
 - `camo stop` reports `stopped` for a missing session without throwing, but a
   mid-task failure should not trigger an immediate stop. First collect evidence
   (see Failure Protocol), then clean up.
@@ -178,32 +226,33 @@ Notes:
 ## Recommended Login Flow (OpenCode + Google)
 
 The recommended and only supported login flow is `camo login` against the
-persistent `default` profile. Do not run any other camo command while
-inside a `camo login`; treat it as the authoritative entry point.
+persistent `default` profile selected implicitly by omitting `--profile`. Do
+not run any other camo command while inside a `camo login`; treat it as the
+authoritative entry point.
 
 ```bash
 # 1) Boot the daemon + browser on default (foreground so you can interact)
-camo daemon start --profile default
-camo login --profile default \
-           --url https://auth.opencode.ai/login \
-           --until-cookie-name authorization \
-           --until-url opencode.ai/go \
-           --timeout 600000
+camo daemon start
+camo login \
+  --url https://auth.opencode.ai/login \
+  --until-cookie-name authorization \
+  --until-url opencode.ai/go \
+  --timeout 600000
 
 # 2) Add Google login on the SAME profile (do not change profile id)
-camo new-tab --profile default --url https://accounts.google.com/
-camo login --profile default \
-           --url https://accounts.google.com/ \
-           --until-cookie-name __Secure-3PSID \
-           --until-url myaccount.google.com \
-           --timeout 600000
+camo new-tab --url https://accounts.google.com/
+camo login \
+  --url https://accounts.google.com/ \
+  --until-cookie-name __Secure-3PSID \
+  --until-url myaccount.google.com \
+  --timeout 600000
 
 # 3) Verify both logins persisted
-camo get-cookies --profile default
+camo get-cookies
 # Expect: cookies.google.com + accounts.google.com + auth.opencode.ai + opencode.ai
 
 # 4) Stop the browser, then the daemon
-camo stop --profile default
+camo stop
 camo daemon stop
 ```
 
@@ -217,13 +266,13 @@ camo daemon stop
 
 ### Restart reuse
 
-After `camo stop` + `camo daemon stop`, rerun:
+After `camo stop` + `camo daemon stop`, rerun the same implicit-default flow:
 
 ```bash
-camo daemon start --profile default
-camo start --profile default --url https://auth.opencode.ai/login
+camo daemon start
+camo start --url https://auth.opencode.ai/login
 # opencode.ai/google cookies should be already loaded by Camoufox
-camo get-cookies --profile default
+camo get-cookies
 ```
 
 Verified (2026-08-13): default profile holds `authorization`/`provider` on
@@ -231,7 +280,7 @@ Verified (2026-08-13): default profile holds `authorization`/`provider` on
 `.google.com`/`accounts.google.com`/`myaccount.google.com`/`gds.google.com`/
 `ogs.google.com`. Reopening the same profile reuses these without re-login.
 
-## Command Reference (0.4.2)
+## Command Reference (0.4.3)
 
 Flag names use the registry spelling: `--profile`, `--selector`, `--text`,
 `--waitUntil`, `--format`, `--path`, `--for`, `--target`, `--timeout`, `--ms`,

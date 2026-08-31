@@ -27,10 +27,21 @@ async function importOp(opName) {
  * @returns {Object} command result { ok, ... }
  */
 export async function handleCommand(cmd, args, ctx) {
-  const { profile, opts, ensureBrowser } = ctx;
+  const { opts, ensureBrowser, ephemeralAllocations } = ctx;
+  const requestedProfile = ctx.profile;
+  const resolvedProfile = ephemeralAllocations?.get(requestedProfile) || requestedProfile;
+  const profile = cmd === 'start' || cmd === 'stop' ? requestedProfile : resolvedProfile;
 
-  if (isBrowserCommand(cmd)) {
-    await ensureBrowser(profile);
+  // start owns allocation; every later browser command must reuse its
+  // resolved ephemeral profile instead of launching the alias itself.
+  if (isBrowserCommand(cmd) && cmd !== 'start') {
+    if (requestedProfile === 'temp' && !ephemeralAllocations?.has(requestedProfile)) {
+      throw new CamoError({
+        code: 'E_STATE_NOT_FOUND',
+        details: { resource: 'ephemeral_allocations', alias: requestedProfile },
+      });
+    }
+    await ensureBrowser(resolvedProfile);
   }
 
   switch (cmd) {
@@ -45,6 +56,7 @@ export async function handleCommand(cmd, args, ctx) {
       const allocatedProfile = ctx.ephemeralAllocations.get(requestedProfile);
       const aliasedProfile = allocatedProfile || requestedProfile;
       const existing = hasBrowser(aliasedProfile);
+      const requestedHeadless = (args && args.headless === true) || opts.mode === 'headless';
       if (allocatedProfile && !existing) {
         throw new CamoError({
           code: 'E_STATE_INVALID',
@@ -52,6 +64,18 @@ export async function handleCommand(cmd, args, ctx) {
         });
       }
       if (existing) {
+        const session = await getSession(aliasedProfile);
+        const sessionHeadless = session?.headless === true;
+        if (typeof args?.headless === 'boolean' && requestedHeadless !== sessionHeadless) {
+          throw new CamoError({
+            code: 'E_STATE_INVALID',
+            details: {
+              resource: 'browser_session',
+              profileId: aliasedProfile,
+              reason: `session already running with headless=${sessionHeadless}; requested headless=${requestedHeadless}. Stop the session first, then start with --headless.`,
+            },
+          });
+        }
         const page = getCurrentPage(aliasedProfile);
         const targetUrl = (args && typeof args.url === 'string' && args.url) ? args.url : 'about:blank';
         await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -66,7 +90,7 @@ export async function handleCommand(cmd, args, ctx) {
       }
       const session = await startSession({
         profileId: requestedProfile,
-        headless: opts.mode === 'headless',
+        headless: requestedHeadless,
         ephemeral: ephemeralRequested,
       });
       const effectiveProfile = session.profileId || requestedProfile;
@@ -129,7 +153,7 @@ export async function handleCommand(cmd, args, ctx) {
     case 'snapshot': {
       const snapshot = await importOp('snapshot');
       const r = await snapshot({ profileId: profile });
-      return { ok: true, snapshot: true, url: r.url, htmlLength: r.htmlLength };
+      return { ok: true, snapshot: true, url: r.url, htmlLength: r.htmlLength, html: r.html };
     }
 
     case 'wait': {
@@ -159,7 +183,7 @@ export async function handleCommand(cmd, args, ctx) {
     case 'close-tab': {
       const closeTab = await importOp('closeTab');
       const r = await closeTab({ profileId: profile, tabId: args.tabId });
-      return { ok: true, closedTab: true };
+      return { ok: true, closed: r.closed === true };
     }
 
     case 'switch-tab': {
@@ -226,7 +250,7 @@ export async function handleCommand(cmd, args, ctx) {
     case 'list-tabs': {
       const listTabs = await importOp('listTabs');
       const r = await listTabs({ profileId: profile });
-      return { ok: true, tabs: r.tabs };
+      return { ok: true, count: r.count, tabs: r.tabs };
     }
 
     case 'new-tab': {

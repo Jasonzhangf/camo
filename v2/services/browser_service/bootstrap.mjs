@@ -270,13 +270,8 @@ export async function stopSession(profileId) {
 
     if (wasEphemeral) {
         const dir = ephemeralProfileDirFor(pid);
-        try {
-            if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
-        } catch (cause) {
-            console.warn(`stopSession: failed to remove ephemeral dir ${dir}:`, cause?.message || cause);
-        }
+        if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: false });
         _ephemeralProfiles.delete(pid);
-        try { deleteProfileMeta(pid); } catch {}
     }
 
     return { profileId: pid, stopped: true, ephemeral: wasEphemeral };
@@ -338,16 +333,11 @@ export function sweepStaleEphemeralProfiles() {
     const swept = [];
     for (const pid of _ephemeralProfiles.keys()) {
         const dir = ephemeralProfileDirFor(pid);
-        try {
-            if (fs.existsSync(dir)) {
-                fs.rmSync(dir, { recursive: true, force: true });
-                swept.push(pid);
-            }
-        } catch (cause) {
-            console.warn(`sweepStaleEphemeralProfiles: failed ${dir}:`, cause?.message || cause);
+        if (fs.existsSync(dir)) {
+            fs.rmSync(dir, { recursive: true, force: false });
+            swept.push(pid);
         }
         _ephemeralProfiles.delete(pid);
-        try { deleteProfileMeta(pid); } catch {}
     }
     return { swept };
 }
@@ -414,12 +404,12 @@ export async function shutdown() {
     ensureWritable();
     emit('browser_service.shutdown', {});
     await closeAll();
-    sweepStaleEphemeralProfiles();
     if (_lockHandles.size > 0) {
         const { release: releaseLock } = await import('../lock/manager.mjs');
         for (const profileId of [..._lockHandles.keys()]) releaseLock(profileId, { owner: lockOwner(), pid: process.pid });
         _lockHandles.clear();
     }
+    sweepStaleEphemeralProfiles();
 }
 
 export function describe() {

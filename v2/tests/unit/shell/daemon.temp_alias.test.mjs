@@ -31,6 +31,7 @@ import {
   __resetForTest as resetTabPool,
 } from '../../../services/page_runtime/tab_pool.mjs';
 import * as progressLog from '../../../services/progress_event/log.mjs';
+import { __enableTestRoot as enablePipeline } from '../../../services/page_runtime/input_pipeline.mjs';
 
 bootstrap.__enableTestRoot();
 enableBridgeTestRoot();
@@ -39,6 +40,7 @@ enableProfileRoot();
 enableLockRoot();
 enableTabPool();
 progressLog.__enableTestRoot();
+enablePipeline();
 
 const profileRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-temp-alias-'));
 const runsRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-temp-alias-runs-'));
@@ -64,7 +66,9 @@ function fakeCtx({ allocations }) {
   return {
     profile: 'temp',
     opts: { mode: 'persistent', daemonId: 'temp-alias-test' },
-    ensureBrowser: async () => {},
+    ensureBrowser: async (profileId) => {
+      assert.equal(profileId, allocations.get('temp') || 'temp');
+    },
     ephemeralAllocations: allocations,
   };
 }
@@ -72,9 +76,13 @@ function fakeCtx({ allocations }) {
 function stubBrowser(profileId) {
   return {
     profileId,
-    page: { goto: async () => {} },
+    page: {
+      goto: async () => {},
+      content: async () => '<html><body>temp</body></html>',
+      url: () => 'about:blank',
+    },
     browser: () => ({ close: async () => {} }),
-    context: { pages: () => [{ url: () => 'about:blank' }] },
+    context: { pages: () => [{ url: () => 'about:blank' }], close: async () => {} },
   };
 }
 
@@ -117,6 +125,30 @@ test('positive: stop on temp closes the allocated browser and clears the alias m
   const stopped = await handleCommand('stop', {}, ctx);
   assert.equal(stopped.profile, start.profile);
   assert.equal(allocations.has('temp'), false, 'alias must be cleared on stop');
+  assert.equal(fs.existsSync(path.join(profileRoot, start.profile)), false, 'temporary profile data must be deleted');
+});
+
+test('positive: browser command after temp start reuses the allocated profile', async () => {
+  const allocations = new Map();
+  const ctx = fakeCtx({ allocations });
+  const start = await handleCommand('start', {}, ctx);
+  await handleCommand('snapshot', {}, ctx);
+  assert.equal(allocations.get('temp'), start.profile);
+  assert.equal(launchCount, 1, 'snapshot must not launch a second temporary browser');
+});
+
+test('negative: browser command on unallocated temp surfaces not-found and never launches', async () => {
+  const allocations = new Map();
+  const ctx = fakeCtx({ allocations });
+  let err;
+  try {
+    await handleCommand('snapshot', {}, ctx);
+  } catch (cause) {
+    err = cause;
+  }
+  assert.ok(err, 'snapshot on unallocated temp must throw');
+  assert.equal(err.code, 'E_STATE_NOT_FOUND');
+  assert.equal(launchCount, 0, 'must not auto-create a temp browser for a page command');
 });
 
 test('negative: stop on temp without a prior allocation surfaces a typed error and never silently succeeds', async () => {
@@ -168,4 +200,17 @@ test('positive: named ephemeral alias resolves to its allocated profile for reus
   const stopped = await handleCommand('stop', {}, ctx);
   assert.equal(stopped.profile, first.profile);
   assert.equal(allocations.has('named-ephemeral'), false);
+});
+
+test('positive: daemon shutdown releases the lock before deleting temporary profile data', async () => {
+  const allocations = new Map();
+  const ctx = fakeCtx({ allocations });
+  const start = await handleCommand('start', {}, ctx);
+  const profileDir = path.join(profileRoot, start.profile);
+  assert.equal(fs.existsSync(profileDir), true);
+
+  await bootstrap.shutdown();
+
+  assert.equal(fs.existsSync(profileDir), false, 'shutdown must not recreate temporary profile residue');
+  assert.equal(fs.existsSync(path.join(profileDir, 'lock.json')), false, 'shutdown must release the temp profile lock');
 });

@@ -600,6 +600,59 @@
       "semantic_io": "serialized screenshot request to Camoufox page operation"
     },
     {
+      "feature_id": "cmd.snapshot.response",
+      "from": "commands.builtins",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/snapshot.mjs",
+        "symbol": "run",
+        "local_symbol": "snapshot.run"
+      },
+      "invocation": {
+        "kind": "registry_dispatch",
+        "registry_object": "BUILTINS",
+        "command_id": "snapshot",
+        "builtin_namespace": "snapshot",
+        "dispatch_local_symbol": "mod",
+        "method": "run"
+      },
+      "semantic_io": "registry-selected snapshot command to concrete builtin owner"
+    },
+    {
+      "feature_id": "cmd.snapshot.response",
+      "from": "commands.builtins",
+      "to": "transports.client",
+      "caller": {
+        "path": "v2/commands/builtins/snapshot.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/transports/client/api.mjs",
+        "symbol": "sendCommand",
+        "local_symbol": "sendCommand"
+      },
+      "semantic_io": "snapshot request to structured page HTML response"
+    },
+    {
+      "feature_id": "cmd.snapshot.project",
+      "from": "shell.daemon",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/shell/daemon/command_handlers.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "snapshot",
+        "local_symbol": "snapshot"
+      },
+      "semantic_io": "page HTML snapshot to daemon wire payload"
+    },
+    {
       "feature_id": "cmd.get_page_info.response",
       "from": "shell.cli",
       "to": "commands.builtins",

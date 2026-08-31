@@ -105,6 +105,37 @@ test('positive: goto builtin sends the right wire args', async () => {
   assert.equal(captured.profile, 'default');
 });
 
+test('positive: snapshot builtin preserves HTML payload from server', async () => {
+  enableWsTestRoot();
+  resetRoutes();
+  registerHandler('command', async () => ({
+    kind: 'result',
+    payload: {
+      ok: true,
+      snapshot: true,
+      url: 'https://example.com/',
+      htmlLength: 42,
+      html: '<html><body>Example</body></html>',
+    },
+  }));
+  const transport = {
+    async sendFrame(env) {
+      let out;
+      const { handleFrame } = await import('../../../transports/ws/server.mjs');
+      await handleFrame({
+        text: JSON.stringify(env),
+        send: (e) => { out = e; },
+      });
+      return out;
+    },
+  };
+  const parsed = parseFlags(['--profile', 'p1', '--format', 'json'], { cmd: 'snapshot' });
+  const out = await runBuiltin('snapshot', transport, parsed, {});
+  assert.equal(out.data.html, '<html><body>Example</body></html>');
+  assert.equal(out.data.htmlLength, 42);
+  assert.equal(out.data.url, 'https://example.com/');
+});
+
 test('negative: stop builtin propagates E_STATE_NOT_FOUND from server', async () => {
   enableWsTestRoot();
   resetRoutes();

@@ -40,7 +40,11 @@ export async function run(transport, parsed = {}, ctx = {}) {
     cmd: 'snapshot',
     profile,
     format,
-    data: reply.payload?.data ?? {},
+    data: {
+      url: reply.payload?.url ?? null,
+      htmlLength: reply.payload?.htmlLength ?? 0,
+      html: reply.payload?.html ?? '',
+    },
     issuedAt: new Date().toISOString(),
     traceId: ctx.traceId || null,
   };

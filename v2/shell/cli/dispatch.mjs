@@ -75,6 +75,16 @@ export async function dispatch(argv, opts = {}) {
     });
   }
 
+  // Validation-only pass: resolve help/usage and surface input errors without
+  // requiring a transport or touching daemon state. Real execution still goes
+  // through the full transport path below.
+  if (opts.validateOnly) {
+    if (parsed.help) {
+      return { kind: 'help', cmd, usage: readDocstring(cmd) };
+    }
+    return { kind: 'validated', cmd };
+  }
+
   // Transport required for actual command execution.
   if (!opts.transport && !opts.processOnly) {
     if (!opts.transport && !opts.processOnly && !STANDALONE_CMDS.has(cmd)) throw new CamoError({ code: 'E_STATE_NO_TRANSPORT', details: { reason: 'dispatch requires opts.transport; no fallback' } });

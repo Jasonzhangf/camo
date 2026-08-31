@@ -1,4 +1,4 @@
-# camo CLI Usage (camo 0.4.2)
+# camo CLI Usage (camo 0.4.3)
 
 ## 0. Enforcement
 
@@ -20,25 +20,25 @@ Do not use v1 leftovers (`init`, `profile create`, `sessions`, `status`,
 ## 1. Quick Start
 
 ```bash
-# 1) Start the shared daemon (persistent default profile)
-camo daemon start --profile default
+# 1) Start the shared daemon (persistent default profile is implicit)
+camo daemon start
 
 # 2) Start a browser session
-camo start --profile default --url https://example.com
+camo start --url https://example.com
 
 # 3) Inspect the page
-camo get-page-info --profile default
-camo snapshot --profile default
+camo get-page-info
+camo snapshot
 
 # 4) Stop the session, then the daemon
-camo stop --profile default
+camo stop
 camo daemon stop
 ```
 
 ## 2. Command Map
 
 All `--profile` flags are `--profile <id>`; there are no positional profile
-arguments in 0.4.2.
+arguments in 0.4.3.
 
 ### Daemon and session lifecycle
 
@@ -51,8 +51,12 @@ camo stop  [--profile <id>]
 ```
 
 Profile resolution: explicit `--profile` > `CAMO_PROFILE` > `default`.
-Ephemeral requires an explicit `--ephemeral` on the daemon command;
-`camo start` without `--profile` uses persistent `default`.
+`camo start` without `--profile` uses persistent `default` implicitly as an
+implicit parameter. `default` currently holds persisted Weibo (微博) and
+Xiaohongshu / XHS (小红书) login cookies; it may also hold OpenCode / Google
+cookies. Cookies alone are not a live login guarantee: verify the target page
+state (`camo get-page-info`) before relying on the Weibo or Xiaohongshu session.
+Do not create a parallel profile for a platform `default` already covers.
 
 ### Navigation / page state
 
@@ -106,32 +110,38 @@ camo search <platform> <query> [--profile <id>] [--max-results <n>] [--cookies <
 ### A) Headless page verification
 
 ```bash
-camo daemon start --profile default
-camo start --profile default --headless --url https://example.com
-camo get-page-info --profile default
-camo screenshot --profile default --path /tmp/example.png
-camo stop --profile default
+camo daemon start
+camo start --headless --url https://example.com
+camo get-page-info
+camo screenshot --path /tmp/example.png
+camo stop
 camo daemon stop
 ```
 
 ### B) Search bootstrap (in-process search command)
 
 ```bash
-camo daemon start --profile default
-camo search xhs "咖啡探店" --profile default --max-results 20
-camo stop --profile default
+camo daemon start
+camo search xhs "咖啡探店" --max-results 20
+camo stop
 camo daemon stop
 ```
 
-### C) Isolated multi-command check (ephemeral daemon)
+### C) Isolated multi-command check (temporary profile)
 
 ```bash
-camo daemon start --profile skill-check --ephemeral
-camo start --profile skill-check --url https://example.com
-camo get-page-info --profile skill-check
-camo stop --profile skill-check
+camo daemon start
+camo start --profile temp --url https://example.com
+# Save the returned profile, for example: _temp_12345_1735689600000
+camo get-page-info --profile <returned-temp-id>
+camo snapshot --profile <returned-temp-id>
+camo stop --profile temp
+test ! -e "$HOME/.camo/profiles/<returned-temp-id>"
 camo daemon stop
 ```
+
+Documented at `SKILL.md`: temp profiles are disposable and Camo owns cleanup.
+Never accept a stop that leaves a `_temp_*` directory behind.
 
 ### D) Failure evidence
 

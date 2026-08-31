@@ -61,11 +61,17 @@ async function checkCamoufoxHealth() {
 
   const homedir = os.homedir();
   const isWin = os.platform() === 'win32';
-  const cacheDir = isWin 
-    ? path.join(homedir, 'AppData', 'Local', 'camoufox')
-    : os.platform() === 'darwin'
-      ? path.join(homedir, 'Library', 'Caches', 'camoufox')
-      : path.join(homedir, '.cache', 'camoufox');
+  const executableEnv = String(process.env.CAMO_EXECUTABLE_PATH || '').trim();
+  // CAMO_EXECUTABLE_PATH points at <cache>/Camoufox.app/Contents/MacOS/camoufox;
+  // derive the cache root from it so isolated HOMEs still resolve the real
+  // installed binary instead of triggering a download.
+  const cacheDir = executableEnv
+    ? path.resolve(path.dirname(executableEnv), '..', '..', '..')
+    : isWin
+      ? path.join(homedir, 'AppData', 'Local', 'camoufox')
+      : os.platform() === 'darwin'
+        ? path.join(homedir, 'Library', 'Caches', 'camoufox')
+        : path.join(homedir, '.cache', 'camoufox');
   
   const resourcesProps = path.join(cacheDir, 'Camoufox.app', 'Contents', 'Resources', 'properties.json');
   const macosProps = path.join(cacheDir, 'Camoufox.app', 'Contents', 'MacOS', 'properties.json');

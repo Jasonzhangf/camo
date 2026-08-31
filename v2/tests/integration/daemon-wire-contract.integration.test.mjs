@@ -27,6 +27,66 @@ function daemonContext(profile) {
   };
 }
 
+test('tab command projections preserve count and closed truth', async () => {
+  enablePipeline();
+  enableBridge();
+  const profile = 'tabs_wire_contract';
+  const closedPages = [];
+  const pages = [
+    { url: () => 'https://example.com/', title: async () => 'Example', close: async () => closedPages.push('https://example.com/') },
+    { url: () => 'about:newtab', title: async () => '' },
+    { url: () => 'https://news.ycombinator.com/', title: async () => 'Hacker News', close: async () => closedPages.push('https://news.ycombinator.com/') },
+  ];
+  __setBrowserForTest(profile, {
+    context: {
+      pages: () => pages,
+    },
+  });
+
+  const listed = await handleCommand('list-tabs', { profile }, daemonContext(profile));
+  assert.equal(listed.ok, true);
+  assert.equal(listed.count, 2);
+  assert.deepEqual(listed.tabs.map((tab) => tab.url), [
+    'https://example.com/',
+    'https://news.ycombinator.com/',
+  ]);
+
+  const closed = await handleCommand('close-tab', { profile, tabId: 1 }, daemonContext(profile));
+  assert.equal(closed.ok, true);
+  assert.equal(closed.closed, true);
+  assert.deepEqual(closedPages, ['https://news.ycombinator.com/']);
+});
+
+test('switch-tab resolves the same visible tab ids as list-tabs', async () => {
+  enablePipeline();
+  enableBridge();
+  const profile = 'switch_tabs_wire_contract';
+  const fronted = [];
+  const pages = [
+    {
+      url: () => 'https://example.com/',
+      title: async () => 'Example',
+      bringToFront: async () => fronted.push('https://example.com/'),
+    },
+    { url: () => 'about:newtab', title: async () => '' },
+    {
+      url: () => 'https://news.ycombinator.com/',
+      title: async () => 'Hacker News',
+      bringToFront: async () => fronted.push('https://news.ycombinator.com/'),
+    },
+  ];
+  __setBrowserForTest(profile, {
+    context: { pages: () => pages },
+  });
+
+  const switched = await handleCommand('switch-tab', { profile, tabId: 1 }, daemonContext(profile));
+  assert.equal(switched.ok, true);
+  assert.equal(switched.switched, true);
+  assert.equal(switched.tabId, 1);
+  assert.equal(switched.url, 'https://news.ycombinator.com/');
+  assert.deepEqual(fronted, ['https://news.ycombinator.com/']);
+});
+
 test('scroll preserves CLI dx/dy through daemon to protocol wheel', async () => {
   enablePipeline();
   enableBridge();
@@ -64,6 +124,24 @@ test('type projects typedChars from runtime and rejects missing response truth',
     () => runType(malformedTransport, { profile, positional: ['Jason'], named: {} }),
     (cause) => cause?.code === 'E_PROTO_BAD_ENVELOPE',
   );
+});
+
+test('snapshot projects the full HTML payload through the daemon wire', async () => {
+  enablePipeline();
+  enableBridge();
+  const profile = 'snapshot_wire_contract';
+  __setBrowserForTest(profile, {
+    page: {
+      url: () => 'https://example.com/',
+      content: async () => '<html><body>Example</body></html>',
+    },
+  });
+  const result = await handleCommand('snapshot', { profile }, daemonContext(profile));
+  assert.equal(result.ok, true);
+  assert.equal(result.snapshot, true);
+  assert.equal(result.url, 'https://example.com/');
+  assert.equal(result.htmlLength, 33);
+  assert.equal(result.html, '<html><body>Example</body></html>');
 });
 
 test('hover belongs to the canonical ephemeral browser command set', () => {

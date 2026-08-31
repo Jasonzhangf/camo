@@ -8,6 +8,8 @@ import { CamoError } from '../../contracts/error_envelope/projector.mjs';
 export const DAEMON_LOOPBACK_HOST = '127.0.0.1';
 
 function daemonDir() {
+  const portableRoot = String(process.env.CAMO_PORTABLE_ROOT || process.env.CAMO_ROOT || '').trim();
+  if (portableRoot) return path.join(portableRoot, '.camo', 'daemon');
   return path.join(os.homedir(), '.camo', 'daemon');
 }
 
@@ -324,7 +326,16 @@ export function listRegistrations({ includeStale = false } = {}) {
   if (!fs.existsSync(file)) return [];
   const claim = readClaim(file);
   if (claim.state !== 'active') return [];
-  const registration = activeRegistration(claim, file);
+  let registration;
+  try {
+    registration = activeRegistration(claim, file);
+  } catch (cause) {
+    // A claim that no longer matches the active shared-daemon schema (for
+    // example written by an older camo version without the loopback host) is
+    // not usable by this CLI. Treat it as "no active daemon" instead of making
+    // every command crash with E_CONFIG_INVALID before argument validation.
+    return [];
+  }
   return includeStale || claimOwnerIsCurrent(registration) ? [registration] : [];
 }
 

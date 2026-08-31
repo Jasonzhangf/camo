@@ -52,6 +52,7 @@ export async function run(_transport, parsed = {}, _ctx = {}) {
       }
       const args = ['--profile', profile];
       if (parsed.named?.ephemeral === true) args.push('--ephemeral');
+      if (parsed.named?.headless === true) args.push('--headless');
       const child = spawnDaemonProcess({
         scriptPath: DAEMON_SCRIPT,
         args,

@@ -70,6 +70,40 @@ test('positive: present Camoufox install reports installation readiness and neve
   } finally { teardown(); }
 });
 
+test('positive: CAMO_EXECUTABLE_PATH resolves the installed binary under an isolated HOME', async () => {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-health-exe-'));
+  const propsDir = path.join(tmpRoot, 'Camoufox.app', 'Contents', 'Resources');
+  const macosDir = path.join(tmpRoot, 'Camoufox.app', 'Contents', 'MacOS');
+  fs.mkdirSync(propsDir, { recursive: true });
+  fs.mkdirSync(macosDir, { recursive: true });
+  fs.writeFileSync(path.join(propsDir, 'properties.json'), '{"fake":true}', 'utf8');
+  fs.writeFileSync(path.join(tmpRoot, 'version.json'), JSON.stringify({
+    version: '152.0.4',
+    release: 'beta.29',
+  }), 'utf8');
+  const exePath = path.join(macosDir, 'camoufox');
+  fs.writeFileSync(exePath, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+
+  const previousHome = process.env.HOME;
+  const previousExe = process.env.CAMO_EXECUTABLE_PATH;
+  const isolatedHome = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-health-empty-home-'));
+  process.env.HOME = isolatedHome;
+  process.env.CAMO_EXECUTABLE_PATH = exePath;
+  try {
+    const mod = await loadFresh();
+    const out = await mod.checkCamoufoxHealth();
+    assert.equal(out.ok, true);
+    assert.equal(out.installPath, path.join(propsDir, 'properties.json'));
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    if (previousExe === undefined) delete process.env.CAMO_EXECUTABLE_PATH;
+    else process.env.CAMO_EXECUTABLE_PATH = previousExe;
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+    fs.rmSync(isolatedHome, { recursive: true, force: true });
+  }
+});
+
 test('negative: Camoufox beta.28 is rejected because it can deadlock mouse acknowledgements', async () => {
   const { teardown } = withFakeInstall(true, {
     version: '152.0.4',

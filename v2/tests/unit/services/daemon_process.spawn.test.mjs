@@ -16,6 +16,12 @@ test('positive: both CLI daemon starters delegate to the shared process owner', 
   }
 });
 
+test('positive: daemon builtin forwards --headless to the daemon process', () => {
+  const source = fs.readFileSync(callerUrls[0], 'utf8');
+  assert.match(source, /parsed\.named\?\.headless\s*===\s*true/);
+  assert.match(source, /args\.push\('--headless'\)/);
+});
+
 test('positive: detached daemon stdio cannot retain parent-owned pipes', async () => {
   const { spawnDaemonProcess } = await import('../../../services/daemon_process/spawn.mjs');
   const calls = [];

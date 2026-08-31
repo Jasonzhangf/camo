@@ -118,6 +118,32 @@ async function main(argv) {
      'fetch-page', 'snapshot', 'scroll-and-collect', 'get-readable', 'get-text',
      'new-tab', 'close-tab', 'list-tabs', 'set-viewport', 'set-user-agent', 'multi-open', 'start'].includes(args[0])
   );
+
+  // Surface input errors before any daemon discovery / health work. Browser
+  // commands must validate required args first so `camo goto` (no url) returns
+  // E_INPUT_MISSING_FIELD (exit 2) regardless of daemon or Camoufox state.
+  if (!hasHelpFlag && args.length > 0 && !NO_TRANSPORT_CMDS.has(args[0]) && !PROCESS_ONLY_CMDS.has(args[0])) {
+    try {
+      const preflight = await dispatch(args, { transport: null, config, validateOnly: true });
+      if (preflight.kind === 'help') {
+        process.stdout.write((preflight.usage || usage()) + '\n');
+        return 0;
+      }
+      if (preflight.kind === 'usage') {
+        process.stdout.write((preflight.usage || usage()) + '\n');
+        return 2;
+      }
+    } catch (cause) {
+      if (isCamoError(cause)) {
+        const wire = toWire(cause);
+        process.stderr.write('camo: [' + wire.code + '] ' + wire.message + '\n');
+        if (wire.details) process.stderr.write('  details: ' + JSON.stringify(wire.details) + '\n');
+        return 2;
+      }
+      process.stderr.write('camo: internal error: ' + (cause && cause.message || String(cause)) + '\n');
+      return 3;
+    }
+  }
   
   if (isBrowserCmd) {
     const health = await checkCamoufoxHealth();

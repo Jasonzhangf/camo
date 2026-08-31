@@ -114,3 +114,18 @@ test('positive: idle sweep skips profiles with in-flight commands', async () => 
   assert.deepEqual(result.stopped, ['inflight-a']);
   assert.deepEqual(bootstrap.listSessions(), ['inflight-b']);
 });
+
+test('positive: start --headless launches a headless session', async () => {
+  await handleCommand('start', { headless: true }, makeCtx('headless-ok'));
+  const session = await bootstrap.getSession('headless-ok');
+  assert.equal(session.headless, true);
+});
+
+test('negative: start --headless on an existing headful session fails explicitly', async () => {
+  await handleCommand('start', {}, makeCtx('headless-mismatch'));
+  await assert.rejects(
+    handleCommand('start', { headless: true }, makeCtx('headless-mismatch')),
+    (error) => error.code === 'E_STATE_INVALID'
+      && /already running with headless=false/.test(error.details?.reason),
+  );
+});
