@@ -1,8 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   getProcessIdentity,
   isProcessAlive,
+  parseRegistration,
 } from '../../../services/daemon_registration/registry.mjs';
 
 function withProcessKill(replacement, run) {
@@ -68,4 +72,55 @@ test('positive: process identity probe preserves the configured C locale', (t) =
     if (original === undefined) delete process.env.LANG;
     else process.env.LANG = original;
   }
+});
+
+function writeRegistration(overrides = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-daemon-registration-'));
+  const file = path.join(dir, 'registration.json');
+  fs.writeFileSync(file, JSON.stringify({
+    state: 'active',
+    pid: process.pid,
+    processIdentity: getProcessIdentity(process.pid),
+    token: 'daemon-registration-test',
+    claimedAt: '2026-08-31T00:00:00.000Z',
+    daemonId: 'daemon-registration-test',
+    host: '127.0.0.1',
+    wsPort: 49151,
+    httpPort: 49152,
+    scope: 'shared',
+    headless: false,
+    mode: 'persistent',
+    startedAt: '2026-08-31T00:00:00.000Z',
+    ...overrides,
+  }));
+  return { dir, file };
+}
+
+test('positive: active daemon registration publishes the exact loopback host', (t) => {
+  const registration = writeRegistration();
+  t.after(() => fs.rmSync(registration.dir, { recursive: true, force: true }));
+
+  assert.equal(parseRegistration(registration.file).host, '127.0.0.1');
+});
+
+test('negative: active daemon registration rejects an implicit endpoint host', (t) => {
+  const registration = writeRegistration({ host: undefined });
+  t.after(() => fs.rmSync(registration.dir, { recursive: true, force: true }));
+
+  assert.throws(
+    () => parseRegistration(registration.file),
+    (error) => error.code === 'E_CONFIG_INVALID'
+      && error.details.resource === 'daemon_registration',
+  );
+});
+
+test('negative: active daemon registration rejects a DNS alias endpoint', (t) => {
+  const registration = writeRegistration({ host: 'localhost' });
+  t.after(() => fs.rmSync(registration.dir, { recursive: true, force: true }));
+
+  assert.throws(
+    () => parseRegistration(registration.file),
+    (error) => error.code === 'E_CONFIG_INVALID'
+      && error.details.resource === 'daemon_registration',
+  );
 });

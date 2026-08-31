@@ -14,7 +14,7 @@
         "symbol": "findActiveDaemon",
         "local_symbol": "findActiveDaemon"
       },
-      "semantic_io": "active shared endpoint or null"
+      "semantic_io": "active shared exact-loopback host and ports or null"
     },
     {
       "feature_id": "daemon.registration.read",
@@ -29,7 +29,7 @@
         "symbol": "findActiveDaemon",
         "local_symbol": "findActiveDaemon"
       },
-      "semantic_io": "process command to active shared daemon endpoint"
+      "semantic_io": "process command to active shared exact-loopback daemon endpoint"
     },
     {
       "feature_id": "daemon.registration.read",
@@ -104,7 +104,7 @@
         "symbol": "registerDaemon",
         "local_symbol": "registerDaemon"
       },
-      "semantic_io": "listening ports to shared registration"
+      "semantic_io": "exact loopback host and listening ports to shared registration"
     },
     {
       "feature_id": "daemon.registration.write",
