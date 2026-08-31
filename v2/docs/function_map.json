@@ -160,6 +160,10 @@
         {
           "path": "v2/services/browser_service/internal/camoufox_bridge.mjs",
           "symbol": "closeBrowser"
+        },
+        {
+          "path": "v2/services/browser_service/internal/camoufox_bridge.mjs",
+          "symbol": "relaunchBrowser"
         }
       ]
     },
@@ -488,6 +492,25 @@
         {
           "path": "v2/commands/builtins/setViewport.mjs",
           "symbol": "run"
+        }
+      ]
+    },
+    {
+      "id": "cmd.set_user_agent.project",
+      "status": "active",
+      "owner_module": "shell.daemon",
+      "entry_symbols": [
+        {
+          "path": "v2/shell/daemon/command_handlers.mjs",
+          "symbol": "handleCommand"
+        },
+        {
+          "path": "v2/commands/builtins/setUserAgent.mjs",
+          "symbol": "run"
+        },
+        {
+          "path": "v2/services/browser_service/bootstrap.mjs",
+          "symbol": "setSessionUserAgent"
         }
       ]
     },

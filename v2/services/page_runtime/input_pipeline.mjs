@@ -9,7 +9,7 @@
 //   - operations/navigation_ops.mjs: goto, newTab, closeTab, listTabs
 //   - operations/interaction_ops.mjs: click, hover, type, scroll, upload, select
 //   - operations/query_ops.mjs: screenshot, snapshot, getText, getPageInfo, findElements, getReadable
-//   - operations/config_ops.mjs: getCookies, setCookies, setUserAgent, setViewport
+//   - operations/config_ops.mjs: getCookies, setCookies, setViewport
 //   - operations/wait_ops.mjs: wait, waitForDomStable
 //   - operations/advanced_ops.mjs: evaluate, scrollAndCollect, fetch
 //
@@ -58,7 +58,6 @@ export const switchTab = wrapOperation('switchTab', pageOps.switchTab);
 export const multiOpen = wrapOperation('multiOpen', pageOps.multiOpen);
 export const getCookies = wrapOperation('getCookies', pageOps.getCookies);
 export const setCookies = wrapOperation('setCookies', pageOps.setCookies);
-export const setUserAgent = wrapOperation('setUserAgent', pageOps.setUserAgent);
 export const setViewport = wrapOperation('setViewport', pageOps.setViewport);
 export const waitForDomStable = wrapOperation('waitForDomStable', pageOps.waitForDomStable);
 export const scrollAndCollect = wrapOperation('scrollAndCollect', pageOps.scrollAndCollect);

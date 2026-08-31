@@ -14,5 +14,8 @@ export async function run(transport, parsed = {}, ctx = {}) {
   const userAgent = parsed.named?.ua ?? null;
   if (!userAgent || typeof userAgent !== 'string') throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'ua' } });
   const reply = await sendCommand(transport, { cmd: 'set-user-agent', args: { profile, userAgent } });
-  return { cmd: 'set-user-agent', profile, userAgent, set: reply.payload?.set === true, issuedAt: new Date().toISOString(), traceId: ctx.traceId || null };
+  if (reply.payload?.set !== true || reply.payload?.userAgent !== userAgent) {
+    throw new CamoError({ code: 'E_PROTO_BAD_ENVELOPE', details: { cmd, expected: { set: true, userAgent }, actual: reply.payload || null } });
+  }
+  return { cmd: 'set-user-agent', profile, userAgent, set: true, issuedAt: new Date().toISOString(), traceId: ctx.traceId || null };
 }

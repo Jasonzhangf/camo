@@ -254,9 +254,14 @@ export async function handleCommand(cmd, args, ctx) {
     }
 
     case 'set-user-agent': {
-      const setUserAgent = await importOp('setUserAgent');
-      const r = await setUserAgent({ profileId: profile, userAgent: args.userAgent });
-      return { ok: true, userAgentSet: true };
+      const { run: runSerialized } = await import('../../services/page_runtime/input_pipeline.mjs');
+      const { setSessionUserAgent } = await import('../../services/browser_service/bootstrap.mjs');
+      const r = await runSerialized(
+        profile,
+        { kind: 'setuseragent', params: { userAgent: args.userAgent } },
+        () => setSessionUserAgent({ profileId: profile, userAgent: args.userAgent }),
+      );
+      return { ok: true, set: r.set === true, userAgent: r.userAgent };
     }
 
     case 'set-viewport': {

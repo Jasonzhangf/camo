@@ -1,6 +1,6 @@
 // Configuration operations. truth_owner: page_runtime.
 //
-// Config: getCookies, setCookies, setUserAgent, setViewport.
+// Config: getCookies, setCookies, setViewport.
 
 import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
 import { safeId, getPageOrThrow, emit } from './_page_helpers.mjs';
@@ -56,32 +56,6 @@ export async function setCookies({ profileId, cookies }) {
   } catch (cause) {
     emit(pid, 'setCookies.error', { error: cause?.message });
     throw new CamoError({ code: 'E_BROWSER_SETCOOKIES_FAILED', details: { profileId: pid, reason: cause?.message }, cause });
-  }
-}
-
-/**
- * Set user agent for the current context.
- * @param {Object} opts
- * @param {string} opts.profileId
- * @param {string} opts.userAgent - User agent string
- * @returns {Object} set user agent result
- */
-export async function setUserAgent({ profileId, userAgent }) {
-  const pid = safeId(profileId, 'profileId');
-  const bridge = await getBridge();
-  const record = bridge.getBrowser(pid);
-  if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
-  if (!userAgent || typeof userAgent !== 'string') throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'userAgent' } });
-  emit(pid, 'setUserAgent.start', { userAgent: userAgent.slice(0, 80) });
-  try {
-    await record.context.setExtraHTTPHeaders({ 'User-Agent': userAgent });
-    await record.page.setUserAgent(userAgent);
-    const result = { profileId: pid, userAgent, set: true };
-    emit(pid, 'setUserAgent.done', {});
-    return result;
-  } catch (cause) {
-    emit(pid, 'setUserAgent.error', { error: cause?.message });
-    throw new CamoError({ code: 'E_BROWSER_SETUSERAGENT_FAILED', details: { profileId: pid, reason: cause?.message }, cause });
   }
 }
 

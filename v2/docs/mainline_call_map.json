@@ -1015,6 +1015,51 @@
       "semantic_io": "serialized dimensions to protocol viewport update and exact success truth"
     },
     {
+      "feature_id": "cmd.set_user_agent.project",
+      "from": "shell.daemon",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/shell/daemon/command_handlers.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "run",
+        "local_symbol": "runSerialized"
+      },
+      "semantic_io": "requested UA to one serialized profile transition"
+    },
+    {
+      "feature_id": "cmd.set_user_agent.project",
+      "from": "shell.daemon",
+      "to": "services.browser_service",
+      "caller": {
+        "path": "v2/shell/daemon/command_handlers.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "setSessionUserAgent",
+        "local_symbol": "setSessionUserAgent"
+      },
+      "semantic_io": "serialized UA transition request to session lifecycle owner"
+    },
+    {
+      "feature_id": "cmd.set_user_agent.project",
+      "from": "services.browser_service",
+      "to": "services.browser_service.internal",
+      "caller": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "setSessionUserAgent"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/internal/camoufox_bridge.mjs",
+        "symbol": "relaunchBrowser",
+        "local_symbol": "relaunchBrowserOwner"
+      },
+      "semantic_io": "same persistent profile to context-created UA with URL and viewport restoration"
+    },
+    {
       "feature_id": "cmd.scroll.request",
       "from": "shell.cli",
       "to": "commands.builtins",

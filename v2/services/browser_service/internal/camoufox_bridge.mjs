@@ -16,6 +16,9 @@ import { resolveProfileDir } from './storage-paths.mjs';
 
 const _records = new Map();  // profileId -> { context, browser, page, fingerprint, createdAt }
 let _enabled = false;
+let launchEngineContextOwner = launchEngineContext;
+let loadOrGenerateFingerprintOwner = loadOrGenerateFingerprint;
+let applyFingerprintOwner = applyFingerprint;
 
 export function __enableTestRoot() { _enabled = true; }
 
@@ -48,7 +51,7 @@ export async function launchBrowser(profileId, opts = {}) {
     const headless = opts.headless ?? false;
 
     // Load/generate fingerprint
-    const fingerprint = await loadOrGenerateFingerprint(pid, {
+    const fingerprint = await loadOrGenerateFingerprintOwner(pid, {
         platform: opts.fingerprintPlatform || null,
     });
 
@@ -60,17 +63,20 @@ export async function launchBrowser(profileId, opts = {}) {
         ? { width: Math.floor(Number(opts.viewport.width)), height: Math.floor(Number(opts.viewport.height)) }
         : null;
     const viewport = explicitViewport || fingerprint?.viewport || fallbackViewport;
+    const effectiveFingerprint = opts.userAgent
+        ? { ...fingerprint, userAgent: opts.userAgent }
+        : fingerprint;
 
     let context;
     try {
-        context = await launchEngineContext({
+        context = await launchEngineContextOwner({
             engine: 'camoufox',
             headless,
             profileDir: profileDir(pid),
             viewport,
-            userAgent: fingerprint?.userAgent,
-            locale: fingerprint?.language || 'zh-CN',
-            timezoneId: fingerprint?.timezoneId || 'Asia/Shanghai',
+            userAgent: effectiveFingerprint?.userAgent,
+            locale: effectiveFingerprint?.language || 'zh-CN',
+            timezoneId: effectiveFingerprint?.timezoneId || 'Asia/Shanghai',
         });    } catch (cause) {
         throw new CamoError({
             code: 'E_BROWSER_LAUNCH_FAILED',
@@ -80,7 +86,7 @@ export async function launchBrowser(profileId, opts = {}) {
     }
 
     // Apply fingerprint JS overrides
-    await applyFingerprint(context, fingerprint);
+    await applyFingerprintOwner(context, effectiveFingerprint);
 
     // Get or create page
     const existing = context.pages();
@@ -92,7 +98,7 @@ export async function launchBrowser(profileId, opts = {}) {
         context,
         browser,
         page,
-        fingerprint,
+        fingerprint: effectiveFingerprint,
         createdAt: new Date().toISOString(),
         profileId: pid,
         headless,
@@ -100,6 +106,68 @@ export async function launchBrowser(profileId, opts = {}) {
 
     _records.set(pid, record);
     return record;
+}
+
+/**
+ * Reopen one persistent profile with a session-local user-agent override.
+ * The profile directory is reused so its cookies remain persistent.
+ */
+export async function relaunchBrowser(profileId, opts = {}) {
+    ensureWritable();
+    const pid = String(profileId || '').trim();
+    if (!pid) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'profileId' } });
+    if (!opts.userAgent || typeof opts.userAgent !== 'string') {
+        throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'userAgent' } });
+    }
+
+    const current = _records.get(pid);
+    if (!current) {
+        throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
+    }
+    const currentUrl = typeof current.page?.url === 'function' ? current.page.url() : 'about:blank';
+    const currentViewport = typeof current.page?.viewportSize === 'function'
+        ? current.page.viewportSize()
+        : null;
+    const headless = current.headless === true;
+
+    try {
+        await current.context.close();
+    } catch (cause) {
+        _records.delete(pid);
+        throw new CamoError({
+            code: 'E_BROWSER_RELAUNCH_FAILED',
+            details: { profileId: pid, phase: 'close', reason: cause?.message || String(cause) },
+            cause,
+        });
+    }
+    _records.delete(pid);
+
+    try {
+        const next = await launchBrowser(pid, {
+            ...opts,
+            headless,
+            viewport: currentViewport || opts.viewport,
+        });
+        if (currentViewport && typeof next.page?.setViewportSize === 'function') {
+            await next.page.setViewportSize(currentViewport);
+        }
+        if (currentUrl && currentUrl !== 'about:blank' && typeof next.page?.goto === 'function') {
+            await next.page.goto(currentUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        }
+        return { ...next, restoredUrl: currentUrl, restoredViewport: currentViewport };
+    } catch (cause) {
+        const active = _records.get(pid);
+        if (active) {
+            try { await active.context.close(); } catch {}
+            _records.delete(pid);
+        }
+        if (cause?.code === 'E_BROWSER_RELAUNCH_FAILED') throw cause;
+        throw new CamoError({
+            code: 'E_BROWSER_RELAUNCH_FAILED',
+            details: { profileId: pid, phase: 'launch-or-restore', reason: cause?.message || String(cause) },
+            cause,
+        });
+    }
 }
 
 /**
@@ -212,4 +280,14 @@ export async function closeAll() {
 export function __resetForTest() {
     if (!_enabled) throw new CamoError({ code: 'E_INTERNAL_UNEXPECTED', details: { op: '__resetForTest' } });
     _records.clear();
+    launchEngineContextOwner = launchEngineContext;
+    loadOrGenerateFingerprintOwner = loadOrGenerateFingerprint;
+    applyFingerprintOwner = applyFingerprint;
+}
+
+export function __setLaunchOwnersForTest({ launch, loadFingerprint, apply } = {}) {
+    if (!_enabled) throw new CamoError({ code: 'E_INTERNAL_UNEXPECTED', details: { op: '__setLaunchOwnersForTest' } });
+    launchEngineContextOwner = launch || launchEngineContext;
+    loadOrGenerateFingerprintOwner = loadFingerprint || loadOrGenerateFingerprint;
+    applyFingerprintOwner = apply || applyFingerprint;
 }

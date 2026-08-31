@@ -60,12 +60,14 @@
       "write_paths": [
         "v2/services/browser_service/internal/camoufox_bridge.mjs::launchBrowser",
         "v2/services/browser_service/internal/camoufox_bridge.mjs::closeBrowser",
-        "v2/services/browser_service/internal/camoufox_bridge.mjs::closeAll"
+        "v2/services/browser_service/internal/camoufox_bridge.mjs::closeAll",
+        "v2/services/browser_service/internal/camoufox_bridge.mjs::relaunchBrowser"
       ],
       "indirect_paths": [
         "v2/services/browser_service/bootstrap.mjs::startSession->launchBrowser",
         "v2/services/browser_service/bootstrap.mjs::startSession->closeBrowser",
         "v2/services/browser_service/bootstrap.mjs::stopSession->closeBrowser",
+        "v2/services/browser_service/bootstrap.mjs::setSessionUserAgent->relaunchBrowser",
         "v2/services/browser_service/internal/engine-manager.mjs::launchEngineContext",
         "v2/services/browser_service/internal/fingerprint.mjs::loadOrGenerateFingerprint"
       ],
@@ -204,7 +206,8 @@
       ],
       "indirect_paths": [
         "v2/services/browser_service/bootstrap.mjs::touchSession->touch",
-        "v2/services/browser_service/bootstrap.mjs::sweepIdleSessions->stopSession"
+        "v2/services/browser_service/bootstrap.mjs::sweepIdleSessions->stopSession",
+        "v2/services/browser_service/bootstrap.mjs::setSessionUserAgent->deleteSession"
       ],
       "forbidden_paths": [
         "v2/lifecycle/session_registry.mjs::write",
@@ -233,7 +236,8 @@
       "indirect_paths": [
         "v2/services/browser_service/bootstrap.mjs::startSession->acquire",
         "v2/services/browser_service/bootstrap.mjs::stopSession->release",
-        "v2/services/browser_service/bootstrap.mjs::shutdown->release"
+        "v2/services/browser_service/bootstrap.mjs::shutdown->release",
+        "v2/services/browser_service/bootstrap.mjs::setSessionUserAgent->release"
       ],
       "forbidden_paths": [
         "v2/lifecycle/lock.mjs::write",
@@ -321,6 +325,7 @@
       "truth_store": "memory_per_session",
       "read_paths": [
         "v2/services/page_runtime/input_pipeline.mjs::status",
+        "v2/services/page_runtime/input_pipeline.mjs::run",
         "v2/services/page_runtime/input_pipeline.mjs::goto",
         "v2/services/page_runtime/input_pipeline.mjs::click",
         "v2/services/page_runtime/input_pipeline.mjs::hover",
@@ -334,6 +339,7 @@
         "v2/services/page_runtime/input_pipeline.mjs::select"
       ],
       "write_paths": [
+        "v2/services/page_runtime/input_pipeline.mjs::run",
         "v2/services/page_runtime/input_pipeline.mjs::goto",
         "v2/services/page_runtime/input_pipeline.mjs::click",
         "v2/services/page_runtime/input_pipeline.mjs::hover",
@@ -350,6 +356,7 @@
         "v2/shell/daemon/command_handlers.mjs::handleCommand->getCookies",
         "v2/shell/daemon/command_handlers.mjs::handleCommand->getPageInfo",
         "v2/shell/daemon/command_handlers.mjs::handleCommand->wait",
+        "v2/shell/daemon/command_handlers.mjs::handleCommand->run",
         "v2/shell/daemon/index.mjs::handleCommand->wait",
         "v2/shell/daemon/index.mjs::handleCommand->goto",
         "v2/shell/daemon/index.mjs::handleCommand->click",
@@ -630,7 +637,6 @@
         "v2/services/page_runtime/input_pipeline.mjs::getReadable",
         "v2/services/page_runtime/input_pipeline.mjs::getCookies",
         "v2/services/page_runtime/input_pipeline.mjs::setCookies",
-        "v2/services/page_runtime/input_pipeline.mjs::setUserAgent",
         "v2/services/page_runtime/input_pipeline.mjs::setViewport",
         "v2/services/page_runtime/input_pipeline.mjs::wait",
         "v2/services/page_runtime/input_pipeline.mjs::waitForDomStable",

@@ -24,6 +24,7 @@ import {
     getPage,
     listActive,
     closeAll,
+    relaunchBrowser,
     __enableTestRoot as __enableCamoufoxBridge,
 } from './internal/camoufox_bridge.mjs';
 import { append as appendProgress } from '../progress_event/log.mjs';
@@ -34,6 +35,7 @@ import { migrateLegacyProfileData } from '../profile/storage_paths.mjs';
 
 let launchBrowserOwner = launchBrowser;
 let closeBrowserOwner = closeBrowser;
+let relaunchBrowserOwner = relaunchBrowser;
 
 let _enabled = false;
 export function __enableTestRoot() {
@@ -280,6 +282,53 @@ export async function stopSession(profileId) {
     return { profileId: pid, stopped: true, ephemeral: wasEphemeral };
 }
 
+export async function setSessionUserAgent({ profileId, userAgent } = {}) {
+    ensureWritable();
+    const pid = safeId(profileId, 'profileId');
+    if (!userAgent || typeof userAgent !== 'string') {
+        throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'userAgent' } });
+    }
+    const { tryRead: tryReadSession, deleteSession } = await import('../session/manager.mjs');
+    if (!tryReadSession(pid)) {
+        throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser_session', profileId: pid } });
+    }
+    emit('session.user_agent.start', { profileId: pid });
+    try {
+        const record = await relaunchBrowserOwner(pid, { userAgent });
+        emit('session.user_agent.done', { profileId: pid });
+        return { profileId: pid, userAgent, set: true, restoredUrl: record.restoredUrl || null };
+    } catch (cause) {
+        const cleanupErrors = [];
+        try { await closeBrowserOwner(pid); } catch (error) { cleanupErrors.push(error); }
+        if (tryReadSession(pid)) {
+            try { deleteSession(pid); } catch (error) { cleanupErrors.push(error); }
+        }
+        if (_lockHandles.has(pid)) {
+            try {
+                const { release: releaseLock } = await import('../lock/manager.mjs');
+                releaseLock(pid, { owner: lockOwner(), pid: process.pid });
+                _lockHandles.delete(pid);
+            } catch (error) { cleanupErrors.push(error); }
+        }
+        const tabPoolMod = await import('../../services/page_runtime/tab_pool.mjs');
+        tabPoolMod.closeAll(pid);
+        emit('session.user_agent.error', {
+            profileId: pid,
+            error: cause?.message || String(cause),
+            cleanupErrors: cleanupErrors.map((error) => error?.message || String(error)),
+        });
+        throw new CamoError({
+            code: 'E_BROWSER_SETUSERAGENT_FAILED',
+            details: {
+                profileId: pid,
+                reason: cause?.message || String(cause),
+                cleanupErrors: cleanupErrors.map((error) => error?.message || String(error)),
+            },
+            cause,
+        });
+    }
+}
+
 export function listEphemeralProfiles() {
     return [..._ephemeralProfiles.keys()];
 }
@@ -393,10 +442,11 @@ export async function __resetForTest() {
     await closeAll();
 }
 
-export function __setBrowserLifecycleForTest({ launch, close } = {}) {
+export function __setBrowserLifecycleForTest({ launch, close, relaunch } = {}) {
     if (!_enabled) throw new CamoError({ code: 'E_INTERNAL_UNEXPECTED', details: { op: '__setBrowserLifecycleForTest' } });
     launchBrowserOwner = launch || launchBrowser;
     closeBrowserOwner = close || closeBrowser;
+    relaunchBrowserOwner = relaunch || relaunchBrowser;
 }
 
 export function __setOwnedProfilesForTest(profileIds) {

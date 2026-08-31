@@ -415,6 +415,20 @@
       ]
     },
     {
+      "id": "cmd.set_user_agent.project",
+      "owner_resource": "daemon.command_handlers",
+      "required_commands": [
+        "npm run test:all",
+        "node v2/gates/run-all.mjs --strict"
+      ],
+      "positive": [
+        "v2/tests/integration/set-user-agent-wire-contract.integration.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/integration/set-user-agent-wire-contract.integration.test.mjs"
+      ]
+    },
+    {
       "id": "cmd.screenshot",
       "owner_resource": "command_log",
       "positive": [
