@@ -30,6 +30,10 @@ temp/
 
 # Development worktrees
 playground/
+camo-cleanfix-20260812/
+
+# Multi-agent collaboration state (not source)
+.agent-collab/
 
 # Backup files
 *.bak
