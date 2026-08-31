@@ -32,7 +32,7 @@
           "display_name":     {"type": "string"},
           "layer":            {"type": "string", "pattern": "^L[0-9]_\\w+$"},
           "truth_owner":      {"type": "string", "pattern": "^v2/(services|runtime|protocol|contracts)/"},
-          "truth_store":      {"enum": ["memory_in_owner_process", "memory_in_ws_server", "memory_per_session", "memory_per_run", "memory_cache_per_process", "transient_per_request", "disk_json", "disk_jsonl", "disk_json_with_sigterm", "compiled_page_scripts", "code_schema", "code_registry"]},
+          "truth_store":      {"enum": ["memory_in_owner_process", "memory_in_ws_server", "memory_per_session", "memory_per_run", "memory_cache_per_process", "transient_per_request", "os_process", "disk_json", "disk_jsonl", "disk_json_with_sigterm", "compiled_page_scripts", "code_schema", "code_registry"]},
           "truth_path":       {"type": "string"},
           "read_paths":       {"type": "array", "items": {"type": "string"}},
           "write_paths":      {"type": "array", "items": {"type": "string"}},

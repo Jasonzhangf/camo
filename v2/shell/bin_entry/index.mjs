@@ -11,7 +11,6 @@
 //   - No fake transport fallback.
 //   - Auto-discovers or auto-starts daemon as needed.
 
-import { spawn } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -20,6 +19,7 @@ import { dispatch, usage } from '../cli/dispatch.mjs';
 import { isCamoError, toWire } from '../../contracts/error_envelope/projector.mjs';
 import { loadConfig } from '../config/loader.mjs';
 import { findActiveDaemon } from '../../services/daemon_registration/registry.mjs';
+import { spawnDaemonProcess } from '../../services/daemon_process/spawn.mjs';
 import { checkCamoufoxHealth, ensureCamoufox } from '../camoufox_health.mjs';
 
 // PKG_ROOT is set by the bin/camo.mjs entry shim via CAMO_PKG_ROOT env var;
@@ -84,30 +84,13 @@ async function startDaemon(profile, mode) {
   }
   if (process.env.CAMO_HEADLESS === '1') args.push('--headless');
 
-  const child = spawn(process.execPath, [DAEMON_SCRIPT, ...args], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: true,
-    env: { ...process.env, CAMO_WS_PORT: '0', CAMO_HTTP_PORT: '0' },
-  });
-  child.unref();
-
-  let stderr = '';
-  child.stderr.on('data', (chunk) => { stderr += String(chunk); });
-
-  child.on('exit', (code) => {
-    if (code !== 0 && code !== null) {
-      console.error(`[camo] daemon exited with code ${code}`);
-      if (stderr) console.error(stderr);
-    }
+  const child = spawnDaemonProcess({
+    scriptPath: DAEMON_SCRIPT,
+    args,
   });
 
-  try {
-    const daemon = await waitForDaemon(profile);
-    return { wsUrl: `ws://localhost:${daemon.wsPort}`, daemon, child };
-  } catch (err) {
-    if (stderr) console.error(stderr);
-    throw err;
-  }
+  const daemon = await waitForDaemon(profile);
+  return { wsUrl: `ws://localhost:${daemon.wsPort}`, daemon, child };
 }
 
 async function main(argv) {

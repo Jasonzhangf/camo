@@ -224,8 +224,8 @@ export async function launchEngineContext(opts) {
         ...(firefox_user_prefs ? { firefox_user_prefs } : {}),
         ...(config ? { config } : {}),
         data_dir: opts.profileDir,
-        ...(useMinimalWindowsOptions ? {} : { humanize: true }),
-        iKnowWhatImDoing: true,
+        humanize: false,
+        i_know_what_im_doing: true,
         ...(useMinimalWindowsOptions ? {} : { locale: opts.locale || 'zh-CN' }),
         ...(useMinimalWindowsOptions ? {} : {
             fonts: [
