@@ -9,8 +9,8 @@ test('config: loadConfig returns defaults when no overrides', () => {
   const config = loadConfig({});
   assert.ok(config.profile);
   assert.ok(config.logLevel);
-  assert.ok(config.wsUrl);
-  assert.ok(config.httpUrl);
+  assert.equal('wsUrl' in config, false);
+  assert.equal('httpUrl' in config, false);
   assert.equal(typeof config.timeout, 'number');
 });
 
@@ -20,11 +20,35 @@ test('config: loadConfig applies overrides', () => {
   assert.equal(config.logLevel, 'debug');
 });
 
+test('config: endpoint overrides fail instead of creating a second truth', () => {
+  assert.throws(
+    () => loadConfig({ wsUrl: 'ws://127.0.0.1:9000' }),
+    (error) => error.code === 'E_CONFIG_INVALID'
+      && error.details.field === 'wsUrl',
+  );
+});
+
+test('config: endpoint environment overrides fail explicitly', () => {
+  const previous = process.env.CAMO_HTTP_URL;
+  process.env.CAMO_HTTP_URL = 'http://127.0.0.1:9001';
+  try {
+    assert.throws(
+      () => loadConfig({}),
+      (error) => error.code === 'E_CONFIG_INVALID'
+        && error.details.source === 'environment',
+    );
+  } finally {
+    if (previous === undefined) delete process.env.CAMO_HTTP_URL;
+    else process.env.CAMO_HTTP_URL = previous;
+  }
+});
+
 test('config: getDefault returns expected keys', () => {
   assert.ok(CONFIG_KEYS.includes('profile'));
   assert.ok(CONFIG_KEYS.includes('logLevel'));
-  assert.ok(CONFIG_KEYS.includes('wsUrl'));
-  assert.ok(CONFIG_KEYS.length > 5);
+  assert.equal(CONFIG_KEYS.includes('wsUrl'), false);
+  assert.equal(CONFIG_KEYS.includes('httpUrl'), false);
+  assert.ok(CONFIG_KEYS.length >= 5);
 });
 
 test('logging: createLogger with default level', () => {

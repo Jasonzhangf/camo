@@ -90,7 +90,7 @@ async function startDaemon(profile, mode) {
   });
 
   const daemon = await waitForDaemon(profile);
-  return { wsUrl: `ws://localhost:${daemon.wsPort}`, daemon, child };
+  return { wsUrl: `ws://${daemon.host}:${daemon.wsPort}`, daemon, child };
 }
 
 async function main(argv) {
@@ -189,7 +189,7 @@ async function main(argv) {
   
   const existing = findActiveDaemon();
   if (existing) {
-    transport = makeWsTransport(`ws://localhost:${existing.wsPort}`);
+    transport = makeWsTransport(`ws://${existing.host}:${existing.wsPort}`);
   } else if (process.env.CAMO_AUTOSTART === '1' || args[0] === 'start') {
     const daemon = await startDaemon(profile, isEphemeral ? 'ephemeral' : 'persistent');
     transport = makeWsTransport(daemon.wsUrl);

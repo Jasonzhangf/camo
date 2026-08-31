@@ -59,6 +59,25 @@
       ]
     },
     {
+      "id": "daemon.endpoint.loopback",
+      "status": "active",
+      "owner_module": "services.daemon_registration",
+      "entry_symbols": [
+        {
+          "path": "v2/services/daemon_registration/registry.mjs",
+          "symbol": "DAEMON_LOOPBACK_HOST"
+        },
+        {
+          "path": "v2/services/daemon_registration/registry.mjs",
+          "symbol": "parseRegistration"
+        },
+        {
+          "path": "v2/services/daemon_registration/registry.mjs",
+          "symbol": "registerDaemon"
+        }
+      ]
+    },
+    {
       "id": "daemon.process.spawn",
       "status": "active",
       "owner_module": "services.daemon_process",

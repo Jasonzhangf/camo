@@ -32,6 +32,7 @@ import {
   enableAllOwners as enableAllBrowserOwners
 } from '../../services/browser_service/bootstrap.mjs';
 import {
+  DAEMON_LOOPBACK_HOST,
   claimDaemonSlot,
   registerDaemon,
   releaseDaemonSlot,
@@ -178,7 +179,7 @@ async function handleCommand(env) {
 // --- HTTP server ---
 function createHttpServer() {
   const server = http.createServer(async (req, res) => {
-    const parsedUrl = new URL(req.url || '/', `http://localhost:${HTTP_PORT}`);
+    const parsedUrl = new URL(req.url || '/', `http://${DAEMON_LOOPBACK_HOST}:${HTTP_PORT}`);
     const method = req.method;
 
     if (parsedUrl.pathname === '/health') {
@@ -251,7 +252,7 @@ function createHttpServer() {
 
 // --- WS server ---
 function createWsServer() {
-  const wss = new WebSocketServer({ port: WS_PORT });
+  const wss = new WebSocketServer({ host: DAEMON_LOOPBACK_HOST, port: WS_PORT });
 
   wss.on('connection', (ws) => {
     emit('ws.connected', { remoteAddress: ws.socket?.remoteAddress });
@@ -390,10 +391,10 @@ async function main(argv) {
     }
   });
 
-  httpServer.listen(HTTP_PORT, () => {
+  httpServer.listen(HTTP_PORT, DAEMON_LOOPBACK_HOST, () => {
     const actualHttpPort = httpServer.address().port;
     emit('http.start', { port: actualHttpPort });
-    console.error(`[camo daemon] HTTP http://localhost:${actualHttpPort}`);
+    console.error(`[camo daemon] HTTP http://${DAEMON_LOOPBACK_HOST}:${actualHttpPort}`);
     
     // Create WS server after HTTP is ready
     wsServer = createWsServer();
@@ -441,7 +442,7 @@ async function main(argv) {
       profileIdleSweepTimer.unref?.();
 
       emit('ws.start', { port: actualWsPort });
-      console.error(`[camo daemon] WS ws://localhost:${actualWsPort}`);
+      console.error(`[camo daemon] WS ws://${DAEMON_LOOPBACK_HOST}:${actualWsPort}`);
       console.error(`[camo daemon] Mode=${opts.mode}, Profile=${opts.profile}, DaemonId=${reg.daemonId}`);
     });
   });

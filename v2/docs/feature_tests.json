@@ -101,6 +101,23 @@
       ]
     },
     {
+      "id": "daemon.endpoint.loopback",
+      "owner_resource": "daemon_registration",
+      "required_commands": [
+        "npm run test:all",
+        "node v2/gates/run-all.mjs --strict"
+      ],
+      "positive": [
+        "v2/tests/unit/services/daemon_registration.registry.test.mjs",
+        "v2/tests/unit/shell/shell-modules.test.mjs",
+        "v2/tests/e2e/lifecycle.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/services/daemon_registration.registry.test.mjs",
+        "v2/tests/unit/shell/shell-modules.test.mjs"
+      ]
+    },
+    {
       "id": "browser.installation_readiness",
       "owner_resource": "browser_instance",
       "required_commands": [

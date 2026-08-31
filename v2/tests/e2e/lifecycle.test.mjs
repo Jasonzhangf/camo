@@ -61,12 +61,13 @@ test('e2e: ephemeral daemon start → ws ping → sigterm → cleanup', { skip: 
   const reg = await waitForRegistration(child.pid);
   assert.equal(reg.scope, 'shared');
   assert.equal(reg.mode, 'ephemeral');
+  assert.equal(reg.host, '127.0.0.1', 'daemon endpoint host is exact loopback truth');
   assert.ok(reg.wsPort > 0, 'wsPort is a real port number');
   assert.ok(reg.httpPort > 0, 'httpPort is a real port number');
 
   // Connect via WS and ping.
   const ws = await new Promise((resolve, reject) => {
-    const sock = new WebSocket(`ws://localhost:${reg.wsPort}`);
+    const sock = new WebSocket(`ws://${reg.host}:${reg.wsPort}`);
     const timer = setTimeout(() => reject(new Error('ws connect timeout')), 5000);
     sock.on('open', () => { clearTimeout(timer); resolve(sock); });
     sock.on('error', (e) => { clearTimeout(timer); reject(e); });
@@ -153,6 +154,7 @@ test('e2e: daemon finder returns active daemons and filters dead ones', () => {
   // Either we have one (left over) or none — both are valid.
   if (any) {
     assert.ok(any.pid > 0);
+    assert.equal(any.host, '127.0.0.1');
     assert.ok(any.wsPort > 0);
   }
 });
