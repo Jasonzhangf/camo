@@ -47,8 +47,10 @@ async function chooseVisibleLocator(page, locator, profileId, selector, text, fa
 async function moveLocatorIntoViewport(page, locator, profileId, selector, text, failureCode) {
   const viewport = page.viewportSize() || { width: 800, height: 600 };
   const margin = 8;
+  const verticalMargin = Math.min(64, Math.max(margin, Math.round(viewport.height * 0.1)));
+  let pointerAnchored = false;
 
-  for (let attempt = 0; attempt < 12; attempt += 1) {
+  for (let wheelAttempt = 0; wheelAttempt < 12; wheelAttempt += 1) {
     const box = await locator.boundingBox();
     if (!box) {
       throw new CamoError({
@@ -59,18 +61,66 @@ async function moveLocatorIntoViewport(page, locator, profileId, selector, text,
 
     const cx = Math.round(box.x + box.width / 2);
     const cy = Math.round(box.y + box.height / 2);
-    const inside = cx >= margin && cx <= viewport.width - margin
-      && cy >= margin && cy <= viewport.height - margin;
+    const activeVerticalMargin = pointerAnchored ? verticalMargin : margin;
+    const inside = box.x >= margin && box.x + box.width <= viewport.width - margin
+      && box.y >= activeVerticalMargin
+      && box.y + box.height <= viewport.height - activeVerticalMargin;
     if (inside) return { x: cx, y: cy };
 
-    const wheelX = cx < margin
-      ? Math.min(-120, cx - margin)
-      : (cx > viewport.width - margin ? Math.max(120, cx - (viewport.width - margin)) : 0);
-    const wheelY = cy < margin
-      ? Math.min(-120, cy - margin)
-      : (cy > viewport.height - margin ? Math.max(120, cy - (viewport.height - margin)) : 0);
-    await page.mouse.move(Math.floor(viewport.width / 2), Math.floor(viewport.height / 2));
+    const wheelX = box.x < margin || box.x + box.width > viewport.width - margin
+      ? (cx < viewport.width / 2
+        ? Math.max(-120, cx - viewport.width / 2)
+        : Math.min(120, cx - viewport.width / 2))
+      : 0;
+    const wheelY = box.y < activeVerticalMargin
+      || box.y + box.height > viewport.height - activeVerticalMargin
+      ? (cy < viewport.height / 2
+        ? Math.max(-120, cy - viewport.height / 2)
+        : Math.min(120, cy - viewport.height / 2))
+      : 0;
+    if (!pointerAnchored) {
+      await page.mouse.move(Math.floor(viewport.width / 2), Math.floor(viewport.height / 2));
+      pointerAnchored = true;
+    }
     await page.mouse.wheel(wheelX, wheelY);
+
+    let previousBox = null;
+    let settledBox = null;
+    for (let settleAttempt = 0; settleAttempt < 12; settleAttempt += 1) {
+      // Playwright acknowledges wheel dispatch before scrolling finishes.
+      // Require two stable geometry samples before clicking or redispatching.
+      await page.waitForTimeout(32);
+      const currentBox = await locator.boundingBox();
+      if (!currentBox) {
+        throw new CamoError({
+          code: failureCode,
+          details: { profileId, selector, text, reason: 'element not visible or not in DOM' },
+        });
+      }
+      if (previousBox
+        && Math.abs(currentBox.x - previousBox.x) < 0.5
+        && Math.abs(currentBox.y - previousBox.y) < 0.5
+        && Math.abs(currentBox.width - previousBox.width) < 0.5
+        && Math.abs(currentBox.height - previousBox.height) < 0.5) {
+        settledBox = currentBox;
+        break;
+      }
+      previousBox = currentBox;
+    }
+    if (!settledBox) {
+      throw new CamoError({
+        code: failureCode,
+        details: { profileId, selector, text, reason: 'element did not settle after protocol wheel input' },
+      });
+    }
+
+    const settledX = Math.round(settledBox.x + settledBox.width / 2);
+    const settledY = Math.round(settledBox.y + settledBox.height / 2);
+    const settledInside = settledBox.x >= margin
+      && settledBox.x + settledBox.width <= viewport.width - margin
+      && settledBox.y >= verticalMargin
+      && settledBox.y + settledBox.height <= viewport.height - verticalMargin;
+    if (settledInside) return { x: settledX, y: settledY };
   }
 
   throw new CamoError({

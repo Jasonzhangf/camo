@@ -79,6 +79,7 @@ test('positive: offscreen target enters viewport through protocol wheel input', 
     __setBrowserForTest('protocol_scroll', { page: {
       viewportSize: () => ({ width: 800, height: 600 }),
       locator: () => locator,
+      waitForTimeout: async (...args) => calls.push(['wait', ...args]),
       mouse: {
         move: async (...args) => calls.push(['move', ...args]),
         down: async (...args) => calls.push(['down', ...args]),
@@ -91,6 +92,238 @@ test('positive: offscreen target enters viewport through protocol wheel input', 
   `);
   assert.equal(result.out.clicked, true);
   assert.equal(result.calls.filter((entry) => entry[0] === 'wheel').length, 1);
+});
+
+test('positive: offscreen click waits for wheel-driven layout settlement', () => {
+  const result = runScript(`
+    import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';
+    import { __setBrowserForTest, __enableTestRoot as enableBridge } from './v2/services/browser_service/internal/camoufox_bridge.mjs';
+    import { click } from './v2/services/page_runtime/operations/interaction_ops.mjs';
+    __enableTestRoot();
+    enableBridge();
+    const calls = [];
+    let y = 900;
+    let settled = false;
+    let waitCalls = 0;
+    const locator = { count: async () => 1, nth() { return this; }, first() { return this; }, async boundingBox() { return { x: 200, y, width: 80, height: 20 }; } };
+    __setBrowserForTest('protocol_scroll_settlement', { page: {
+      viewportSize: () => ({ width: 800, height: 600 }),
+      locator: () => locator,
+      waitForTimeout: async () => { waitCalls += 1; settled = true; },
+      mouse: {
+        move: async (...args) => calls.push(['move', ...args]),
+        down: async (...args) => {
+          if (!settled) throw new Error('scroll_not_settled');
+          calls.push(['down', ...args]);
+        },
+        up: async (...args) => calls.push(['up', ...args]),
+        wheel: async (x, dy) => { calls.push(['wheel', x, dy]); y = 500; },
+      },
+    }});
+    const out = await click({ profileId: 'protocol_scroll_settlement', selector: '#target' });
+    process.stdout.write(JSON.stringify({ out, calls, waitCalls }));
+  `);
+  assert.equal(result.out.clicked, true);
+  assert.equal(result.waitCalls >= 1, true);
+  assert.equal(result.calls.some((entry) => entry[0] === 'down'), true);
+});
+
+test('positive: multi-wheel click anchors once and settles before redispatch', () => {
+  const result = runScript(`
+    import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';
+    import { __setBrowserForTest, __enableTestRoot as enableBridge } from './v2/services/browser_service/internal/camoufox_bridge.mjs';
+    import { click } from './v2/services/page_runtime/operations/interaction_ops.mjs';
+    __enableTestRoot();
+    enableBridge();
+    const calls = [];
+    let anchorMoves = 0;
+    let wheelCount = 0;
+    let waitCount = 0;
+    let y = 1300;
+    const locator = {
+      count: async () => 1,
+      nth() { return this; },
+      first() { return this; },
+      async boundingBox() {
+        calls.push(['box', y]);
+        return { x: 200, y, width: 80, height: 20 };
+      },
+    };
+    __setBrowserForTest('protocol_multi_scroll', { page: {
+      viewportSize: () => ({ width: 800, height: 600 }),
+      locator: () => locator,
+      waitForTimeout: async () => {
+        waitCount += 1;
+        if (wheelCount === 1) y = waitCount === 1 ? 1000 : 800;
+        if (wheelCount === 2) y = 500;
+      },
+      mouse: {
+        move: async (x, moveY) => {
+          calls.push(['move', x, moveY]);
+          if (x === 400 && moveY === 300) {
+            anchorMoves += 1;
+            if (anchorMoves > 1) throw new Error('scroll_anchor_repeated');
+          }
+        },
+        down: async (...args) => calls.push(['down', ...args]),
+        up: async (...args) => calls.push(['up', ...args]),
+        wheel: async (...args) => {
+          wheelCount += 1;
+          waitCount = 0;
+          calls.push(['wheel', ...args]);
+        },
+      },
+    }});
+    let out = null;
+    let code = null;
+    try { out = await click({ profileId: 'protocol_multi_scroll', selector: '#target' }); }
+    catch (error) { code = error.code; }
+    process.stdout.write(JSON.stringify({ out, code, calls, anchorMoves, wheelCount }));
+  `);
+  assert.equal(result.code, null);
+  assert.equal(result.out.clicked, true);
+  assert.equal(result.anchorMoves, 1);
+  assert.equal(result.wheelCount, 2);
+  assert.equal(result.calls.some((entry) => entry[0] === 'down'), true);
+});
+
+test('positive: partially visible target clears the fixed bottom boundary with bounded wheel segments', () => {
+  const result = runScript(`
+    import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';
+    import { __setBrowserForTest, __enableTestRoot as enableBridge } from './v2/services/browser_service/internal/camoufox_bridge.mjs';
+    import { click } from './v2/services/page_runtime/operations/interaction_ops.mjs';
+    __enableTestRoot();
+    enableBridge();
+    const calls = [];
+    let y = 1098.6;
+    let wheelCount = 0;
+    const locator = {
+      count: async () => 1,
+      nth() { return this; },
+      first() { return this; },
+      async boundingBox() { return { x: 16, y, width: 358, height: 48 }; },
+    };
+    __setBrowserForTest('protocol_partial_boundary', { page: {
+      viewportSize: () => ({ width: 390, height: 844 }),
+      locator: () => locator,
+      waitForTimeout: async () => {},
+      mouse: {
+        move: async (...args) => calls.push(['move', ...args]),
+        down: async (...args) => {
+          if (y + 48 > 780) throw new Error('fixed_bottom_boundary_intercepted');
+          calls.push(['down', ...args]);
+        },
+        up: async (...args) => calls.push(['up', ...args]),
+        wheel: async (x, dy) => {
+          if (Math.abs(x) > 120 || Math.abs(dy) > 120) throw new Error('unbounded_wheel_delta');
+          wheelCount += 1;
+          y -= dy;
+          calls.push(['wheel', x, dy]);
+        },
+      },
+    }});
+    let out = null;
+    let code = null;
+    try { out = await click({ profileId: 'protocol_partial_boundary', selector: '#target' }); }
+    catch (error) { code = error.code; }
+    process.stdout.write(JSON.stringify({ out, code, calls, wheelCount, y }));
+  `);
+  assert.equal(result.code, null);
+  assert.equal(result.out.clicked, true);
+  assert.equal(result.wheelCount > 1, true);
+  assert.equal(result.calls.filter((entry) => entry[0] === 'wheel')
+    .every((entry) => Math.abs(entry[1]) <= 120 && Math.abs(entry[2]) <= 120), true);
+  assert.equal(result.calls.some((entry) => entry[0] === 'down'), true);
+});
+
+test('positive: top target clears fixed header through bounded center-directed wheel segments', () => {
+  const result = runScript(`
+    import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';
+    import { __setBrowserForTest, __enableTestRoot as enableBridge } from './v2/services/browser_service/internal/camoufox_bridge.mjs';
+    import { click } from './v2/services/page_runtime/operations/interaction_ops.mjs';
+    __enableTestRoot();
+    enableBridge();
+    const calls = [];
+    let y = -113;
+    let wheelCount = 0;
+    const locator = {
+      count: async () => 1,
+      nth() { return this; },
+      first() { return this; },
+      async boundingBox() { return { x: 16, y, width: 58, height: 40 }; },
+    };
+    __setBrowserForTest('protocol_fixed_header', { page: {
+      viewportSize: () => ({ width: 390, height: 844 }),
+      locator: () => locator,
+      waitForTimeout: async () => {},
+      mouse: {
+        move: async (...args) => calls.push(['move', ...args]),
+        down: async (...args) => {
+          if (y < 64) throw new Error('fixed_header_intercepted');
+          calls.push(['down', ...args]);
+        },
+        up: async (...args) => calls.push(['up', ...args]),
+        wheel: async (x, dy) => {
+          if (Math.abs(x) > 120 || Math.abs(dy) > 120) throw new Error('unbounded_wheel_delta');
+          wheelCount += 1;
+          y -= dy;
+          calls.push(['wheel', x, dy]);
+        },
+      },
+    }});
+    let out = null;
+    let code = null;
+    try { out = await click({ profileId: 'protocol_fixed_header', selector: '#back' }); }
+    catch (error) { code = error.code; }
+    process.stdout.write(JSON.stringify({ out, code, calls, wheelCount, y }));
+  `);
+  assert.equal(result.code, null);
+  assert.equal(result.out.clicked, true);
+  assert.equal(result.wheelCount > 1, true);
+  assert.equal(result.y >= 64, true);
+  assert.equal(result.calls.filter((entry) => entry[0] === 'wheel')
+    .every((entry) => Math.abs(entry[1]) <= 120 && Math.abs(entry[2]) <= 120), true);
+  assert.equal(result.calls.some((entry) => entry[0] === 'down'), true);
+});
+
+test('negative: moving offscreen target never receives a false-success click', () => {
+  const result = runScript(`
+    import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';
+    import { __setBrowserForTest, __enableTestRoot as enableBridge } from './v2/services/browser_service/internal/camoufox_bridge.mjs';
+    import { click } from './v2/services/page_runtime/operations/interaction_ops.mjs';
+    __enableTestRoot();
+    enableBridge();
+    const calls = [];
+    let wheelIssued = false;
+    let sample = 0;
+    const locator = {
+      count: async () => 1,
+      nth() { return this; },
+      first() { return this; },
+      async boundingBox() {
+        if (!wheelIssued) return { x: 200, y: 900, width: 80, height: 20 };
+        sample += 1;
+        return { x: 200, y: sample % 2 ? 100 : 140, width: 80, height: 20 };
+      },
+    };
+    __setBrowserForTest('protocol_scroll_moving', { page: {
+      viewportSize: () => ({ width: 800, height: 600 }),
+      locator: () => locator,
+      waitForTimeout: async () => {},
+      mouse: {
+        move: async (...args) => calls.push(['move', ...args]),
+        down: async (...args) => calls.push(['down', ...args]),
+        up: async (...args) => calls.push(['up', ...args]),
+        wheel: async (...args) => { wheelIssued = true; calls.push(['wheel', ...args]); },
+      },
+    }});
+    let code = null;
+    try { await click({ profileId: 'protocol_scroll_moving', selector: '#target' }); }
+    catch (error) { code = error.code; }
+    process.stdout.write(JSON.stringify({ code, calls }));
+  `);
+  assert.equal(result.code, 'E_BROWSER_CLICK_FAILED');
+  assert.equal(result.calls.some((entry) => entry[0] === 'down' || entry[0] === 'up'), false);
 });
 
 test('positive: visible duplicate wins over offscreen duplicate', () => {
