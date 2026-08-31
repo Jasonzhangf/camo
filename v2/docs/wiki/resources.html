@@ -9,7 +9,7 @@ section { border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px; }</st
 <h1>camo v2 resources</h1>
 <p>Mirror of <code>v2/resources/registry/resources.json</code>. Status of every entry: design until its corresponding gate is green and forbidden paths are physically removed from v1.</p>
 <h2 id="resource-index">Index</h2>
-<ul><li><a href="#r-browser_instance">browser_instance</a></li><li><a href="#r-daemon_registration">daemon_registration</a></li><li><a href="#r-profile">profile</a></li><li><a href="#r-profile_cookie_backup">profile_cookie_backup</a></li><li><a href="#r-browser_session">browser_session</a></li><li><a href="#r-profile_lock">profile_lock</a></li><li><a href="#r-container_match">container_match</a></li><li><a href="#r-subscription">subscription</a></li><li><a href="#r-tab_pool">tab_pool</a></li><li><a href="#r-input_pipeline">input_pipeline</a></li><li><a href="#r-page_runtime">page_runtime</a></li><li><a href="#r-display_metrics">display_metrics</a></li><li><a href="#r-autoscript_run">autoscript_run</a></li><li><a href="#r-autoscript_action">autoscript_action</a></li><li><a href="#r-progress_event">progress_event</a></li><li><a href="#r-command_log">command_log</a></li><li><a href="#r-ws_message">ws_message</a></li><li><a href="#r-http_message">http_message</a></li><li><a href="#r-error_envelope">error_envelope</a></li><li><a href="#r-pipeline_state">pipeline_state</a></li><li><a href="#r-daemon.command_handlers">daemon.command_handlers</a></li><li><a href="#r-page_ops">page_ops</a></li></ul>
+<ul><li><a href="#r-browser_instance">browser_instance</a></li><li><a href="#r-daemon_registration">daemon_registration</a></li><li><a href="#r-daemon_process">daemon_process</a></li><li><a href="#r-profile">profile</a></li><li><a href="#r-profile_cookie_backup">profile_cookie_backup</a></li><li><a href="#r-browser_session">browser_session</a></li><li><a href="#r-profile_lock">profile_lock</a></li><li><a href="#r-container_match">container_match</a></li><li><a href="#r-subscription">subscription</a></li><li><a href="#r-tab_pool">tab_pool</a></li><li><a href="#r-input_pipeline">input_pipeline</a></li><li><a href="#r-page_runtime">page_runtime</a></li><li><a href="#r-display_metrics">display_metrics</a></li><li><a href="#r-autoscript_run">autoscript_run</a></li><li><a href="#r-autoscript_action">autoscript_action</a></li><li><a href="#r-progress_event">progress_event</a></li><li><a href="#r-command_log">command_log</a></li><li><a href="#r-ws_message">ws_message</a></li><li><a href="#r-http_message">http_message</a></li><li><a href="#r-error_envelope">error_envelope</a></li><li><a href="#r-pipeline_state">pipeline_state</a></li><li><a href="#r-daemon.command_handlers">daemon.command_handlers</a></li><li><a href="#r-page_ops">page_ops</a></li></ul>
 
     <section id="r-browser_instance">
       <h2><code>browser_instance</code></h2>
@@ -31,6 +31,18 @@ section { border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px; }</st
       <h3>Writes</h3><ul><li><code>v2/services/daemon_registration/registry.mjs::register</code></li><li><code>v2/services/daemon_registration/registry.mjs::unregister</code></li><li><code>v2/services/daemon_registration/registry.mjs::releaseDaemonSlot</code></li></ul>
       <h3>Indirect</h3><ul><li><code>v2/shell/daemon/index.mjs::shutdown->releaseDaemonSlot</code></li></ul>
       <h3>Forbidden</h3><ul><li><code>v2/shell/**::daemon_write</code></li></ul>
+
+      <p><a href="#resource-index">back to index</a></p>
+    </section>
+
+    <section id="r-daemon_process">
+      <h2><code>daemon_process</code></h2>
+      <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>v2/services/daemon_process</code> - <strong>Store:</strong> os_process</p>
+
+      <h3>Reads</h3><ul></ul>
+      <h3>Writes</h3><ul><li><code>v2/services/daemon_process/spawn.mjs::spawnDaemonProcess</code></li></ul>
+      <h3>Indirect</h3><ul><li><code>v2/commands/builtins/daemon.mjs::run->spawnDaemonProcess</code></li><li><code>v2/shell/bin_entry/index.mjs::startDaemon->spawnDaemonProcess</code></li></ul>
+      <h3>Forbidden</h3><ul><li><code>v2/commands/builtins/daemon.mjs::spawn</code></li><li><code>v2/shell/bin_entry/index.mjs::spawn</code></li></ul>
 
       <p><a href="#resource-index">back to index</a></p>
     </section>

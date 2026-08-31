@@ -59,6 +59,17 @@
       ]
     },
     {
+      "id": "daemon.process.spawn",
+      "status": "active",
+      "owner_module": "services.daemon_process",
+      "entry_symbols": [
+        {
+          "path": "v2/services/daemon_process/spawn.mjs",
+          "symbol": "spawnDaemonProcess"
+        }
+      ]
+    },
+    {
       "id": "daemon.shutdown.orchestrate",
       "status": "active",
       "owner_module": "shell.daemon",
@@ -130,6 +141,17 @@
         {
           "path": "v2/services/browser_service/internal/camoufox_bridge.mjs",
           "symbol": "closeBrowser"
+        }
+      ]
+    },
+    {
+      "id": "browser.engine.launch",
+      "status": "active",
+      "owner_module": "services.browser_service.internal",
+      "entry_symbols": [
+        {
+          "path": "v2/services/browser_service/internal/engine-manager.mjs",
+          "symbol": "launchEngineContext"
         }
       ]
     },

@@ -9,11 +9,11 @@
 //   - No retry; no fallback. Caller may retry with explicit backoff.
 //   - daemon stop is idempotent: missing daemon exits 0 with reason.
 
-import { spawn } from 'node:child_process';
 import path from 'node:path';
 import url from 'node:url';
 import { CamoError } from '../../contracts/error_envelope/projector.mjs';
 import { findActiveDaemon, listRegistrations } from '../../services/daemon_registration/registry.mjs';
+import { spawnDaemonProcess } from '../../services/daemon_process/spawn.mjs';
 
 export const cmd = 'daemon';
 
@@ -52,29 +52,19 @@ export async function run(_transport, parsed = {}, _ctx = {}) {
       }
       const args = ['--profile', profile];
       if (parsed.named?.ephemeral === true) args.push('--ephemeral');
-      const child = spawn(process.execPath, [DAEMON_SCRIPT, ...args], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: true,
-        env: { ...process.env, CAMO_WS_PORT: '0', CAMO_HTTP_PORT: '0' },
-      });
-      // Detach the child so it survives after this process exits
-      child.unref();
-      const stderrBuf = [];
-      child.stderr.on('data', (c) => stderrBuf.push(String(c)));
-      child.on('exit', (code) => {
-        if (code !== 0 && code !== null) {
-          process.stderr.write(`[camo] daemon (pid=${child.pid}) exited ${code}\n${stderrBuf.join('')}\n`);
-        }
+      const child = spawnDaemonProcess({
+        scriptPath: DAEMON_SCRIPT,
+        args,
       });
       let reg;
       try {
         reg = await waitForDaemonRegistration(profile);
       } catch (cause) {
-        process.stderr.write(`camo: daemon did not start: ${cause.message}\n${stderrBuf.join('')}\n`);
+        process.stderr.write(`camo: daemon did not start: ${cause.message}\n`);
         try { child.kill('SIGTERM'); } catch {}
         throw new CamoError({
           code: 'E_DAEMON_START_FAILED',
-          details: { profile, reason: cause?.message || String(cause), stderr: stderrBuf.join('').slice(-2000) },
+          details: { profile, reason: cause?.message || String(cause) },
           cause,
         });
       }

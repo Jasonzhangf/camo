@@ -47,6 +47,36 @@
       "semantic_io": "registration cleanup verification"
     },
     {
+      "feature_id": "daemon.process.spawn",
+      "from": "commands.builtins",
+      "to": "services.daemon_process",
+      "caller": {
+        "path": "v2/commands/builtins/daemon.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/services/daemon_process/spawn.mjs",
+        "symbol": "spawnDaemonProcess",
+        "local_symbol": "spawnDaemonProcess"
+      },
+      "semantic_io": "explicit daemon start request to detached process with parent-independent stdio"
+    },
+    {
+      "feature_id": "daemon.process.spawn",
+      "from": "shell.bin_entry",
+      "to": "services.daemon_process",
+      "caller": {
+        "path": "v2/shell/bin_entry/index.mjs",
+        "symbol": "startDaemon"
+      },
+      "callee": {
+        "path": "v2/services/daemon_process/spawn.mjs",
+        "symbol": "spawnDaemonProcess",
+        "local_symbol": "spawnDaemonProcess"
+      },
+      "semantic_io": "CLI auto-start request to detached process with parent-independent stdio"
+    },
+    {
       "feature_id": "daemon.registration.write",
       "from": "shell.daemon",
       "to": "services.daemon_registration",
@@ -310,6 +340,21 @@
         "local_symbol": "launchBrowser"
       },
       "semantic_io": "profile launch request to owned Camoufox handles"
+    },
+    {
+      "feature_id": "browser.engine.launch",
+      "from": "services.browser_service.internal",
+      "to": "services.browser_service.internal",
+      "caller": {
+        "path": "v2/services/browser_service/internal/camoufox_bridge.mjs",
+        "symbol": "launchBrowser"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/internal/engine-manager.mjs",
+        "symbol": "launchEngineContext",
+        "local_symbol": "launchEngineContext"
+      },
+      "semantic_io": "profile browser request to Camoufox launch options with native humanization disabled"
     },
     {
       "feature_id": "browser.runtime.ownership",

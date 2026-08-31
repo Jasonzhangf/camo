@@ -164,6 +164,14 @@
       "status": "active"
     },
     {
+      "id": "services.daemon_process",
+      "layer": "L2_service",
+      "owned_paths": [
+        "v2/services/daemon_process/**"
+      ],
+      "status": "active"
+    },
+    {
       "id": "services.progress_event",
       "layer": "L2_service",
       "owned_paths": [

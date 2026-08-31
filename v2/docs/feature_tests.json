@@ -86,6 +86,21 @@
       ]
     },
     {
+      "id": "daemon.process.spawn",
+      "owner_resource": "daemon_process",
+      "required_commands": [
+        "npm test",
+        "npm run test:all",
+        "node v2/gates/run-all.mjs --strict"
+      ],
+      "positive": [
+        "v2/tests/unit/services/daemon_process.spawn.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/services/daemon_process.spawn.test.mjs"
+      ]
+    },
+    {
       "id": "browser.installation_readiness",
       "owner_resource": "browser_instance",
       "required_commands": [
@@ -97,6 +112,21 @@
       ],
       "negative": [
         "v2/tests/unit/shell/camoufox_health.test.mjs"
+      ]
+    },
+    {
+      "id": "browser.engine.launch",
+      "owner_resource": "browser_instance",
+      "required_commands": [
+        "npm test",
+        "npm run test:all",
+        "node v2/gates/run-all.mjs --strict"
+      ],
+      "positive": [
+        "v2/tests/unit/services/browser_service.engine_manager.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/services/browser_service.engine_manager.test.mjs"
       ]
     },
     {
