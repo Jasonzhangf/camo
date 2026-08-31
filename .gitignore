@@ -28,6 +28,9 @@ tmp/
 temp/
 .tmp/
 
+# Development worktrees
+playground/
+
 # Backup files
 *.bak
 *.syntax-error
