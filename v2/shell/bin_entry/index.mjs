@@ -122,8 +122,7 @@ async function main(argv) {
   if (isBrowserCmd) {
     const health = await checkCamoufoxHealth();
     if (!health.ok) {
-      if (health.error?.includes('not found')) {
-        console.error('Camoufox not found, downloading...');
+      if (health.repairable) {
         await ensureCamoufox();
       } else {
         process.stderr.write('Camoufox error: ' + (health.error || 'unknown') + '\n');
