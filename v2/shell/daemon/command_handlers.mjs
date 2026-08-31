@@ -126,6 +126,24 @@ export async function handleCommand(cmd, args, ctx) {
       return { ok: true, navigated: true, url: args.url, finalUrl: r.finalUrl, statusCode: r.statusCode };
     }
 
+    case 'back': {
+      const back = await importOp('back');
+      const r = await back({ profileId: profile });
+      return { ok: true, navigated: r.navigated === true, finalUrl: r.finalUrl };
+    }
+
+    case 'forward': {
+      const forward = await importOp('forward');
+      const r = await forward({ profileId: profile });
+      return { ok: true, navigated: r.navigated === true, finalUrl: r.finalUrl };
+    }
+
+    case 'reload': {
+      const reload = await importOp('reload');
+      const r = await reload({ profileId: profile, waitUntil: args.waitUntil || 'load' });
+      return { ok: true, reloaded: true, finalUrl: r.finalUrl, statusCode: r.statusCode };
+    }
+
     case 'click': {
       const click = await importOp('click');
       const r = await click({ profileId: profile, selector: args.selector, text: args.text, button: args.button || 'left' });

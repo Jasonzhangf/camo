@@ -38,6 +38,72 @@ export async function goto({ profileId, url, waitUntil = 'load' }) {
 }
 
 /**
+ * Go back one history entry in the active page.
+ * @param {Object} opts
+ * @param {string} opts.profileId
+ * @returns {Object} navigation result
+ */
+export async function back({ profileId }) {
+  const pid = safeId(profileId, 'profileId');
+  const page = getPageOrThrow(pid);
+  emit(pid, 'back.start', {});
+  try {
+    const response = await page.goBack({ waitUntil: 'domcontentloaded', timeout: 30000 });
+    const result = { profileId: pid, navigated: response !== null, finalUrl: page.url() };
+    emit(pid, 'back.done', result);
+    return result;
+  } catch (cause) {
+    emit(pid, 'back.error', { error: cause?.message });
+    throw new CamoError({ code: 'E_BROWSER_NAVIGATION_FAILED', details: { profileId: pid, op: 'back', reason: cause?.message }, cause });
+  }
+}
+
+/**
+ * Go forward one history entry in the active page.
+ * @param {Object} opts
+ * @param {string} opts.profileId
+ * @returns {Object} navigation result
+ */
+export async function forward({ profileId }) {
+  const pid = safeId(profileId, 'profileId');
+  const page = getPageOrThrow(pid);
+  emit(pid, 'forward.start', {});
+  try {
+    const response = await page.goForward({ waitUntil: 'domcontentloaded', timeout: 30000 });
+    const result = { profileId: pid, navigated: response !== null, finalUrl: page.url() };
+    emit(pid, 'forward.done', result);
+    return result;
+  } catch (cause) {
+    emit(pid, 'forward.error', { error: cause?.message });
+    throw new CamoError({ code: 'E_BROWSER_NAVIGATION_FAILED', details: { profileId: pid, op: 'forward', reason: cause?.message }, cause });
+  }
+}
+
+/**
+ * Reload the active page.
+ * @param {Object} opts
+ * @param {string} opts.profileId
+ * @param {string} [opts.waitUntil] - 'load'|'domcontentloaded'|'networkidle'|'commit'
+ * @returns {Object} navigation result
+ */
+export async function reload({ profileId, waitUntil = 'load' }) {
+  const pid = safeId(profileId, 'profileId');
+  const page = getPageOrThrow(pid);
+  const allowedWaitUntil = new Set(['load', 'domcontentloaded', 'networkidle', 'commit']);
+  const waitVal = allowedWaitUntil.has(waitUntil) ? waitUntil : 'load';
+  emit(pid, 'reload.start', { waitUntil: waitVal });
+  try {
+    const response = await page.reload({ waitUntil: waitVal, timeout: 30000 });
+    const result = { profileId: pid, reloaded: true, statusCode: response?.status() ?? null, ok: response?.ok() ?? false, finalUrl: page.url() };
+    emit(pid, 'reload.done', result);
+    return result;
+  } catch (cause) {
+    emit(pid, 'reload.error', { error: cause?.message });
+    throw new CamoError({ code: 'E_BROWSER_NAVIGATION_FAILED', details: { profileId: pid, op: 'reload', reason: cause?.message }, cause });
+  }
+}
+
+/**
  * Create a new tab.
  * @param {Object} opts
  * @param {string} opts.profileId

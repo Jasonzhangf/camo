@@ -129,6 +129,65 @@
       "docstring": "commands/docstrings/goto.md"
     },
     {
+      "cmd": "back",
+      "module": "commands/builtins/back.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/back.md"
+    },
+    {
+      "cmd": "forward",
+      "module": "commands/builtins/forward.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/forward.md"
+    },
+    {
+      "cmd": "reload",
+      "module": "commands/builtins/reload.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "waitUntil": {
+            "type": "enum",
+            "values": [
+              "load",
+              "domcontentloaded",
+              "networkidle",
+              "commit"
+            ],
+            "required": false,
+            "doc": "page wait condition"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/reload.md"
+    },
+    {
       "cmd": "click",
       "module": "commands/builtins/click.mjs",
       "args_schema": {

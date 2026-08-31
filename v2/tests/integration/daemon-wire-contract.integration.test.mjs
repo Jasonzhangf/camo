@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { run as runBack } from '../../commands/builtins/back.mjs';
+import { run as runForward } from '../../commands/builtins/forward.mjs';
+import { run as runReload } from '../../commands/builtins/reload.mjs';
 import { run as runScroll } from '../../commands/builtins/scroll.mjs';
 import { run as runType } from '../../commands/builtins/type.mjs';
 import { handleCommand } from '../../shell/daemon/command_handlers.mjs';
@@ -147,4 +150,81 @@ test('snapshot projects the full HTML payload through the daemon wire', async ()
 test('hover belongs to the canonical ephemeral browser command set', () => {
   assert.equal(isBrowserCommand('hover'), true);
   assert.equal(isBrowserCommand('get-page-info'), false);
+});
+
+test('back projects navigated/finalUrl through the daemon wire', async () => {
+  enablePipeline();
+  enableBridge();
+  const profile = 'back_wire_contract';
+  __setBrowserForTest(profile, {
+    page: {
+      url: () => 'https://example.com/',
+      goBack: async () => ({ status: () => 200, ok: () => true }),
+    },
+  });
+  const transport = wireTransport((args) => handleCommand('back', args, daemonContext(profile)));
+  const output = await runBack(transport, { profile, named: {} });
+  assert.equal(output.cmd, 'back');
+  assert.equal(output.profile, profile);
+  assert.equal(output.navigated, true);
+  assert.equal(output.finalUrl, 'https://example.com/');
+});
+
+test('back reports navigated=false when there is no previous history entry', async () => {
+  enablePipeline();
+  enableBridge();
+  const profile = 'back_empty_wire_contract';
+  __setBrowserForTest(profile, {
+    page: {
+      url: () => 'https://example.com/',
+      goBack: async () => null,
+    },
+  });
+  const transport = wireTransport((args) => handleCommand('back', args, daemonContext(profile)));
+  const output = await runBack(transport, { profile, named: {} });
+  assert.equal(output.navigated, false);
+});
+
+test('forward projects navigated/finalUrl through the daemon wire', async () => {
+  enablePipeline();
+  enableBridge();
+  const profile = 'forward_wire_contract';
+  __setBrowserForTest(profile, {
+    page: {
+      url: () => 'https://example.com/',
+      goForward: async () => ({ status: () => 200, ok: () => true }),
+    },
+  });
+  const transport = wireTransport((args) => handleCommand('forward', args, daemonContext(profile)));
+  const output = await runForward(transport, { profile, named: {} });
+  assert.equal(output.cmd, 'forward');
+  assert.equal(output.navigated, true);
+  assert.equal(output.finalUrl, 'https://example.com/');
+});
+
+test('reload projects reloaded/statusCode/finalUrl through the daemon wire', async () => {
+  enablePipeline();
+  enableBridge();
+  const profile = 'reload_wire_contract';
+  __setBrowserForTest(profile, {
+    page: {
+      url: () => 'https://example.com/',
+      reload: async ({ waitUntil }) => {
+        assert.equal(waitUntil, 'load');
+        return { status: () => 200, ok: () => true };
+      },
+    },
+  });
+  const transport = wireTransport((args) => handleCommand('reload', args, daemonContext(profile)));
+  const output = await runReload(transport, { profile, named: {} });
+  assert.equal(output.cmd, 'reload');
+  assert.equal(output.reloaded, true);
+  assert.equal(output.statusCode, 200);
+  assert.equal(output.finalUrl, 'https://example.com/');
+});
+
+test('back/forward/reload belong to the canonical browser command set', () => {
+  assert.equal(isBrowserCommand('back'), true);
+  assert.equal(isBrowserCommand('forward'), true);
+  assert.equal(isBrowserCommand('reload'), true);
 });

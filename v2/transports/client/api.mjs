@@ -18,10 +18,10 @@ export function __enableTestRoot() { _enabled = true; }
 
 // All 29 commands supported by camo v2 (kebab-case)
 const ALLOWED_CMDS = new Set([
-  'click', 'close-tab', 'daemon', 'evaluate', 'fetch-page', 'find-elements',
-  'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'goto', 'hover',
+  'back', 'click', 'close-tab', 'daemon', 'evaluate', 'fetch-page', 'find-elements',
+  'forward', 'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'goto', 'hover',
   'list-tabs', 'new-tab', 'screenshot', 'scroll', 'scroll-and-collect', 'select',
-  'set-cookies', 'set-user-agent', 'set-viewport', 'snapshot', 'start', 'stop', 'switch-tab',
+  'reload', 'set-cookies', 'set-user-agent', 'set-viewport', 'snapshot', 'start', 'stop', 'switch-tab',
   'multi-open', 'type', 'upload', 'wait', 'wait-dom-stable'
 ]);
 

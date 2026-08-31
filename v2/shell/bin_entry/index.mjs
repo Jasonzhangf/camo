@@ -113,7 +113,7 @@ async function main(argv) {
 
   const hasHelpFlag = args.includes('--help') || args.includes('-h');
   const isBrowserCmd = args.length > 0 && !hasHelpFlag && (
-    ['goto', 'click', 'type', 'scroll', 'screenshot', 'get-page-info', 'get-cookies', 
+    ['goto', 'back', 'forward', 'reload', 'click', 'type', 'scroll', 'screenshot', 'get-page-info', 'get-cookies', 
      'set-cookies', 'evaluate', 'find-elements', 'wait', 'hover', 'select', 'upload',
      'fetch-page', 'snapshot', 'scroll-and-collect', 'get-readable', 'get-text',
      'new-tab', 'close-tab', 'list-tabs', 'set-viewport', 'set-user-agent', 'multi-open', 'start'].includes(args[0])

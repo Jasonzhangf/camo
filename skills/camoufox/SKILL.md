@@ -306,6 +306,9 @@ camo doctor
 
 ```bash
 camo goto <url> [--profile <id>] [--waitUntil load|domcontentloaded|networkidle]
+camo back [--profile <id>]
+camo forward [--profile <id>]
+camo reload [--waitUntil load|domcontentloaded|networkidle|commit] [--profile <id>]
 camo get-page-info [--profile <id>]
 camo get-text [--selector <css>] [--profile <id>]
 camo get-readable [--maxLength <n>] [--profile <id>]

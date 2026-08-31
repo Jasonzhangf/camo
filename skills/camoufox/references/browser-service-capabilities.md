@@ -17,6 +17,7 @@ There is no `camo init`, `camo status`, `camo sessions`, `camo cleanup`,
 ## 2. Browser/Page Primitives
 
 - navigate: `camo goto <url> [--waitUntil ...]`, `camo fetch-page <url>`
+- history: `camo back`, `camo forward`, `camo reload`
 - screenshot: `camo screenshot [--path <file>]`
 - page content: `camo snapshot`, `camo get-text`, `camo get-readable`
 - tabs: `camo new-tab`, `camo switch-tab`, `camo close-tab`, `camo list-tabs`

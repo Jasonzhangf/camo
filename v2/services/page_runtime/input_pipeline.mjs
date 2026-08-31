@@ -37,6 +37,9 @@ export { __enableTestRoot, __resetForTest };
 
 // Build wrapper functions for all 25 operations using the factory.
 export const goto = wrapOperation('goto', pageOps.goto);
+export const back = wrapOperation('back', pageOps.back);
+export const forward = wrapOperation('forward', pageOps.forward);
+export const reload = wrapOperation('reload', pageOps.reload);
 export const click = wrapOperation('click', pageOps.click);
 export const type = wrapOperation('type', pageOps.type);
 export const scroll = wrapOperation('scroll', pageOps.scroll);

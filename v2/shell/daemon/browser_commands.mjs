@@ -1,5 +1,8 @@
 const BROWSER_COMMANDS = new Set([
   'goto',
+  'back',
+  'forward',
+  'reload',
   'click',
   'type',
   'scroll',

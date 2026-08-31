@@ -15,6 +15,9 @@
 // Re-export all operations for backward compatibility with input_pipeline.
 export {
   goto,
+  back,
+  forward,
+  reload,
   newTab,
   closeTab,
   listTabs,
