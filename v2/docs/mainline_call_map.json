@@ -464,6 +464,21 @@
       "semantic_io": "CLI browser command to installation readiness result with launchVerified false"
     },
     {
+      "feature_id": "browser.installation_readiness",
+      "from": "shell.bin_entry",
+      "to": "shell.bin_entry",
+      "caller": {
+        "path": "v2/shell/bin_entry/index.mjs",
+        "symbol": "main"
+      },
+      "callee": {
+        "path": "v2/shell/camoufox_health.mjs",
+        "symbol": "ensureCamoufox",
+        "local_symbol": "ensureCamoufox"
+      },
+      "semantic_io": "repairable missing or stale browser runtime to official fetch and exact post-fetch compatibility check"
+    },
+    {
       "feature_id": "cmd.start.request",
       "from": "shell.cli",
       "to": "commands.builtins",

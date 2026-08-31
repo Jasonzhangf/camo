@@ -280,6 +280,14 @@
         {
           "path": "v2/shell/camoufox_health.mjs",
           "symbol": "checkCamoufoxHealth"
+        },
+        {
+          "path": "v2/shell/camoufox_health.mjs",
+          "symbol": "ensureCamoufox"
+        },
+        {
+          "path": "v2/shell/camoufox_health.mjs",
+          "symbol": "validateCamoufoxRuntimeVersions"
         }
       ]
     },

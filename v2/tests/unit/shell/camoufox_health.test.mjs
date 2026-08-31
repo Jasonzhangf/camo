@@ -14,7 +14,10 @@ function loadFresh() {
   return import(url);
 }
 
-function withFakeInstall(makeFake) {
+function withFakeInstall(makeFake, versionManifest = {
+  version: '152.0.4',
+  release: 'beta.29',
+}) {
   const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-health-'));
   const previousHome = process.env.HOME;
   process.env.HOME = tmpHome;
@@ -33,6 +36,12 @@ function withFakeInstall(makeFake) {
     fs.mkdirSync(propsDir, { recursive: true });
     fs.mkdirSync(macosDir, { recursive: true });
     fs.writeFileSync(path.join(propsDir, 'properties.json'), '{"fake":true}', 'utf8');
+    if (versionManifest !== null) {
+      const body = typeof versionManifest === 'string'
+        ? versionManifest
+        : JSON.stringify(versionManifest);
+      fs.writeFileSync(path.join(cacheDir, 'version.json'), body, 'utf8');
+    }
     installed = true;
   }
   return { teardown, installed };
@@ -59,4 +68,49 @@ test('positive: present Camoufox install reports installation readiness and neve
     assert.equal(out.launchVerified, false, 'install presence check must never promise launch success');
     assert.equal(out.launchOwner, 'daemon.browser_service', 'launch verification must remain owned by daemon browser-service');
   } finally { teardown(); }
+});
+
+test('negative: Camoufox beta.28 is rejected because it can deadlock mouse acknowledgements', async () => {
+  const { teardown } = withFakeInstall(true, {
+    version: '152.0.4',
+    release: 'beta.28',
+  });
+  try {
+    const mod = await loadFresh();
+    const out = await mod.checkCamoufoxHealth();
+    assert.equal(out.ok, false);
+    assert.equal(out.errorCode, 'E_CAMOUFOX_BINARY_INCOMPATIBLE');
+    assert.match(out.error || '', /beta\.28|beta\.29/);
+  } finally { teardown(); }
+});
+
+test('negative: missing Camoufox version manifest is rejected explicitly', async () => {
+  const { teardown } = withFakeInstall(true, null);
+  try {
+    const mod = await loadFresh();
+    const out = await mod.checkCamoufoxHealth();
+    assert.equal(out.ok, false);
+    assert.equal(out.errorCode, 'E_CAMOUFOX_VERSION_MISSING');
+  } finally { teardown(); }
+});
+
+test('negative: malformed Camoufox version manifest is rejected explicitly', async () => {
+  const { teardown } = withFakeInstall(true, '{not-json');
+  try {
+    const mod = await loadFresh();
+    const out = await mod.checkCamoufoxHealth();
+    assert.equal(out.ok, false);
+    assert.equal(out.errorCode, 'E_CAMOUFOX_VERSION_INVALID');
+  } finally { teardown(); }
+});
+
+test('negative: unverified Playwright 1.61 is rejected by the exact runtime contract', async () => {
+  const mod = await loadFresh();
+  const out = mod.validateCamoufoxRuntimeVersions({
+    camoufoxVersion: '152.0.4',
+    camoufoxRelease: 'beta.29',
+    playwrightCoreVersion: '1.61.0',
+  });
+  assert.equal(out.ok, false);
+  assert.equal(out.errorCode, 'E_CAMOUFOX_PROTOCOL_INCOMPATIBLE');
 });

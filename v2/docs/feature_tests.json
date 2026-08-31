@@ -125,10 +125,12 @@
         "npm run test:all"
       ],
       "positive": [
-        "v2/tests/unit/shell/camoufox_health.test.mjs"
+        "v2/tests/unit/shell/camoufox_health.test.mjs",
+        "v2/tests/unit/shell/camoufox_postinstall_contract.test.mjs"
       ],
       "negative": [
-        "v2/tests/unit/shell/camoufox_health.test.mjs"
+        "v2/tests/unit/shell/camoufox_health.test.mjs",
+        "v2/tests/unit/shell/camoufox_postinstall_contract.test.mjs"
       ]
     },
     {

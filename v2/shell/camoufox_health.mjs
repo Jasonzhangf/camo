@@ -2,6 +2,58 @@
  * Check Camoufox installation readiness.
  * Browser launch verification belongs to daemon.browser_service.
  */
+const CAMOUFOX_RUNTIME_CONTRACT = Object.freeze({
+  camoufoxVersion: '152.0.4',
+  camoufoxRelease: 'beta.29',
+  playwrightCoreVersion: '1.60.0',
+});
+
+function validateCamoufoxRuntimeVersions({
+  camoufoxVersion,
+  camoufoxRelease,
+  playwrightCoreVersion,
+}) {
+  if (typeof camoufoxVersion !== 'string' || typeof camoufoxRelease !== 'string') {
+    return {
+      ok: false,
+      errorCode: 'E_CAMOUFOX_VERSION_INVALID',
+      repairable: false,
+      error: 'Camoufox version manifest must contain string version and release fields',
+    };
+  }
+
+  if (
+    camoufoxVersion !== CAMOUFOX_RUNTIME_CONTRACT.camoufoxVersion
+    || camoufoxRelease !== CAMOUFOX_RUNTIME_CONTRACT.camoufoxRelease
+  ) {
+    return {
+      ok: false,
+      errorCode: 'E_CAMOUFOX_BINARY_INCOMPATIBLE',
+      repairable: true,
+      error: `Camoufox ${camoufoxVersion}-${camoufoxRelease} is incompatible; expected ${CAMOUFOX_RUNTIME_CONTRACT.camoufoxVersion}-${CAMOUFOX_RUNTIME_CONTRACT.camoufoxRelease}`,
+    };
+  }
+
+  if (playwrightCoreVersion !== CAMOUFOX_RUNTIME_CONTRACT.playwrightCoreVersion) {
+    return {
+      ok: false,
+      errorCode: 'E_CAMOUFOX_PROTOCOL_INCOMPATIBLE',
+      repairable: false,
+      error: `playwright-core ${playwrightCoreVersion || 'unknown'} is incompatible; expected ${CAMOUFOX_RUNTIME_CONTRACT.playwrightCoreVersion}`,
+    };
+  }
+
+  return { ok: true };
+}
+
+async function readResolvedPlaywrightCoreVersion() {
+  const { createRequire } = await import('node:module');
+  const rootRequire = createRequire(import.meta.url);
+  const camoufoxEntry = rootRequire.resolve('camoufox');
+  const camoufoxRequire = createRequire(camoufoxEntry);
+  return camoufoxRequire('playwright-core/package.json').version;
+}
+
 async function checkCamoufoxHealth() {
   const os = await import('node:os');
   const path = await import('node:path');
@@ -17,6 +69,7 @@ async function checkCamoufoxHealth() {
   
   const resourcesProps = path.join(cacheDir, 'Camoufox.app', 'Contents', 'Resources', 'properties.json');
   const macosProps = path.join(cacheDir, 'Camoufox.app', 'Contents', 'MacOS', 'properties.json');
+  const versionPath = path.join(cacheDir, 'version.json');
 
   // Check 1: properties.json exists in Resources (the real location)
   if (!fs.existsSync(resourcesProps)) {
@@ -24,7 +77,61 @@ async function checkCamoufoxHealth() {
       ok: false,
       launchVerified: false,
       launchOwner: 'daemon.browser_service',
+      errorCode: 'E_CAMOUFOX_BINARY_MISSING',
+      repairable: true,
       error: 'Camoufox binary not found. Run: npx camoufox fetch',
+    };
+  }
+
+  if (!fs.existsSync(versionPath)) {
+    return {
+      ok: false,
+      launchVerified: false,
+      launchOwner: 'daemon.browser_service',
+      errorCode: 'E_CAMOUFOX_VERSION_MISSING',
+      repairable: true,
+      error: `Camoufox version manifest not found: ${versionPath}`,
+    };
+  }
+
+  let installedVersion;
+  try {
+    installedVersion = JSON.parse(fs.readFileSync(versionPath, 'utf8'));
+  } catch (cause) {
+    return {
+      ok: false,
+      launchVerified: false,
+      launchOwner: 'daemon.browser_service',
+      errorCode: 'E_CAMOUFOX_VERSION_INVALID',
+      repairable: false,
+      error: `Camoufox version manifest is invalid: ${cause?.message || cause}`,
+    };
+  }
+
+  let playwrightCoreVersion;
+  try {
+    playwrightCoreVersion = await readResolvedPlaywrightCoreVersion();
+  } catch (cause) {
+    return {
+      ok: false,
+      launchVerified: false,
+      launchOwner: 'daemon.browser_service',
+      errorCode: 'E_CAMOUFOX_PROTOCOL_INCOMPATIBLE',
+      repairable: false,
+      error: `Unable to resolve Camoufox playwright-core version: ${cause?.message || cause}`,
+    };
+  }
+
+  const compatibility = validateCamoufoxRuntimeVersions({
+    camoufoxVersion: installedVersion?.version,
+    camoufoxRelease: installedVersion?.release,
+    playwrightCoreVersion,
+  });
+  if (!compatibility.ok) {
+    return {
+      ...compatibility,
+      launchVerified: false,
+      launchOwner: 'daemon.browser_service',
     };
   }
 
@@ -37,6 +144,8 @@ async function checkCamoufoxHealth() {
         ok: false,
         launchVerified: false,
         launchOwner: 'daemon.browser_service',
+        errorCode: 'E_CAMOUFOX_INSTALL_LAYOUT_INVALID',
+        repairable: false,
         error: `Camoufox installation repair failed: ${cause?.message || cause}`,
       };
     }
@@ -56,6 +165,10 @@ async function checkCamoufoxHealth() {
     launchVerified: false,
     launchOwner: 'daemon.browser_service',
     installPath: resourcesProps,
+    versionPath,
+    camoufoxVersion: installedVersion.version,
+    camoufoxRelease: installedVersion.release,
+    playwrightCoreVersion,
   };
 }
 
@@ -64,23 +177,33 @@ async function checkCamoufoxHealth() {
  */
 async function ensureCamoufox() {
   const health = await checkCamoufoxHealth();
-  if (health.ok) return;
+  if (health.ok) return health;
 
-  // Auto-download if not present
-  if (health.error?.includes('not found')) {
-    console.error('Camoufox not found, downloading...');
-    const { spawn } = await import('node:child_process');
-    const result = spawn('npx', ['camoufox', 'fetch'], { stdio: 'inherit' });
-    await new Promise(r => { result.on('close', r); });
-    
-    // Retry health check
-    const retry = await checkCamoufoxHealth();
-    if (!retry.ok) {
-      throw new Error('Camoufox setup failed: ' + retry.error);
-    }
-  } else {
+  if (!health.repairable) {
     throw new Error('Camoufox unhealthy: ' + health.error);
   }
+
+  console.error('Camoufox runtime is missing or incompatible, fetching the admitted binary...');
+  const { spawn } = await import('node:child_process');
+  const result = spawn('npx', ['camoufox', 'fetch'], { stdio: 'inherit' });
+  const exitCode = await new Promise((resolve, reject) => {
+    result.once('error', reject);
+    result.once('close', resolve);
+  });
+  if (exitCode !== 0) {
+    throw new Error(`Camoufox fetch failed with exit code ${exitCode}`);
+  }
+
+  const retry = await checkCamoufoxHealth();
+  if (!retry.ok) {
+    throw new Error('Camoufox setup failed: ' + retry.error);
+  }
+  return retry;
 }
 
-export { checkCamoufoxHealth, ensureCamoufox };
+export {
+  CAMOUFOX_RUNTIME_CONTRACT,
+  checkCamoufoxHealth,
+  ensureCamoufox,
+  validateCamoufoxRuntimeVersions,
+};
