@@ -5,6 +5,8 @@ import path from 'node:path';
 import lockfile from 'proper-lockfile';
 import { CamoError } from '../../contracts/error_envelope/projector.mjs';
 
+export const DAEMON_LOOPBACK_HOST = '127.0.0.1';
+
 function daemonDir() {
   return path.join(os.homedir(), '.camo', 'daemon');
 }
@@ -293,6 +295,7 @@ function assertClaimOwner(claim) {
 function activeRegistration(raw, file) {
   const valid = raw.state === 'active'
     && typeof raw.daemonId === 'string' && raw.daemonId.length > 0
+    && raw.host === DAEMON_LOOPBACK_HOST
     && Number.isInteger(raw.wsPort) && raw.wsPort > 0
     && Number.isInteger(raw.httpPort) && raw.httpPort > 0
     && raw.scope === 'shared'
@@ -335,6 +338,7 @@ export function registerDaemon({ claim, wsPort, httpPort, headless, mode }) {
     ...active,
     state: 'active',
     daemonId: `daemon-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    host: DAEMON_LOOPBACK_HOST,
     wsPort,
     httpPort,
     scope: 'shared',
