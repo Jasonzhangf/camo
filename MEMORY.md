@@ -281,3 +281,13 @@ Tags: camo, protocol, set-viewport, mobile, wheel, readable, tarball, onestop, a
   live persistent/temp/legacy/invalid-input replay.
 
 Tags: camo, dsh-review, legacy-profile-migration, temp-alias, health-truth, lock-iteration, release-baseline
+
+## 2026-09-01: input pipeline timeout release binding
+
+- Root fix candidate is a clean child of `5ce1d004`: `13ca9cad5e19b11e7d103e769a9e312445361107`. It adds per-operation timeout/error cleanup and explicit pipeline unlock after click/WS-timeout failure, with paired positive/negative tests.
+- Verification before install: `npm run test:all` = 381 unit + 10 smoke + 62 integration + 4 e2e pass; strict gates 20/20; build, file-size, pack dry-run, syntax, and diff checks pass. AGY review `agy-camo-input-liveness-5ce1d004-r1` returned `pass` with zero findings.
+- Release source binding: global install was first corrected to the clean worktree, then replaced by tarball install `web-auto-camo-0.4.2.tgz`; installed package is not a worktree symlink. Installed `_pipeline_state.mjs` SHA-256 equals candidate source SHA-256.
+- Tarball real-entry replay in isolated HOME with the verified Camoufox beta.29 cache: normal `click` returned `clicked:true`; forced `--timeout 1` returned explicit `E_IO_TIMEOUT`; same temp profile `get-page-info` succeeded; official `camo stop --profile temp` removed the returned `_temp_*` directory; official daemon stop ended `not_running`.
+- Residual risk: JavaScript cannot forcibly terminate an arbitrary executor that ignores `AbortSignal`; the timeout releases pipeline state and surfaces an error, but executor cancellation is not fully closed.
+
+Tags: camo, input-pipeline, timeout, ws-timeout, release-binding, tarball, installed-replay, 5ce1d004
