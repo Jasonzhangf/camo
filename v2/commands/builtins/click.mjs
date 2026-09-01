@@ -28,6 +28,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
   const selector = parsed.named?.selector ?? null;
   const text = parsed.named?.text ?? null;
   const button = parsed.named?.button ?? 'left';
+  const timeout = parsed.named?.timeout ?? null;
 
   const hasSelector = typeof selector === 'string' && selector.length > 0;
   const hasText = typeof text === 'string' && text.length > 0;
@@ -40,7 +41,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
 
   const reply = await sendCommand(transport, {
     cmd: 'click',
-    args: { profile, selector, text, button },
+    args: { profile, selector, text, button, timeout },
   });
   return {
     cmd: 'click',
@@ -48,6 +49,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
     selector,
     text,
     button,
+    timeout,
     clicked: reply.payload?.clicked === true,
     issuedAt: new Date().toISOString(),
     traceId: ctx.traceId || null,

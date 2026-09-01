@@ -104,7 +104,13 @@ export async function handleCommand(cmd, args, ctx) {
 
     case 'click': {
       const click = await importOp('click');
-      const r = await click({ profileId: profile, selector: args.selector, text: args.text, button: args.button || 'left' });
+      const r = await click({
+        profileId: profile,
+        selector: args.selector,
+        text: args.text,
+        button: args.button || 'left',
+        timeout: args.timeout,
+      });
       return { ok: true, clicked: true };
     }
 

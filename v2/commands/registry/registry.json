@@ -160,6 +160,12 @@
             ],
             "required": false,
             "doc": "mouse button"
+          },
+          "timeout": {
+            "type": "integer",
+            "min": 1,
+            "required": false,
+            "doc": "hard operation timeout in ms (default 30000)"
           }
         },
         "positional": []

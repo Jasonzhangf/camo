@@ -5,6 +5,21 @@
 import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
 import { safeId, getPageOrThrow, emit, resolveLocator } from './_page_helpers.mjs';
 
+function throwIfAborted(signal) {
+  if (signal?.aborted) throw signal.reason || new CamoError({ code: 'E_IO_TIMEOUT', details: { reason: 'operation aborted' } });
+}
+
+async function awaitProtocol(operation, signal) {
+  throwIfAborted(signal);
+  if (!signal) return operation;
+  return Promise.race([
+    operation,
+    new Promise((_, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    }),
+  ]);
+}
+
 async function chooseVisibleLocator(page, locator, profileId, selector, text, failureCode) {
   const count = await locator.count();
   const viewport = page.viewportSize?.() || null;
@@ -44,11 +59,13 @@ async function chooseVisibleLocator(page, locator, profileId, selector, text, fa
   return selected;
 }
 
-async function moveLocatorIntoViewport(page, locator, profileId, selector, text, failureCode) {
+async function moveLocatorIntoViewport(page, locator, profileId, selector, text, failureCode, signal) {
   const viewport = page.viewportSize() || { width: 800, height: 600 };
   const margin = 8;
+  let pointerAnchored = false;
 
-  for (let attempt = 0; attempt < 12; attempt += 1) {
+  for (let wheelAttempt = 0; wheelAttempt < 12; wheelAttempt += 1) {
+    throwIfAborted(signal);
     const box = await locator.boundingBox();
     if (!box) {
       throw new CamoError({
@@ -69,8 +86,11 @@ async function moveLocatorIntoViewport(page, locator, profileId, selector, text,
     const wheelY = cy < margin
       ? Math.min(-120, cy - margin)
       : (cy > viewport.height - margin ? Math.max(120, cy - (viewport.height - margin)) : 0);
-    await page.mouse.move(Math.floor(viewport.width / 2), Math.floor(viewport.height / 2));
-    await page.mouse.wheel(wheelX, wheelY);
+    if (!pointerAnchored) {
+      await awaitProtocol(page.mouse.move(Math.floor(viewport.width / 2), Math.floor(viewport.height / 2)), signal);
+      pointerAnchored = true;
+    }
+    await awaitProtocol(page.mouse.wheel(wheelX, wheelY), signal);
   }
 
   throw new CamoError({
@@ -96,7 +116,7 @@ async function moveLocatorIntoViewport(page, locator, profileId, selector, text,
  * @param {string} [opts.button] - 'left'|'right'|'middle'
  * @returns {Object} click result
  */
-export async function click({ profileId, selector, text, button = 'left' }) {
+export async function click({ profileId, selector, text, button = 'left' }, signal) {
   const pid = safeId(profileId, 'profileId');
   const page = getPageOrThrow(pid);
   const { locator, hasSelector, hasText } = resolveLocator(page, selector, text);
@@ -107,10 +127,10 @@ export async function click({ profileId, selector, text, button = 'left' }) {
 
   try {
     const loc = await chooseVisibleLocator(page, locator, pid, selector, text, 'E_BROWSER_CLICK_FAILED');
-    const point = await moveLocatorIntoViewport(page, loc, pid, selector, text, 'E_BROWSER_CLICK_FAILED');
-    await page.mouse.move(point.x, point.y);
-    await page.mouse.down({ button: btn });
-    await page.mouse.up({ button: btn });
+    const point = await moveLocatorIntoViewport(page, loc, pid, selector, text, 'E_BROWSER_CLICK_FAILED', signal);
+    await awaitProtocol(page.mouse.move(point.x, point.y), signal);
+    await awaitProtocol(page.mouse.down({ button: btn }), signal);
+    await awaitProtocol(page.mouse.up({ button: btn }), signal);
 
     const result = { profileId: pid, clicked: true, selector: hasSelector ? selector : null, text: hasText ? text : null, button: btn };
     emit(pid, 'click.done', result);
