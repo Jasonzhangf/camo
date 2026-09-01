@@ -1,18 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
 const ROOT = path.resolve(new URL('../../../', import.meta.url).pathname);
-const require = createRequire(import.meta.url);
-const { getLaunchPath } = require('camoufox');
 
 test('negative: failed launch releases lock and only removes metadata created by that start', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-launch-fail-home-'));
   const profile = `_ephemeral_launch_fail_${process.pid}`;
+  const missingExecutable = path.join(home, 'missing-camoufox');
   try {
     const script = `
       import fs from 'node:fs';
@@ -43,7 +41,7 @@ test('negative: failed launch releases lock and only removes metadata created by
       env: {
         ...process.env,
         HOME: home,
-        CAMO_EXECUTABLE_PATH: getLaunchPath(),
+        CAMO_EXECUTABLE_PATH: missingExecutable,
       },
       encoding: 'utf8',
       timeout: 30_000,
@@ -87,7 +85,7 @@ test('negative: failed launch releases lock and only removes metadata created by
       env: {
         ...process.env,
         HOME: home,
-        CAMO_EXECUTABLE_PATH: getLaunchPath(),
+        CAMO_EXECUTABLE_PATH: missingExecutable,
       },
       encoding: 'utf8',
       timeout: 30_000,
