@@ -178,6 +178,25 @@ test('negative: click builtin enforces exactly-one of selector|text', async () =
   );
 });
 
+test('positive: click builtin preserves hard timeout in the command payload', async () => {
+  enableWsTestRoot();
+  resetRoutes();
+  const transport = {
+    async sendFrame(env) {
+      assert.equal(env.payload.cmd, 'click');
+      assert.equal(env.payload.args.timeout, 1250);
+      return {
+        id: env.id,
+        kind: 'result',
+        payload: { clicked: true },
+      };
+    },
+  };
+  const parsed = parseFlags(['--selector', '#x', '--timeout', '1250'], { cmd: 'click' });
+  const result = await runBuiltin('click', transport, parsed, {});
+  assert.equal(result.timeout, 1250);
+});
+
 test('negative: type builtin rejects empty text', async () => {
   enableWsTestRoot();
   resetRoutes();

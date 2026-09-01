@@ -94,6 +94,43 @@ test('positive: offscreen target enters viewport through protocol wheel input', 
   assert.equal(result.calls.filter((entry) => entry[0] === 'wheel').length, 1);
 });
 
+test('negative: hung protocol wheel times out and releases the profile pipeline', () => {
+  const result = runScript(`
+    import { __enableTestRoot as enablePipeline, click, getPageInfo } from './v2/services/page_runtime/input_pipeline.mjs';
+    import { __setBrowserForTest, __enableTestRoot as enableBridge } from './v2/services/browser_service/internal/camoufox_bridge.mjs';
+    enablePipeline();
+    enableBridge();
+    const locator = {
+      count: async () => 1,
+      nth() { return this; },
+      first() { return this; },
+      async boundingBox() { return { x: 200, y: 900, width: 80, height: 20 }; },
+    };
+    __setBrowserForTest('protocol_hung_wheel', { page: {
+      viewportSize: () => ({ width: 800, height: 600 }),
+      locator: () => locator,
+      evaluate: async () => ({ title: 'still alive', url: 'https://example.com' }),
+      mouse: {
+        move: async () => {},
+        down: async () => {},
+        up: async () => {},
+        wheel: async () => new Promise(() => {}),
+      },
+    }});
+
+    let code = null;
+    try {
+      await click({ profileId: 'protocol_hung_wheel', selector: '#target', timeout: 20 });
+    } catch (error) {
+      code = error.code;
+    }
+    const info = await getPageInfo({ profileId: 'protocol_hung_wheel' });
+    process.stdout.write(JSON.stringify({ code, info }));
+  `);
+  assert.equal(result.code, 'E_IO_TIMEOUT');
+  assert.equal(result.info.title, 'still alive');
+});
+
 test('positive: offscreen click waits for wheel-driven layout settlement', () => {
   const result = runScript(`
     import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';
@@ -185,6 +222,52 @@ test('positive: multi-wheel click anchors once and settles before redispatch', (
   assert.equal(result.anchorMoves, 1);
   assert.equal(result.wheelCount, 2);
   assert.equal(result.calls.some((entry) => entry[0] === 'down'), true);
+});
+
+test('negative: second protocol wheel failure does not re-anchor the pointer', () => {
+  const result = runScript(`
+    import { __enableTestRoot as enablePipeline, click } from './v2/services/page_runtime/input_pipeline.mjs';
+    import { __setBrowserForTest, __enableTestRoot as enableBridge } from './v2/services/browser_service/internal/camoufox_bridge.mjs';
+    enablePipeline();
+    enableBridge();
+    const calls = [];
+    let wheelCount = 0;
+    let anchorMoves = 0;
+    let y = 1300;
+    const locator = {
+      count: async () => 1,
+      nth() { return this; },
+      first() { return this; },
+      async boundingBox() { return { x: 200, y, width: 80, height: 20 }; },
+    };
+    __setBrowserForTest('protocol_second_wheel_failure', { page: {
+      viewportSize: () => ({ width: 800, height: 600 }),
+      locator: () => locator,
+      waitForTimeout: async () => {},
+      mouse: {
+        move: async (x, moveY) => {
+          calls.push(['move', x, moveY]);
+          if (x === 400 && moveY === 300) anchorMoves += 1;
+        },
+        down: async (...args) => calls.push(['down', ...args]),
+        up: async (...args) => calls.push(['up', ...args]),
+        wheel: async (...args) => {
+          wheelCount += 1;
+          calls.push(['wheel', ...args]);
+          if (wheelCount === 1) y = 800;
+          else throw new Error('second wheel failed');
+        },
+      },
+    }});
+    let code = null;
+    try { await click({ profileId: 'protocol_second_wheel_failure', selector: '#target' }); }
+    catch (error) { code = error.code; }
+    process.stdout.write(JSON.stringify({ code, calls, anchorMoves, wheelCount }));
+  `);
+  assert.equal(result.code, 'E_BROWSER_CLICK_FAILED');
+  assert.equal(result.anchorMoves, 1);
+  assert.equal(result.wheelCount, 2);
+  assert.equal(result.calls.some((entry) => entry[0] === 'down' || entry[0] === 'up'), false);
 });
 
 test('positive: partially visible target clears the fixed bottom boundary with bounded wheel segments', () => {

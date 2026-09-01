@@ -1,9 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import * as inp from '../../../services/page_runtime/input_pipeline.mjs';
 import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
+import * as progressLog from '../../../services/progress_event/log.mjs';
 
 inp.__enableTestRoot();
+progressLog.__enableTestRoot();
+const progressRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-pipeline-events-'));
+progressLog.__setRunsRootForTest(progressRoot);
 
 test('positive: run() without executor returns executed:false and clears running', () => {
   inp.__resetForTest();
@@ -84,4 +91,72 @@ test('positive: concurrent operations on different profiles are isolated', async
   releaseA();
   assert.deepEqual(await a, { agent: 'a' });
   assert.equal(inp.status('agent-a').running, false);
+});
+
+test('negative: async timeout aborts the pipeline and emits an abort event', async () => {
+  inp.__resetForTest();
+  const profile = 'timeout-abort';
+  let aborted = false;
+  const pending = inp.run(profile, { kind: 'click', params: { timeout: 20 } }, (_, signal) => new Promise((_, reject) => {
+    signal.addEventListener('abort', () => {
+      aborted = true;
+      reject(new Error('operation aborted'));
+    }, { once: true });
+  }));
+
+  await assert.rejects(pending, (error) => {
+    assert.equal(error.code, 'E_IO_TIMEOUT');
+    assert.equal(error.details.profileId, profile);
+    return true;
+  });
+
+  assert.equal(inp.status(profile).running, false);
+  assert.equal(aborted, true);
+  const events = progressLog.readRecent('anonymous').filter((entry) => entry.profileId === profile);
+  assert.equal(events.at(-1).event, 'pipeline.aborted');
+  assert.equal(events.at(-1).payload.kind, 'click');
+
+  const next = inp.run(profile, { kind: 'click' }, () => ({ ok: true }));
+  assert.deepEqual(next, { ok: true });
+});
+
+test('negative: executor failure remains explicit without an abort event', () => {
+  inp.__resetForTest();
+  const profile = 'ordinary-failure';
+  let error;
+  try {
+    inp.run(profile, { kind: 'click' }, () => { throw new Error('wheel failed'); });
+  } catch (cause) {
+    error = cause;
+  }
+
+  assert.equal(error.code, 'E_INTERNAL_UNEXPECTED');
+  assert.equal(inp.status(profile).running, false);
+  const events = progressLog.readRecent('anonymous').filter((entry) => entry.profileId === profile);
+  assert.equal(events.some((entry) => entry.event === 'pipeline.aborted'), false);
+});
+
+test('negative: nested WS timeout remains an abort event', () => {
+  inp.__resetForTest();
+  const profile = 'nested-ws-timeout';
+  const cause = Object.assign(new Error('WS timeout'), { code: 'E_IO_TIMEOUT' });
+  let error;
+  try {
+    inp.run(profile, { kind: 'click' }, () => {
+      const wrapped = new CamoError({
+        code: 'E_BROWSER_CLICK_FAILED',
+        details: { reason: 'WS timeout' },
+        cause,
+      });
+      throw wrapped;
+    });
+  } catch (caught) {
+    error = caught;
+  }
+
+  assert.equal(error.code, 'E_INTERNAL_UNEXPECTED');
+  assert.equal(inp.status(profile).running, false);
+  const events = progressLog.readRecent('anonymous').filter((entry) => entry.profileId === profile);
+  assert.equal(events.at(-1).event, 'pipeline.aborted');
+  assert.equal(events.at(-1).payload.kind, 'click');
 });

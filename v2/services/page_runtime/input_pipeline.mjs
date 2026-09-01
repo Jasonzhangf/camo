@@ -30,6 +30,8 @@ import {
   getState,
   ensureWritable,
   safeId,
+  recordFailure,
+  withOperationTimeout,
 } from './_pipeline_state.mjs';
 
 // Re-export test helpers
@@ -85,18 +87,20 @@ export function run(profileId, op, executor) {
   }
   let result;
   try {
-    result = executor({ profileId, kind, params: op?.params });
+    const controller = new AbortController();
+    result = executor({ profileId, kind, params: op?.params }, controller.signal);
+    if (result && typeof result.then === 'function') {
+      return withOperationTimeout(() => result, op?.params || {}, safeId(profileId, 'profileId'), kind, controller).then(
+        (val) => { s.running = false; s.finishedAt = new Date().toISOString(); s.lastError = null; return val; },
+        (cause) => {
+          recordFailure(s, safeId(profileId, 'profileId'), kind, cause);
+          throw cause;
+        },
+      );
+    }
   } catch (cause) {
-    s.running = false;
-    s.finishedAt = new Date().toISOString();
-    s.lastError = String(cause?.message || cause);
+    recordFailure(s, safeId(profileId, 'profileId'), kind, cause);
     throw new CamoError({ code: 'E_INTERNAL_UNEXPECTED', details: { op: 'input_pipeline.run', kind, profileId }, cause });
-  }
-  if (result && typeof result.then === 'function') {
-    return Promise.resolve(result).then(
-      (val) => { s.running = false; s.finishedAt = new Date().toISOString(); s.lastError = null; return val; },
-      (cause) => { s.running = false; s.finishedAt = new Date().toISOString(); s.lastError = String(cause?.message || cause); throw cause; }
-    );
   }
   s.running = false;
   s.finishedAt = new Date().toISOString();

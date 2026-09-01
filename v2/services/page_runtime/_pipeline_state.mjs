@@ -3,6 +3,7 @@
 // Manages per-profileId operation state with at-most-one-in-flight semantics.
 
 import { CamoError } from '../../contracts/error_envelope/projector.mjs';
+import { append as appendProgress } from '../progress_event/log.mjs';
 
 let _enabled = false;
 export function __enableTestRoot() { _enabled = true; }
@@ -21,8 +22,63 @@ export function __resetForTest() {
 export const ALLOWED_KINDS = new Set(['goto', 'back', 'forward', 'reload', 'click', 'type', 'scroll', 'screenshot', 'snapshot', 'wait', 'evaluate', 'upload', 'select', 'switchPage', 'hover', 'getText', 'getPageInfo', 'findElements', 'getReadable', 'newTab', 'closeTab', 'listTabs', 'switchTab', 'multiOpen', 'getCookies', 'setCookies', 'setUserAgent', 'setuseragent', 'setViewport', 'waitForDomStable', 'scrollAndCollect', 'fetch']);
 
 const _state = new Map();
+const DEFAULT_OPERATION_TIMEOUT_MS = 30_000;
 
 function nowIso() { return new Date().toISOString(); }
+
+function resolveTimeoutMs(args) {
+  const timeout = Number(args?.timeout);
+  return Number.isFinite(timeout) && timeout > 0 ? timeout : DEFAULT_OPERATION_TIMEOUT_MS;
+}
+
+function isPipelineAbort(cause) {
+  let current = cause;
+  for (let depth = 0; current && depth < 8; depth += 1) {
+    if (current.code === 'E_IO_TIMEOUT' || /WS timeout/i.test(String(current.message || current))) return true;
+    current = current.cause;
+  }
+  return false;
+}
+
+function emitPipelineAborted(profileId, kind, cause) {
+  appendProgress({
+    event: 'pipeline.aborted',
+    source: 'input_pipeline',
+    profileId,
+    payload: {
+      kind,
+      code: cause?.code || 'E_INTERNAL_UNEXPECTED',
+      reason: cause?.details?.reason || cause?.message || String(cause),
+    },
+  });
+}
+
+function recordFailure(state, profileId, kind, cause) {
+  state.running = false;
+  state.finishedAt = nowIso();
+  state.lastError = String(cause?.message || cause);
+  if (isPipelineAbort(cause)) emitPipelineAborted(profileId, kind, cause);
+}
+
+async function withOperationTimeout(executor, args, profileId, kind, controller = new AbortController()) {
+  const timeoutMs = resolveTimeoutMs(args);
+  let timer;
+  const timeoutError = new CamoError({
+    code: 'E_IO_TIMEOUT',
+    details: { op: 'input_pipeline', profileId, kind, timeoutMs, reason: 'operation timeout' },
+  });
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort(timeoutError);
+      reject(timeoutError);
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([Promise.resolve().then(() => executor(args, controller.signal)), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export function safeId(id, field) {
   const v = String(id || '').trim();
@@ -71,19 +127,19 @@ export function wrapOperation(kind, executor) {
     s.startedAt = nowIso();
     s.lastKind = kind;
     try {
-      const result = await executor(args);
+      const result = await withOperationTimeout(executor, args, pid, kind);
       s.running = false;
       s.finishedAt = nowIso();
       s.lastError = null;
       return result;
     } catch (cause) {
-      s.running = false;
-      s.finishedAt = nowIso();
-      s.lastError = String(cause?.message || cause);
+      recordFailure(s, pid, kind, cause);
       throw cause;
     }
   };
 }
+
+export { recordFailure, withOperationTimeout };
 
 /**
  * Get status for a profileId (read-only, always available).
