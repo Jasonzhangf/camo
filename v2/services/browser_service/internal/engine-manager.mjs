@@ -226,6 +226,9 @@ export async function launchEngineContext(opts) {
         data_dir: opts.profileDir,
         humanize: false,
         i_know_what_im_doing: true,
+        // Camoufox 0.1.19 otherwise reads version.json from its HOME-derived
+        // cache even when executable_path points at an explicit installation.
+        ff_version: '152',
         ...(useMinimalWindowsOptions ? {} : { locale: opts.locale || 'zh-CN' }),
         ...(useMinimalWindowsOptions ? {} : {
             fonts: [

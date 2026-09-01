@@ -16,3 +16,7 @@ test('negative: Camoufox acknowledgement uses only the supported snake-case opti
   assert.match(source, /\bi_know_what_im_doing:\s*true\b/);
   assert.doesNotMatch(source, /\biKnowWhatImDoing\b/);
 });
+
+test('positive: explicit executable launches carry the admitted Firefox major version', () => {
+  assert.match(source, /\bff_version:\s*['"]152['"]/);
+});
