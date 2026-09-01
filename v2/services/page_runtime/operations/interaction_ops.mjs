@@ -78,6 +78,10 @@ async function moveLocatorIntoViewport(page, locator, profileId, selector, text,
     const cx = Math.round(box.x + box.width / 2);
     const cy = Math.round(box.y + box.height / 2);
     const activeVerticalMargin = pointerAnchored ? verticalMargin : margin;
+    const insideViewport = box.x >= 0 && box.x + box.width <= viewport.width
+      && box.y >= 0 && box.y + box.height <= viewport.height;
+    if (!pointerAnchored && insideViewport) return { x: cx, y: cy };
+
     const inside = box.x >= margin && box.x + box.width <= viewport.width - margin
       && box.y >= activeVerticalMargin
       && box.y + box.height <= viewport.height - activeVerticalMargin;
