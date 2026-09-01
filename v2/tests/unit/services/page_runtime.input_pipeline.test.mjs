@@ -160,3 +160,21 @@ test('negative: nested WS timeout remains an abort event', () => {
   assert.equal(events.at(-1).event, 'pipeline.aborted');
   assert.equal(events.at(-1).payload.kind, 'click');
 });
+
+test('negative: untyped WS timeout text does not emit an abort event', () => {
+  inp.__resetForTest();
+  const profile = 'untyped-ws-timeout';
+  let error;
+  try {
+    inp.run(profile, { kind: 'click' }, () => {
+      throw new Error('WS timeout');
+    });
+  } catch (caught) {
+    error = caught;
+  }
+
+  assert.equal(error.code, 'E_INTERNAL_UNEXPECTED');
+  assert.equal(inp.status(profile).running, false);
+  const events = progressLog.readRecent('anonymous').filter((entry) => entry.profileId === profile);
+  assert.equal(events.some((entry) => entry.event === 'pipeline.aborted'), false);
+});

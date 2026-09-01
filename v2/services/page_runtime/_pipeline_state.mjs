@@ -34,7 +34,7 @@ function resolveTimeoutMs(args) {
 function isPipelineAbort(cause) {
   let current = cause;
   for (let depth = 0; current && depth < 8; depth += 1) {
-    if (current.code === 'E_IO_TIMEOUT' || /WS timeout/i.test(String(current.message || current))) return true;
+    if (current.code === 'E_IO_TIMEOUT') return true;
     current = current.cause;
   }
   return false;
