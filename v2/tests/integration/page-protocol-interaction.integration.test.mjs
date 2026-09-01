@@ -65,7 +65,6 @@ test('positive: click, hover, and type use only protocol mouse/keyboard events',
   ]);
   assert.equal(result.calls.some((entry) => entry[0] === 'evaluate'), false);
 });
-
 test('positive: offscreen target enters viewport through protocol wheel input', () => {
   const result = runScript(`
     import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';
@@ -93,7 +92,6 @@ test('positive: offscreen target enters viewport through protocol wheel input', 
   assert.equal(result.out.clicked, true);
   assert.equal(result.calls.filter((entry) => entry[0] === 'wheel').length, 1);
 });
-
 test('negative: hung protocol wheel times out and releases the profile pipeline', () => {
   const result = runScript(`
     import { __enableTestRoot as enablePipeline, click, getPageInfo } from './v2/services/page_runtime/input_pipeline.mjs';
@@ -130,7 +128,6 @@ test('negative: hung protocol wheel times out and releases the profile pipeline'
   assert.equal(result.code, 'E_IO_TIMEOUT');
   assert.equal(result.info.title, 'still alive');
 });
-
 test('positive: offscreen click waits for wheel-driven layout settlement', () => {
   const result = runScript(`
     import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';
@@ -164,7 +161,6 @@ test('positive: offscreen click waits for wheel-driven layout settlement', () =>
   assert.equal(result.waitCalls >= 1, true);
   assert.equal(result.calls.some((entry) => entry[0] === 'down'), true);
 });
-
 test('positive: multi-wheel click anchors once and settles before redispatch', () => {
   const result = runScript(`
     import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';
@@ -223,7 +219,6 @@ test('positive: multi-wheel click anchors once and settles before redispatch', (
   assert.equal(result.wheelCount, 2);
   assert.equal(result.calls.some((entry) => entry[0] === 'down'), true);
 });
-
 test('negative: second protocol wheel failure does not re-anchor the pointer', () => {
   const result = runScript(`
     import { __enableTestRoot as enablePipeline, click } from './v2/services/page_runtime/input_pipeline.mjs';
