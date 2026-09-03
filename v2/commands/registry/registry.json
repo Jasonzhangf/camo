@@ -220,6 +220,20 @@
             "required": false,
             "doc": "mouse button"
           },
+          "dialogAction": {
+            "type": "enum",
+            "values": [
+              "accept",
+              "dismiss"
+            ],
+            "required": false,
+            "doc": "explicitly handle a native browser dialog triggered by this click"
+          },
+          "dialogText": {
+            "type": "string",
+            "required": false,
+            "doc": "prompt response text used when --dialog-action accept"
+          },
           "timeout": {
             "type": "integer",
             "min": 1,

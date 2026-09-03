@@ -6,7 +6,7 @@
 // Sub-modules:
 //   - _page_helpers.mjs  : shared helpers (safeId, getPageOrThrow, emit, etc.)
 //   - navigation_ops.mjs : goto, newTab, closeTab, listTabs
-//   - interaction_ops.mjs: click, hover, type, scroll, upload, select
+//   - interaction_ops.mjs: click (including explicit native dialog handling), hover, type, scroll, upload, select
 //   - query_ops.mjs      : screenshot, snapshot, getText, getPageInfo, findElements, getReadable
 //   - config_ops.mjs     : getCookies, setCookies, setViewport
 //   - wait_ops.mjs       : wait, waitForDomStable

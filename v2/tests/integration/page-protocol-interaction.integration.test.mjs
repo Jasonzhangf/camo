@@ -4,7 +4,6 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-
 const ROOT = path.resolve(new URL('../../../', import.meta.url).pathname);
 
 function runScript(source) {
@@ -65,6 +64,7 @@ test('positive: click, hover, and type use only protocol mouse/keyboard events',
   ]);
   assert.equal(result.calls.some((entry) => entry[0] === 'evaluate'), false);
 });
+
 test('positive: offscreen target enters viewport through protocol wheel input', () => {
   const result = runScript(`
     import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';

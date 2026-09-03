@@ -166,28 +166,68 @@ async function moveLocatorIntoViewport(page, locator, profileId, selector, text,
  * @param {string} [opts.button] - 'left'|'right'|'middle'
  * @returns {Object} click result
  */
-export async function click({ profileId, selector, text, button = 'left' }, signal) {
+export async function click({ profileId, selector, text, button = 'left', dialogAction = null, dialogText = null }, signal) {
   const pid = safeId(profileId, 'profileId');
   const page = getPageOrThrow(pid);
   const { locator, hasSelector, hasText } = resolveLocator(page, selector, text);
   if (!locator) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'selector or text' } });
   const allowedButtons = new Set(['left', 'right', 'middle']);
   const btn = allowedButtons.has(button) ? button : 'left';
+  const allowedDialogActions = new Set(['accept', 'dismiss']);
+  if (dialogAction !== null && !allowedDialogActions.has(dialogAction)) {
+    throw new CamoError({
+      code: 'E_INPUT_INVALID',
+      details: { field: 'dialogAction', value: dialogAction, allowed: [...allowedDialogActions] },
+    });
+  }
+  if (dialogText !== null && typeof dialogText !== 'string') {
+    throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'dialogText', value: dialogText } });
+  }
+  if (dialogText !== null && dialogAction !== 'accept') {
+    throw new CamoError({
+      code: 'E_INPUT_INVALID',
+      details: { field: 'dialogText', reason: 'dialogText requires dialogAction=accept' },
+    });
+  }
   emit(pid, 'click.start', { selector, text, button: btn });
 
+  let dialogRecord = null;
+  let dialogHandler = null;
   try {
+    if (dialogAction !== null) {
+      dialogHandler = async (dialog) => {
+        dialogRecord = {
+          type: dialog.type(),
+          message: dialog.message(),
+          defaultValue: dialog.defaultValue(),
+          action: dialogAction,
+        };
+        if (dialogAction === 'accept') await dialog.accept(dialogText ?? undefined);
+        else await dialog.dismiss();
+      };
+      page.on('dialog', dialogHandler);
+    }
     const loc = await chooseVisibleLocator(page, locator, pid, selector, text, 'E_BROWSER_CLICK_FAILED');
     const point = await moveLocatorIntoViewport(page, loc, pid, selector, text, 'E_BROWSER_CLICK_FAILED', signal);
     await awaitProtocol(page.mouse.move(point.x, point.y), signal);
     await awaitProtocol(page.mouse.down({ button: btn }), signal);
     await awaitProtocol(page.mouse.up({ button: btn }), signal);
 
-    const result = { profileId: pid, clicked: true, selector: hasSelector ? selector : null, text: hasText ? text : null, button: btn };
+    const result = {
+      profileId: pid,
+      clicked: true,
+      selector: hasSelector ? selector : null,
+      text: hasText ? text : null,
+      button: btn,
+      dialog: dialogRecord,
+    };
     emit(pid, 'click.done', result);
     return result;
   } catch (cause) {
     emit(pid, 'click.error', { selector, text, error: cause?.message });
     throw new CamoError({ code: 'E_BROWSER_CLICK_FAILED', details: { profileId: pid, selector, text, reason: cause?.details?.reason || cause?.message }, cause });
+  } finally {
+    if (dialogHandler) page.off('dialog', dialogHandler);
   }
 }
 

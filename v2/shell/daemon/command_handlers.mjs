@@ -151,9 +151,11 @@ export async function handleCommand(cmd, args, ctx) {
         selector: args.selector,
         text: args.text,
         button: args.button || 'left',
+        dialogAction: args.dialogAction,
+        dialogText: args.dialogText,
         timeout: args.timeout,
       });
-      return { ok: true, clicked: true };
+      return { ok: true, clicked: true, dialog: r.dialog || null };
     }
 
     case 'type': {
