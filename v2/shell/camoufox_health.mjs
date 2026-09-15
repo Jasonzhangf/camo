@@ -8,6 +8,21 @@ const CAMOUFOX_RUNTIME_CONTRACT = Object.freeze({
   playwrightCoreVersion: '1.60.0',
 });
 
+function camoufoxArchiveUrl() {
+  const { camoufoxVersion, camoufoxRelease } = CAMOUFOX_RUNTIME_CONTRACT;
+  const platform = process.platform === 'win32'
+    ? 'win'
+    : process.platform === 'darwin'
+      ? 'mac'
+      : 'lin';
+  const arch = process.arch === 'arm64'
+    ? 'arm64'
+    : process.arch === 'x64'
+      ? 'x86_64'
+      : process.arch;
+  return `https://github.com/daijro/camoufox/releases/download/v${camoufoxVersion}-${camoufoxRelease}/camoufox-${camoufoxVersion}-${camoufoxRelease}-${platform}.${arch}.zip`;
+}
+
 function validateCamoufoxRuntimeVersions({
   camoufoxVersion,
   camoufoxRelease,
@@ -190,14 +205,54 @@ async function ensureCamoufox() {
   }
 
   console.error('Camoufox runtime is missing or incompatible, fetching the admitted binary...');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const fs = await import('node:fs');
   const { spawn } = await import('node:child_process');
-  const result = spawn('npx', ['camoufox', 'fetch'], { stdio: 'inherit' });
-  const exitCode = await new Promise((resolve, reject) => {
-    result.once('error', reject);
-    result.once('close', resolve);
-  });
-  if (exitCode !== 0) {
-    throw new Error(`Camoufox fetch failed with exit code ${exitCode}`);
+  const cacheDir = process.platform === 'win32'
+    ? path.join(os.homedir(), 'AppData', 'Local', 'camoufox')
+    : process.platform === 'darwin'
+      ? path.join(os.homedir(), 'Library', 'Caches', 'camoufox')
+      : path.join(os.homedir(), '.cache', 'camoufox');
+  const downloadDir = path.join(cacheDir, `.download-${process.pid}-${Date.now()}`);
+  const archivePath = path.join(downloadDir, 'camoufox.zip');
+
+  fs.mkdirSync(downloadDir, { recursive: true });
+  try {
+    const curl = spawn('curl', ['-fL', '--retry', '3', '--connect-timeout', '15', '-o', archivePath, camoufoxArchiveUrl()], { stdio: 'inherit' });
+    const curlExitCode = await new Promise((resolve, reject) => {
+      curl.once('error', reject);
+      curl.once('close', resolve);
+    });
+    if (curlExitCode !== 0) {
+      throw new Error(`Camoufox archive download failed with exit code ${curlExitCode}`);
+    }
+
+    const unzip = spawn('unzip', ['-q', '-o', archivePath, '-d', downloadDir], { stdio: 'inherit' });
+    const unzipExitCode = await new Promise((resolve, reject) => {
+      unzip.once('error', reject);
+      unzip.once('close', resolve);
+    });
+    if (unzipExitCode !== 0) {
+      throw new Error(`Camoufox archive extraction failed with exit code ${unzipExitCode}`);
+    }
+
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+    fs.mkdirSync(cacheDir, { recursive: true });
+    for (const entry of fs.readdirSync(downloadDir)) {
+      if (entry === 'camoufox.zip') continue;
+      fs.renameSync(path.join(downloadDir, entry), path.join(cacheDir, entry));
+    }
+    fs.writeFileSync(
+      path.join(cacheDir, 'version.json'),
+      JSON.stringify({
+        version: CAMOUFOX_RUNTIME_CONTRACT.camoufoxVersion,
+        release: CAMOUFOX_RUNTIME_CONTRACT.camoufoxRelease,
+      }),
+      'utf8',
+    );
+  } finally {
+    fs.rmSync(downloadDir, { recursive: true, force: true });
   }
 
   const retry = await checkCamoufoxHealth();

@@ -148,3 +148,12 @@ test('negative: unverified Playwright 1.61 is rejected by the exact runtime cont
   assert.equal(out.ok, false);
   assert.equal(out.errorCode, 'E_CAMOUFOX_PROTOCOL_INCOMPATIBLE');
 });
+
+test('negative: automatic repair downloads the exact admitted Camoufox release', async () => {
+  const source = fs.readFileSync(
+    new URL('../../../shell/camoufox_health.mjs', import.meta.url),
+    'utf8',
+  );
+  assert.match(source, /camoufox-\$\{camoufoxVersion\}-\$\{camoufoxRelease\}/);
+  assert.doesNotMatch(source, /\['camoufox',\s*'fetch'\]/);
+});
