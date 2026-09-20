@@ -1,6 +1,16 @@
-# `camo close-tab`
+# camo close-tab
 
-OpenMinis-aligned browser action. See `camo close-tab --help` for usage.
+Close the page bound to a stable target.
+
+## Usage
+
+```
+camo close-tab --target <t_id> [--profile <id>]
+```
+
+The result returns both the stable `target` and its bound `page` id. Closing
+the page and deleting temporary profile data are separate lifecycle steps;
+`close-tab` never deletes the profile.
 
 ## Wiring
 
@@ -10,6 +20,7 @@ OpenMinis-aligned browser action. See `camo close-tab --help` for usage.
 
 ## Hard Guards
 
-- Requires active session (`camo start` first).
+- Requires an active target (`camo start` first).
+- `--target` is required; tab indices are not accepted.
+- A stale or cross-profile target fails explicitly.
 - No fallback; first failure is reported.
-- Profile id must match `[a-zA-Z0-9._-]+`.

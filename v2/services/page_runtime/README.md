@@ -1,11 +1,17 @@
-# services-page_runtime (design)
+# services-page_runtime
 
-Module owner placeholder. Real implementation will live in this directory.
-See `v2/resources/registry/modules.json` for the canonical id.
+Executes serialized page operations against internal page handles.
 
-Layer: see modules.json.
+The daemon resolves the external `target` through `services/session` and passes
+the resulting target handle to this module. Page runtime never mints or resolves
+external target ids, never consults a mutable current-page projection, and
+never writes the target registry.
 
-Skeletons to land here before this module becomes active:
-- `manager.mjs` (or equivalent) with single owner of the resource(s) listed in resources.json.
-- One thin `index.mjs` re-exporting public surface.
-- Tests under `v2/tests/unit/<path>/`.
+Operation modules consume `target.page` and return `targetId`/`pageId` in their
+results. Navigation, interaction, query, configuration, and wait operations all
+follow that boundary. Tab operations return stable target/page information;
+array position is presentation only.
+
+`input_pipeline.mjs` serializes actions per profile. Stale targets,
+cross-profile targets, and ambiguous multi-target resolution fail before a page
+operation is dispatched.

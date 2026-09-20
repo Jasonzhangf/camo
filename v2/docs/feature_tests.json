@@ -149,6 +149,20 @@
       ]
     },
     {
+      "id": "browser.runtime.ownership",
+      "owner_resource": "browser_instance",
+      "required_commands": [
+        "npm test",
+        "npm run test:all"
+      ],
+      "positive": [
+        "v2/tests/unit/services/browser_service.camoufox_bridge.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/services/browser_service.camoufox_bridge.test.mjs"
+      ]
+    },
+    {
       "id": "browser.lifecycle.multi_profile",
       "owner_resource": "browser_session",
       "required_commands": [
@@ -321,6 +335,39 @@
       ],
       "negative": [
         "v2/tests/unit/commands/builtins.roundtrip.test.mjs"
+      ]
+    },
+    {
+      "id": "cmd.status.read",
+      "owner_resource": "browser_target",
+      "required_commands": [
+        "npm test",
+        "npm run test:all"
+      ],
+      "positive": [
+        "v2/tests/unit/commands/status.builtin.test.mjs",
+        "v2/tests/unit/shell/daemon.target_status.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/commands/status.builtin.test.mjs",
+        "v2/tests/unit/shell/daemon.target_status.test.mjs"
+      ]
+    },
+    {
+      "id": "browser.target.lifecycle",
+      "owner_resource": "browser_target",
+      "required_commands": [
+        "npm test",
+        "npm run test:all",
+        "npm run gates"
+      ],
+      "positive": [
+        "v2/tests/unit/services/session.targets.test.mjs",
+        "v2/tests/unit/shell/daemon.target_status.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/unit/services/session.targets.test.mjs",
+        "v2/tests/unit/shell/daemon.target_status.test.mjs"
       ]
     },
     {

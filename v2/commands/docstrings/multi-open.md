@@ -6,7 +6,7 @@ screenshot of each tab.
 ## Usage
 
 ```bash
-camo multi-open --urls "https://a.com,https://b.com,https://c.com" [--out-dir <dir>] [--prefix <name>] [--profile <id>]
+camo multi-open --urls "https://a.com,https://b.com,https://c.com" [--out-dir <dir>] [--prefix <name>] [--target <t_id>] [--profile <id>]
 ```
 
 ## Arguments
@@ -14,6 +14,7 @@ camo multi-open --urls "https://a.com,https://b.com,https://c.com" [--out-dir <d
 - `--urls` (required): comma-separated list of absolute http(s) URLs.
 - `--out-dir`: directory to save screenshots (default: none, screenshots kept in memory only).
 - `--prefix`: screenshot filename prefix (default: `multi-open`).
+- `--target`: existing target used to select the browser context when the profile has multiple targets.
 - `--profile`: profile id (default: `$CAMO_PROFILE` or `default`).
 
 ## Output
@@ -21,8 +22,8 @@ camo multi-open --urls "https://a.com,https://b.com,https://c.com" [--out-dir <d
 ```json
 {
   "cmd": "multi-open",
-  "opened": [{"tabId": 0, "url": "https://a.com"}],
-  "screenshots": [{"tabId": 0, "url": "https://a.com", "size": 12345, "path": null}],
+  "opened": [{"target": "t_abc123", "page": "page_abc123", "url": "https://a.com"}],
+  "screenshots": [{"target": "t_abc123", "page": "page_abc123", "url": "https://a.com", "size": 12345, "path": null}],
   "errors": []
 }
 ```

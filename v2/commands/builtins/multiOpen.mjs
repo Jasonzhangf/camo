@@ -1,4 +1,4 @@
-// camo v2 builtin: `camo multi-open --urls <u1,u2,...> [--out-dir <dir>] [--prefix <name>] [--profile <id>]`
+// camo v2 builtin: `camo multi-open --urls <u1,u2,...> [--out-dir <dir>] [--prefix <name>] [--target <t_id>] [--profile <id>]`
 //
 // Open multiple URLs in deterministic tab order, then capture a screenshot of each.
 // URLs are given as a comma-separated list via `--urls`.
@@ -21,6 +21,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
     throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'transport' } });
   }
   const profile = safeProfile(parsed.profile);
+  const target = parsed.named?.target ?? null;
   const raw = parsed.named?.urls ?? '';
   const urls = String(raw).split(',').map((u) => u.trim()).filter(Boolean);
   if (urls.length === 0) {
@@ -31,11 +32,12 @@ export async function run(transport, parsed = {}, ctx = {}) {
 
   const reply = await sendCommand(transport, {
     cmd: 'multi-open',
-    args: { profile, urls, outDir, prefix },
+    args: { profile, target, urls, outDir, prefix },
   });
   return {
     cmd: 'multi-open',
     profile,
+    target: reply.payload?.target || target,
     opened: reply.payload?.opened ?? [],
     screenshots: reply.payload?.screenshots ?? [],
     errors: reply.payload?.errors ?? [],

@@ -1,4 +1,5 @@
-// Browser session manager. Single truth_owner for resource_id=browser_session.
+// Browser session manager. Single truth_owner for browser_session and
+// browser_target.
 //
 // In-process Map of profileId -> session. The CLI process only ever
 // reads through `read`/`list`. Writes (create/delete/markClosed) are
@@ -19,6 +20,7 @@ const MAX_LIFECYCLE_EVENTS = 4096;
 
 const _state = new Map();     // profileId -> session
 const _lifecycle = [];        // append-only event list (read-only access for tools)
+const _targets = new Map();   // targetId -> target
 
 let _enabled = false;
 export function __enableTestRoot() { _enabled = true; }
@@ -34,6 +36,10 @@ function nowIso() { return new Date().toISOString(); }
 
 function genInstanceId() {
   return `inst_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
+}
+
+function genTargetId() {
+  return `t_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
 }
 
 function pushLifecycle(event) {
@@ -77,6 +83,9 @@ export function create(profileId, info = {}) {
   const record = {
     profileId: id,
     instanceId: String(info.instanceId || genInstanceId()),
+    generation: Number.isInteger(info.generation) && info.generation >= 0
+      ? info.generation
+      : 0,
     alias,
     headless: info.headless === true,
     startedAt: now,
@@ -147,9 +156,161 @@ export function deleteSession(profileId) {
     throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser_session', profileId: id } });
   }
   const removed = _state.get(id);
+  invalidateTargetsForSession(removed.instanceId);
   _state.delete(id);
   pushLifecycle({ kind: 'delete', profileId: id, at: nowIso() });
   return removed;
+}
+
+function normalizeTargetId(targetId) {
+  const id = String(targetId || '').trim();
+  if (!id) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'target' } });
+  if (!/^t_[a-zA-Z0-9_-]+$/.test(id)) {
+    throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'target', value: id } });
+  }
+  return id;
+}
+
+function targetRecord(record, page) {
+  const now = nowIso();
+  const target = {
+    targetId: genTargetId(),
+    profileId: record.profileId,
+    sessionId: record.instanceId,
+    generation: record.generation,
+    pageId: `page_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`,
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+    page,
+  };
+  _targets.set(target.targetId, target);
+  pushLifecycle({
+    kind: 'target.allocate',
+    targetId: target.targetId,
+    profileId: record.profileId,
+    sessionId: record.instanceId,
+    generation: record.generation,
+    pageId: target.pageId,
+    at: now,
+  });
+  return target;
+}
+
+export function allocateTarget(profileId, page) {
+  ensureWritable();
+  const record = read(profileId);
+  if (!page) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'page' } });
+  return targetRecord(record, page);
+}
+
+export function listTargets({ profileId = null } = {}) {
+  const pid = profileId == null ? null : String(profileId).trim();
+  return [..._targets.values()]
+    .filter((target) => !pid || target.profileId === pid)
+    .sort((a, b) => a.createdAt < b.createdAt ? -1 : 1);
+}
+
+function assertTargetActive(target) {
+  const session = _state.get(target.profileId);
+  if (
+    !session
+    || session.status !== 'active'
+    || target.status !== 'active'
+    || target.sessionId !== session.instanceId
+    || target.generation !== session.generation
+  ) {
+    throw new CamoError({
+      code: 'E_STATE_INVALID',
+      details: {
+        resource: 'browser_target',
+        targetId: target.targetId,
+        reason: 'target is stale for the current session generation',
+        sessionId: target.sessionId,
+        generation: target.generation,
+      },
+    });
+  }
+  return target;
+}
+
+export function resolveTarget(targetId, { profileId = null } = {}) {
+  const id = normalizeTargetId(targetId);
+  const target = _targets.get(id);
+  if (!target) {
+    throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser_target', targetId: id } });
+  }
+  const expectedProfile = profileId == null ? null : String(profileId).trim();
+  if (expectedProfile && target.profileId !== expectedProfile) {
+    throw new CamoError({
+      code: 'E_STATE_INVALID',
+      details: {
+        resource: 'browser_target',
+        targetId: id,
+        reason: 'target belongs to a different profile',
+        targetProfileId: target.profileId,
+        requestedProfileId: expectedProfile,
+      },
+    });
+  }
+  return assertTargetActive(target);
+}
+
+export function resolveTargetForProfile(profileId) {
+  const pid = String(profileId || '').trim();
+  if (!pid) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'profileId' } });
+  const targets = listTargets({ profileId: pid }).filter((target) => {
+    try {
+      assertTargetActive(target);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  if (targets.length === 0) {
+    throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser_target', profileId: pid } });
+  }
+  if (targets.length > 1) {
+    throw new CamoError({
+      code: 'E_STATE_INVALID',
+      details: {
+        resource: 'browser_target',
+        profileId: pid,
+        reason: 'multiple active targets; --target is required',
+        targets: targets.map((target) => target.targetId),
+      },
+    });
+  }
+  return resolveTarget(targets[0].targetId, { profileId: pid });
+}
+
+export function invalidateTarget(targetId) {
+  ensureWritable();
+  const id = normalizeTargetId(targetId);
+  const target = _targets.get(id);
+  if (!target) {
+    throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser_target', targetId: id } });
+  }
+  target.status = 'stale';
+  target.updatedAt = nowIso();
+  pushLifecycle({ kind: 'target.invalidate', targetId: id, profileId: target.profileId, at: target.updatedAt });
+  return target;
+}
+
+function invalidateTargetsForSession(sessionId) {
+  for (const target of _targets.values()) {
+    if (target.sessionId !== sessionId || target.status !== 'active') continue;
+    target.status = 'stale';
+    target.updatedAt = nowIso();
+    pushLifecycle({
+      kind: 'target.invalidate',
+      targetId: target.targetId,
+      profileId: target.profileId,
+      sessionId,
+      reason: 'session closed',
+      at: target.updatedAt,
+    });
+  }
 }
 
 export function isAliasTaken(alias) {
@@ -168,4 +329,5 @@ export function __resetForTest() {
   if (!_enabled) throw new CamoError({ code: 'E_INTERNAL_UNEXPECTED', details: { op: '__resetForTest' } });
   _state.clear();
   _lifecycle.length = 0;
+  _targets.clear();
 }

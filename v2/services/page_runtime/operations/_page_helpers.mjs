@@ -4,7 +4,6 @@
 // It has no side effects and throws no errors on its own.
 
 import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
-import { getPage } from '../../browser_service/internal/camoufox_bridge.mjs';
 import { append as appendProgress } from '../../progress_event/log.mjs';
 
 /**
@@ -23,32 +22,21 @@ export function safeId(id, field) {
 }
 
 /**
- * Get the browser page for a profileId or throw.
- * @param {string} profileId - profile identifier
- * @returns {Object} Playwright/Camoufox page
+ * Resolve the page handle owned by a target. Callers that already received a
+ * target from daemon must pass its page handle here instead of consulting a
+ * mutable "current page" projection.
  */
-export function getPageOrThrow(profileId) {
-  const pid = safeId(profileId, 'profileId');
-  const page = getPage(pid);
-  if (!page) {
-    throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'page', profileId: pid } });
+export function getTargetPageOrThrow(target) {
+  if (!target || !target.page) {
+    throw new CamoError({ code: 'E_STATE_INVALID', details: { resource: 'browser_target', reason: 'target has no page handle' } });
   }
-  return page;
-}
-
-/**
- * Get the browser record for a profileId or throw.
- * @param {string} profileId - profile identifier
- * @returns {Object} browser record with browser/context/page
- */
-export function getBrowserOrThrow(profileId) {
-  const pid = safeId(profileId, 'profileId');
-  const { getBrowser } = require('../../browser_service/internal/camoufox_bridge.mjs');
-  const record = getBrowser(pid);
-  if (!record) {
-    throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
+  if (target.status !== 'active') {
+    throw new CamoError({
+      code: 'E_STATE_INVALID',
+      details: { resource: 'browser_target', targetId: target.targetId, reason: 'target is not active' },
+    });
   }
-  return record;
+  return target.page;
 }
 
 /**

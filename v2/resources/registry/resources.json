@@ -55,7 +55,6 @@
         "v2/services/browser_service/internal/camoufox_bridge.mjs::getPage",
         "v2/services/browser_service/internal/camoufox_bridge.mjs::getRecord",
         "v2/services/browser_service/internal/camoufox_bridge.mjs::getContext",
-        "v2/services/browser_service/internal/camoufox_bridge.mjs::getTabPages",
         "v2/services/browser_service/internal/camoufox_bridge.mjs::listActive"
       ],
       "write_paths": [
@@ -208,7 +207,8 @@
       "indirect_paths": [
         "v2/services/browser_service/bootstrap.mjs::touchSession->touch",
         "v2/services/browser_service/bootstrap.mjs::sweepIdleSessions->stopSession",
-        "v2/services/browser_service/bootstrap.mjs::setSessionUserAgent->deleteSession"
+        "v2/services/browser_service/bootstrap.mjs::setSessionUserAgent->deleteSession",
+        "v2/services/browser_service/bootstrap.mjs::stopSession->deleteSession"
       ],
       "forbidden_paths": [
         "v2/lifecycle/session_registry.mjs::write",
@@ -216,6 +216,37 @@
       ],
       "verification_gate": "registry.resources.browser_session",
       "policy_id": "no-cli-projection-write",
+      "status": "active"
+    },
+    {
+      "resource_id": "browser_target",
+      "display_name": "Browser target",
+      "layer": "L2_service",
+      "truth_owner": "v2/services/session",
+      "truth_store": "memory_in_owner_process",
+      "read_paths": [
+        "v2/services/session/manager.mjs::resolveTarget",
+        "v2/services/session/manager.mjs::resolveTargetForProfile",
+        "v2/services/session/manager.mjs::listTargets",
+        "v2/services/browser_service/bootstrap.mjs::resolveTarget",
+        "v2/services/browser_service/bootstrap.mjs::listTargets"
+      ],
+      "write_paths": [
+        "v2/services/session/manager.mjs::allocateTarget",
+        "v2/services/session/manager.mjs::invalidateTarget"
+      ],
+      "indirect_paths": [
+        "v2/services/browser_service/bootstrap.mjs::startSession->allocateTarget",
+        "v2/services/browser_service/bootstrap.mjs::stopSession->deleteSession",
+        "v2/shell/daemon/command_handlers.mjs::handleCommand->resolveTarget",
+        "v2/shell/daemon/command_handlers.mjs::handleCommand->listTargets"
+      ],
+      "forbidden_paths": [
+        "v2/services/page_runtime/**::target_registry_write",
+        "v2/shell/daemon/**::target_registry_write"
+      ],
+      "verification_gate": "registry.resources.browser_target",
+      "policy_id": "single-truth",
       "status": "active"
     },
     {

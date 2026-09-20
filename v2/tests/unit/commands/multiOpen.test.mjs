@@ -52,6 +52,8 @@ describe('builtins.multi-open', () => {
 });
 
 describe('page_runtime.multiOpen-operation', () => {
+  const activeTarget = (page) => ({ targetId: 't_multi', profileId: 'default', pageId: 'page_multi', status: 'active', page });
+
   test('multiOpen registered in input pipeline', async () => {
     const pipeline = await import('../../../services/page_runtime/input_pipeline.mjs');
     assert.equal(typeof pipeline.multiOpen, 'function');
@@ -59,25 +61,25 @@ describe('page_runtime.multiOpen-operation', () => {
 
   test('multiOpen rejects empty url list', async () => {
     const { multiOpen } = await import('../../../services/page_runtime/operations/navigation_ops.mjs');
-    await assert.rejects(multiOpen({ profileId: 'default', urls: [] }), (e) => e.code === 'E_INPUT_MISSING_FIELD');
-    await assert.rejects(multiOpen({ profileId: 'default', urls: ['not-a-url'] }), (e) => e.code === 'E_INPUT_INVALID');
+    await assert.rejects(multiOpen({ profileId: 'default', target: activeTarget({}), urls: [] }), (e) => e.code === 'E_INPUT_MISSING_FIELD');
+    await assert.rejects(multiOpen({ profileId: 'default', target: activeTarget({}), urls: ['not-a-url'] }), (e) => e.code === 'E_INPUT_INVALID');
   });
 
   test('multiOpen rejects invalid urls without truncating the request', async () => {
     const { multiOpen } = await import('../../../services/page_runtime/operations/navigation_ops.mjs');
-    await assert.rejects(multiOpen({ profileId: 'default', urls: ['ftp://x', 'gopher://y'] }), (e) => e.code === 'E_INPUT_INVALID');
+    await assert.rejects(multiOpen({ profileId: 'default', target: activeTarget({}), urls: ['ftp://x', 'gopher://y'] }), (e) => e.code === 'E_INPUT_INVALID');
     await assert.rejects(
-      multiOpen({ profileId: 'default', urls: ['https://example.com', 'ftp://x'] }),
+      multiOpen({ profileId: 'default', target: activeTarget({}), urls: ['https://example.com', 'ftp://x'] }),
       (e) => e.code === 'E_INPUT_INVALID',
     );
   });
 
-  test('multiOpen without active browser throws E_STATE_NOT_FOUND', async () => {
+  test('multiOpen without a target handle throws E_STATE_INVALID', async () => {
     const { multiOpen } = await import('../../../services/page_runtime/operations/navigation_ops.mjs');
-    await assert.rejects(multiOpen({ profileId: 'no-such-profile', urls: ['https://a.com'] }), (e) => e.code === 'E_STATE_NOT_FOUND');
+    await assert.rejects(multiOpen({ profileId: 'no-such-profile', urls: ['https://a.com'] }), (e) => e.code === 'E_STATE_INVALID');
   });
 
-  test('positive: successful pages remain open with stable index tab ids', async () => {
+  test('positive: successful pages remain open and return internal page handles', async () => {
     enableBridge();
     const pages = [];
     const makePage = (url) => ({
@@ -99,10 +101,13 @@ describe('page_runtime.multiOpen-operation', () => {
 
     const result = await multiOpen({
       profileId: 'multi-open-success',
+      target: activeTarget({}),
       urls: ['https://example.com/a', 'https://example.com/b'],
     });
 
-    assert.deepEqual(result.opened.map((entry) => entry.tabId), [0, 1]);
+    assert.equal(result.opened.length, 2);
+    assert.equal(result.opened[0].page, pages[0]);
+    assert.equal(result.opened[1].page, pages[1]);
     assert.equal(result.screenshots.length, 2);
     assert.equal(pages.length, 2);
     resetBridge();
@@ -134,6 +139,7 @@ describe('page_runtime.multiOpen-operation', () => {
     await assert.rejects(
       multiOpen({
         profileId: 'multi-open-failure',
+        target: activeTarget({}),
         urls: ['https://example.com/a', 'https://example.com/b'],
       }),
       (cause) => cause?.code === 'E_BROWSER_MULTIOPEN_FAILED',
@@ -142,71 +148,71 @@ describe('page_runtime.multiOpen-operation', () => {
     resetBridge();
   });
 
-  test('positive: listTabs filters browser-managed blank placeholders and reindexes', async () => {
+  test('positive: listTabs projects resolved targets and page ids', async () => {
     enableBridge();
-    const pages = [
-      { url: () => 'https://example.com/', title: async () => 'Example', isClosed: () => false },
-      { url: () => 'about:newtab', title: async () => '', isClosed: () => false },
-      { url: () => 'about:blank', title: async () => '', isClosed: () => false },
-      { url: () => 'https://news.ycombinator.com/', title: async () => 'Hacker News', isClosed: () => false },
-      { url: () => 'https://closed.example/', title: async () => 'Closed', isClosed: () => true },
-    ];
+    const first = { url: () => 'https://example.com/', title: async () => 'Example' };
+    const second = { url: () => 'https://news.ycombinator.com/', title: async () => 'Hacker News' };
     __setBrowserForTest('list-tabs-placeholders', {
-      context: { pages: () => pages },
-      page: pages[0],
+      context: { pages: () => [first, second] },
+      page: first,
     });
     const { listTabs } = await import('../../../services/page_runtime/operations/navigation_ops.mjs');
 
-    const result = await listTabs({ profileId: 'list-tabs-placeholders' });
+    const result = await listTabs({
+      profileId: 'list-tabs-placeholders',
+      targets: [
+        { targetId: 't_one', pageId: 'page_one', status: 'active', page: first },
+        { targetId: 't_two', pageId: 'page_two', status: 'active', page: second },
+      ],
+    });
 
     assert.equal(result.count, 2);
     assert.deepEqual(result.tabs, [
-      { tabId: 0, url: 'https://example.com/', title: 'Example' },
-      { tabId: 1, url: 'https://news.ycombinator.com/', title: 'Hacker News' },
+      { target: 't_one', page: 'page_one', url: 'https://example.com/', title: 'Example' },
+      { target: 't_two', page: 'page_two', url: 'https://news.ycombinator.com/', title: 'Hacker News' },
     ]);
     resetBridge();
   });
 
-  test('positive: newTab returns the caller-visible tab id after a blank placeholder', async () => {
+  test('positive: newTab returns the created page handle', async () => {
     enableBridge();
-    const placeholder = { url: () => 'about:newtab' };
     const page = {
       url: () => 'https://example.com/new',
       async goto() {},
       async close() {},
     };
-    const pages = [placeholder];
     __setBrowserForTest('new-tab-visible-index', {
       context: {
-        pages: () => pages,
+        pages: () => [page],
         async newPage() {
-          pages.push(page);
           return page;
         },
       },
     });
     const { newTab } = await import('../../../services/page_runtime/operations/navigation_ops.mjs');
 
-    const result = await newTab({ profileId: 'new-tab-visible-index', url: 'https://example.com/new' });
+    const result = await newTab({
+      profileId: 'new-tab-visible-index',
+      target: activeTarget({}),
+      url: 'https://example.com/new',
+    });
 
-    assert.equal(result.tabId, 0);
+    assert.equal(result.page, page);
     resetBridge();
   });
 
-  test('positive: multiOpen returns caller-visible tab ids after a blank placeholder', async () => {
+  test('positive: multiOpen returns page handles in opened and screenshot projections', async () => {
     enableBridge();
-    const pages = [{ url: () => 'about:newtab' }];
-    const openedPages = [];
+    const pages = [];
     const context = {
       pages: () => pages,
       async newPage() {
         const page = {
-          url: () => `https://example.com/${openedPages.length + 1}`,
+          url: () => `https://example.com/${pages.length + 1}`,
           async goto() {},
           async screenshot() { return Buffer.from('png'); },
           async close() {},
         };
-        openedPages.push(page);
         pages.push(page);
         return page;
       },
@@ -216,11 +222,12 @@ describe('page_runtime.multiOpen-operation', () => {
 
     const result = await multiOpen({
       profileId: 'multi-open-visible-index',
+      target: activeTarget({}),
       urls: ['https://example.com/a', 'https://example.com/b'],
     });
 
-    assert.deepEqual(result.opened.map((entry) => entry.tabId), [0, 1]);
-    assert.deepEqual(result.screenshots.map((entry) => entry.tabId), [0, 1]);
+    assert.deepEqual(result.opened.map((entry) => entry.page), pages);
+    assert.deepEqual(result.screenshots.map((entry) => entry.page), pages);
     resetBridge();
   });
 });

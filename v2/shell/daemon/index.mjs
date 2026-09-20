@@ -23,6 +23,7 @@ import { append as appendProgress } from '../../services/progress_event/log.mjs'
 import { 
   startSession, 
   stopSession, 
+  deleteTempProfile,
   hasBrowser,
   shutdown as shutdownBrowserService,
   touchSession,
@@ -103,7 +104,8 @@ async function releaseProfileBrowser(profile, forceClose) {
   const targetProfile = profile || opts.profile;
   if (opts.mode === 'ephemeral' || forceClose) {
     if (targetProfile) {
-      await stopSession(targetProfile);
+      const result = await stopSession(targetProfile);
+      if (result.ephemeral === true) await deleteTempProfile(targetProfile);
     }
   }
 }
@@ -116,6 +118,28 @@ async function handleCommand(env) {
   const profile = args.profile || opts.profile;
   const isEphemeral = profile.startsWith('_ephemeral_') || opts.mode === 'ephemeral';
   const startedAt = Date.now();
+
+  // status is a read-only projection. Do not append progress, increment
+  // in-flight state, touch session idle time, or release resources.
+  if (cmd === 'status') {
+    try {
+      const commandResult = await dispatchCommand(cmd, args, {
+        profile,
+        opts,
+        ensureBrowser,
+        ephemeralAllocations,
+      });
+      return { kind: 'result', payload: { cmd, ...commandResult } };
+    } catch (cause) {
+      const proj = cause instanceof CamoError ? cause : new CamoError({
+        code: 'E_INTERNAL_UNEXPECTED',
+        message: cause?.message || String(cause),
+        cause,
+      });
+      return { kind: 'error', payload: projectError(proj) };
+    }
+  }
+
   if (profile) inFlightProfiles.set(profile, (inFlightProfiles.get(profile) || 0) + 1);
 
   emit('command.start', { cmd, args, profile, ephemeral: isEphemeral });
@@ -254,8 +278,10 @@ function createHttpServer() {
 function createWsServer() {
   const wss = new WebSocketServer({ host: DAEMON_LOOPBACK_HOST, port: WS_PORT });
 
-  wss.on('connection', (ws) => {
-    emit('ws.connected', { remoteAddress: ws.socket?.remoteAddress });
+  wss.on('connection', (ws, request) => {
+    const quiet = new URL(request?.url || '/', `http://${DAEMON_LOOPBACK_HOST}`)
+      .searchParams.get('quiet') === 'status';
+    if (!quiet) emit('ws.connected', { remoteAddress: ws.socket?.remoteAddress });
 
     ws.on('message', async (data) => {
       let env;
@@ -288,7 +314,9 @@ function createWsServer() {
       })));
     });
 
-    ws.on('close', () => emit('ws.disconnected', {}));
+    ws.on('close', () => {
+      if (!quiet) emit('ws.disconnected', {});
+    });
     ws.on('error', (e) => emit('ws.error', { error: e.message }));
   });
 

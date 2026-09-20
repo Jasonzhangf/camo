@@ -32,6 +32,13 @@ import { read as readProfile, write as writeProfile, deleteProfile as deleteProf
 import { resolveDisplayMetrics } from '../display/resolver.mjs';
 import { resolveProfileDir, resolveEphemeralTempDirName } from './internal/storage-paths.mjs';
 import { migrateLegacyProfileData } from '../profile/storage_paths.mjs';
+import {
+    recordPendingCleanup,
+    listPendingCleanups,
+    clearPendingCleanupsForTest,
+    listReclamation,
+} from './internal/reclamation.mjs';
+import { createTargetFacade } from './internal/targets.mjs';
 
 let launchBrowserOwner = launchBrowser;
 let closeBrowserOwner = closeBrowser;
@@ -83,6 +90,14 @@ function safeId(id, field) {
     }
     return v;
 }
+
+export const {
+    resolveTarget,
+    listTargets,
+    allocateTargetForProfile,
+    allocateTargetForPage,
+    invalidateTarget,
+} = createTargetFacade({ ensureWritable, safeId, getPage });
 
 export function boot({ profileId, headless, mode } = {}) {
     const pid = safeId(profileId, 'profileId');
@@ -208,17 +223,17 @@ export async function startSession({ profileId, headless, mode, viewport, epheme
     }
 
     // Create session record
-    const { create: createSession, deleteSession: deleteSession, tryRead: tryReadSession } = await import('../session/manager.mjs');
+    const { create: createSession } = await import('../session/manager.mjs');
     const session = createSession(pid, {
         headless: hl,
         instanceId: `camoufox-${process.pid}`,
+        generation: Date.now(),
         ephemeral: effectiveEphemeral,
         metadata: { mode: m, startedAt: record.createdAt, engine: 'camoufox' },
     });
 
-    // Initialize tab pool
-    const tabPoolMod = await import('../../services/page_runtime/tab_pool.mjs');
-    tabPoolMod.next(pid);
+    const { allocateTarget } = await import('../session/manager.mjs');
+    const target = allocateTarget(pid, record.page);
 
     // Resolve display metrics
     try {
@@ -236,6 +251,7 @@ export async function startSession({ profileId, headless, mode, viewport, epheme
     return {
         profileId: pid,
         sessionId: session.instanceId,
+        target: target.targetId,
         headless: hl,
         mode: m,
         engine: 'camoufox',
@@ -243,6 +259,8 @@ export async function startSession({ profileId, headless, mode, viewport, epheme
         startedAt: session.startedAt,
     };
 }
+
+export { listPendingCleanups, clearPendingCleanupsForTest, listReclamation };
 
 export async function stopSession(profileId) {
     ensureWritable();
@@ -268,13 +286,26 @@ export async function stopSession(profileId) {
 
     emit('session.stopped', { profileId: pid, ephemeral: wasEphemeral });
 
-    if (wasEphemeral) {
-        const dir = ephemeralProfileDirFor(pid);
-        if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: false });
-        _ephemeralProfiles.delete(pid);
-    }
-
     return { profileId: pid, stopped: true, ephemeral: wasEphemeral };
+}
+
+export async function deleteTempProfile(profileId) {
+    ensureWritable();
+    const pid = safeId(profileId, 'profileId');
+    if (!_ephemeralProfiles.has(pid)) {
+        return { profileId: pid, cleaned: false, pendingCleanup: null };
+    }
+    const dir = ephemeralProfileDirFor(pid);
+    if (fs.existsSync(dir)) {
+        try {
+            fs.rmSync(dir, { recursive: true, force: false });
+        } catch (cause) {
+            recordPendingCleanup(pid, 'delete_temp_profile', cause, dir);
+            return { profileId: pid, cleaned: false, pendingCleanup: { kind: 'delete_temp_profile', path: dir, error: cause?.message || String(cause) } };
+        }
+    }
+    _ephemeralProfiles.delete(pid);
+    return { profileId: pid, cleaned: true, pendingCleanup: null };
 }
 
 export async function setSessionUserAgent({ profileId, userAgent } = {}) {
@@ -283,15 +314,37 @@ export async function setSessionUserAgent({ profileId, userAgent } = {}) {
     if (!userAgent || typeof userAgent !== 'string') {
         throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'userAgent' } });
     }
-    const { tryRead: tryReadSession, deleteSession } = await import('../session/manager.mjs');
+    const {
+        tryRead: tryReadSession,
+        deleteSession,
+        update: updateSession,
+        listTargets: listOwnedTargets,
+        invalidateTarget,
+        allocateTarget,
+    } = await import('../session/manager.mjs');
     if (!tryReadSession(pid)) {
         throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser_session', profileId: pid } });
     }
     emit('session.user_agent.start', { profileId: pid });
     try {
         const record = await relaunchBrowserOwner(pid, { userAgent });
+        // A relaunch is a new browser generation: the previous page handles are
+        // gone, so every old target must become explicitly stale before the new
+        // target is allocated against the new page.
+        for (const target of listOwnedTargets({ profileId: pid })) {
+            if (target.status === 'active') invalidateTarget(target.targetId);
+        }
+        const session = updateSession(pid, { generation: Date.now() });
+        const target = allocateTarget(pid, record.page);
         emit('session.user_agent.done', { profileId: pid });
-        return { profileId: pid, userAgent, set: true, restoredUrl: record.restoredUrl || null };
+        return {
+            profileId: pid,
+            userAgent,
+            set: true,
+            target: target.targetId,
+            sessionId: session.instanceId,
+            restoredUrl: record.restoredUrl || null,
+        };
     } catch (cause) {
         const cleanupErrors = [];
         try { await closeBrowserOwner(pid); } catch (error) { cleanupErrors.push(error); }
@@ -328,27 +381,14 @@ export function listEphemeralProfiles() {
     return [..._ephemeralProfiles.keys()];
 }
 
-export function sweepStaleEphemeralProfiles() {
+export async function sweepStaleEphemeralProfiles() {
     if (_ephemeralProfiles.size === 0) return { swept: [] };
     const swept = [];
     for (const pid of _ephemeralProfiles.keys()) {
-        const dir = ephemeralProfileDirFor(pid);
-        if (fs.existsSync(dir)) {
-            fs.rmSync(dir, { recursive: true, force: false });
-            swept.push(pid);
-        }
-        _ephemeralProfiles.delete(pid);
+        const result = await deleteTempProfile(pid);
+        if (result.cleaned) swept.push(pid);
     }
     return { swept };
-}
-
-export function getCurrentPage(profileId) {
-    const pid = safeId(profileId, 'profileId');
-    const page = getPage(pid);
-    if (!page) {
-        throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'page', profileId: pid } });
-    }
-    return page;
 }
 
 export async function getSession(profileId) {
@@ -385,7 +425,8 @@ export async function sweepIdleSessions(timeoutMs = 1800000, opts = {}) {
         if (skip.has(session.profileId)) continue;
         const updatedAt = Date.parse(session.updatedAt);
         if (!Number.isFinite(updatedAt) || updatedAt > threshold) continue;
-        await stopSession(session.profileId);
+        const result = await stopSession(session.profileId);
+        if (result.ephemeral === true) await deleteTempProfile(session.profileId);
         stopped.push(session.profileId);
     }
     return { stopped };
@@ -409,7 +450,7 @@ export async function shutdown() {
         for (const profileId of [..._lockHandles.keys()]) releaseLock(profileId, { owner: lockOwner(), pid: process.pid });
         _lockHandles.clear();
     }
-    sweepStaleEphemeralProfiles();
+    await sweepStaleEphemeralProfiles();
 }
 
 export function describe() {

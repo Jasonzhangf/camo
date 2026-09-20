@@ -268,3 +268,17 @@ export function listHeld() {
   }
   return held.sort();
 }
+
+export function listStale() {
+  const root = locksRoot();
+  if (!fs.existsSync(root)) return [];
+  const stale = [];
+  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (!isLegalProfileDirName(entry.name)) continue;
+    const profileId = entry.name;
+    const p = probe(profileId);
+    if (p.stale) stale.push(profileId);
+  }
+  return stale.sort();
+}

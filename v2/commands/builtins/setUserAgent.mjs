@@ -1,4 +1,4 @@
-// camo v2 builtin: `camo set-user-agent --ua <string> [--profile <id>]`
+// camo v2 builtin: `camo set-user-agent --ua <string> [--target <t_id>] [--profile <id>]`
 import { CamoError } from '../../contracts/error_envelope/projector.mjs';
 import { sendCommand } from '../../transports/client/api.mjs';
 export const cmd = 'set-user-agent';
@@ -11,11 +11,12 @@ function safeProfile(profileId) {
 export async function run(transport, parsed = {}, ctx = {}) {
   if (!transport || typeof transport.sendFrame !== 'function') throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'transport' } });
   const profile = safeProfile(parsed.profile);
+  const target = parsed.named?.target ?? null;
   const userAgent = parsed.named?.ua ?? null;
   if (!userAgent || typeof userAgent !== 'string') throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'ua' } });
-  const reply = await sendCommand(transport, { cmd: 'set-user-agent', args: { profile, userAgent } });
+  const reply = await sendCommand(transport, { cmd: 'set-user-agent', args: { profile, target, userAgent } });
   if (reply.payload?.set !== true || reply.payload?.userAgent !== userAgent) {
     throw new CamoError({ code: 'E_PROTO_BAD_ENVELOPE', details: { cmd, expected: { set: true, userAgent }, actual: reply.payload || null } });
   }
-  return { cmd: 'set-user-agent', profile, userAgent, set: true, issuedAt: new Date().toISOString(), traceId: ctx.traceId || null };
+  return { cmd: 'set-user-agent', profile, target: reply.payload?.target || target, userAgent, set: true, issuedAt: new Date().toISOString(), traceId: ctx.traceId || null };
 }

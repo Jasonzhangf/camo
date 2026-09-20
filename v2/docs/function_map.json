@@ -32,6 +32,10 @@
         {
           "path": "v2/services/daemon_registration/registry.mjs",
           "symbol": "listRegistrations"
+        },
+        {
+          "path": "v2/services/daemon_registration/registry.mjs",
+          "symbol": "listStaleRegistrations"
         }
       ]
     },
@@ -164,10 +168,6 @@
         {
           "path": "v2/services/browser_service/internal/camoufox_bridge.mjs",
           "symbol": "relaunchBrowser"
-        },
-        {
-          "path": "v2/services/browser_service/internal/camoufox_bridge.mjs",
-          "symbol": "getTabPages"
         }
       ]
     },
@@ -318,6 +318,40 @@
         {
           "path": "v2/services/page_runtime/input_pipeline.mjs",
           "symbol": "goto"
+        }
+      ]
+    },
+    {
+      "id": "cmd.status.read",
+      "status": "active",
+      "owner_module": "commands.builtins",
+      "entry_symbols": [
+        {
+          "path": "v2/commands/builtins/status.mjs",
+          "symbol": "run"
+        }
+      ]
+    },
+    {
+      "id": "browser.target.lifecycle",
+      "status": "active",
+      "owner_module": "services.session",
+      "entry_symbols": [
+        {
+          "path": "v2/services/session/manager.mjs",
+          "symbol": "allocateTarget"
+        },
+        {
+          "path": "v2/services/session/manager.mjs",
+          "symbol": "resolveTarget"
+        },
+        {
+          "path": "v2/services/session/manager.mjs",
+          "symbol": "listTargets"
+        },
+        {
+          "path": "v2/services/session/manager.mjs",
+          "symbol": "invalidateTarget"
         }
       ]
     },

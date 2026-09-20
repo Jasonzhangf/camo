@@ -44,7 +44,7 @@ test('positive: click accepts a native prompt through protocol dialog handling',
       },
     };
     __setBrowserForTest('protocol_dialog', { page });
-    const out = await click({ profileId: 'protocol_dialog', selector: '#after-sale', dialogAction: 'accept', dialogText: '尺寸不合适' });
+    const out = await click({ profileId: 'protocol_dialog', target: { targetId: 't_dialog', page, status: 'active' }, selector: '#after-sale', dialogAction: 'accept', dialogText: '尺寸不合适' });
     process.stdout.write(JSON.stringify({ out, listenerRemoved: !listeners.has('dialog'), calls }));
   `);
   assert.equal(result.out.clicked, true);
@@ -59,12 +59,13 @@ test('negative: click rejects an unknown dialog action before input', () => {
     import { __setBrowserForTest, __enableTestRoot as enableBridge } from './v2/services/browser_service/internal/camoufox_bridge.mjs';
     import { click } from './v2/services/page_runtime/operations/interaction_ops.mjs';
     __enableTestRoot(); enableBridge(); const calls = [];
-    __setBrowserForTest('protocol_dialog_invalid', { page: {
+    const page = {
       viewportSize: () => ({ width: 800, height: 600 }),
       locator: () => ({ count: async () => 1, nth() { return this; }, async boundingBox() { return { x: 20, y: 30, width: 80, height: 20 }; } }),
       mouse: { move: async () => calls.push('move'), down: async () => calls.push('down'), up: async () => calls.push('up') },
-    }});
-    let code = null; try { await click({ profileId: 'protocol_dialog_invalid', selector: '#after-sale', dialogAction: 'invalid' }); }
+    };
+    __setBrowserForTest('protocol_dialog_invalid', { page });
+    let code = null; try { await click({ profileId: 'protocol_dialog_invalid', target: { targetId: 't_dialog_invalid', page, status: 'active' }, selector: '#after-sale', dialogAction: 'invalid' }); }
     catch (error) { code = error.code; } process.stdout.write(JSON.stringify({ code, calls }));
   `);
   assert.equal(result.code, 'E_INPUT_INVALID');

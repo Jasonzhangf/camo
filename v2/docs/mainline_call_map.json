@@ -532,6 +532,74 @@
       "semantic_io": "optional start URL to serialized initial navigation"
     },
     {
+      "feature_id": "cmd.status.read",
+      "from": "commands.builtins",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/status.mjs",
+        "symbol": "run",
+        "local_symbol": "status.run"
+      },
+      "invocation": {
+        "kind": "registry_dispatch",
+        "registry_object": "BUILTINS",
+        "command_id": "status",
+        "builtin_namespace": "status",
+        "dispatch_local_symbol": "mod",
+        "method": "run"
+      },
+      "semantic_io": "registry-selected status command to read-only runtime projection"
+    },
+    {
+      "feature_id": "browser.target.lifecycle",
+      "from": "services.browser_service",
+      "to": "services.session",
+      "caller": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "startSession"
+      },
+      "callee": {
+        "path": "v2/services/session/manager.mjs",
+        "symbol": "allocateTarget",
+        "local_symbol": "allocateTarget"
+      },
+      "semantic_io": "new session stable page handle to target allocation"
+    },
+    {
+      "feature_id": "browser.target.lifecycle",
+      "from": "services.browser_service",
+      "to": "services.session",
+      "caller": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "stopSession"
+      },
+      "callee": {
+        "path": "v2/services/session/manager.mjs",
+        "symbol": "deleteSession",
+        "local_symbol": "deleteSession"
+      },
+      "semantic_io": "session stop to target invalidation"
+    },
+    {
+      "feature_id": "browser.target.lifecycle",
+      "from": "shell.daemon",
+      "to": "services.browser_service",
+      "caller": {
+        "path": "v2/shell/daemon/command_handlers.mjs",
+        "symbol": "resolveTarget"
+      },
+      "callee": {
+        "path": "v2/services/browser_service/bootstrap.mjs",
+        "symbol": "resolveTarget",
+        "local_symbol": "resolveOwnedTarget"
+      },
+      "semantic_io": "explicit target or unique profile to validated target page handle"
+    },
+    {
       "feature_id": "cmd.screenshot.path",
       "from": "shell.cli",
       "to": "commands.builtins",

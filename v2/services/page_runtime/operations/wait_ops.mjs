@@ -3,44 +3,45 @@
 // Wait: wait, waitForDomStable.
 
 import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
-import { safeId, getPageOrThrow, emit } from './_page_helpers.mjs';
+import { safeId, getTargetPageOrThrow, emit } from './_page_helpers.mjs';
 
 /**
  * Wait for a duration.
  * @param {Object} opts
  * @param {string} opts.profileId
  * @param {string} [opts.for_] - Condition: load, domcontentloaded, networkidle, selector, text, url
- * @param {string} [opts.target] - Selector, text, or URL target for conditional waits
+ * @param {Object} opts.target - Resolved target handle owned by daemon
+ * @param {string} [opts.condition] - Selector, text, or URL value for conditional waits
  * @param {number} [opts.timeout] - Maximum wait time in milliseconds
  * @returns {Object} wait result
  */
-export async function wait({ profileId, for_: condition = 'load', target = null, timeout = 30000, ms }) {
+export async function wait({ profileId, target, for_: forCondition = 'load', condition = null, timeout = 30000, ms }) {
   const pid = safeId(profileId, 'profileId');
   const allowed = new Set(['load', 'domcontentloaded', 'networkidle', 'selector', 'text', 'url']);
-  if (!allowed.has(condition)) throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'for', value: condition } });
+  if (!allowed.has(forCondition)) throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'for', value: forCondition } });
   const timeoutMs = typeof timeout === 'number' && timeout >= 0 ? timeout : 30000;
-  const page = getPageOrThrow(pid);
-  if (['selector', 'text', 'url'].includes(condition) && !target) {
-    throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'target' } });
+  const page = getTargetPageOrThrow(target);
+  if (['selector', 'text', 'url'].includes(forCondition) && !condition) {
+    throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'condition' } });
   }
-  emit(pid, 'wait.start', { for: condition, target, timeout: timeoutMs });
+  emit(pid, 'wait.start', { for: forCondition, condition, timeout: timeoutMs });
   try {
     if (typeof ms === 'number' && ms > 0) {
       await new Promise((resolve) => setTimeout(resolve, ms));
-    } else if (condition === 'selector') {
-      await page.locator(target).waitFor({ state: 'visible', timeout: timeoutMs });
-    } else if (condition === 'text') {
-      await page.getByText(target, { exact: false }).waitFor({ state: 'visible', timeout: timeoutMs });
-    } else if (condition === 'url') {
-      await page.waitForURL(target, { timeout: timeoutMs });
+    } else if (forCondition === 'selector') {
+      await page.locator(condition).waitFor({ state: 'visible', timeout: timeoutMs });
+    } else if (forCondition === 'text') {
+      await page.getByText(condition, { exact: false }).waitFor({ state: 'visible', timeout: timeoutMs });
+    } else if (forCondition === 'url') {
+      await page.waitForURL(condition, { timeout: timeoutMs });
     } else {
-      await page.waitForLoadState(condition, { timeout: timeoutMs });
+      await page.waitForLoadState(forCondition, { timeout: timeoutMs });
     }
   } catch (cause) {
-    emit(pid, 'wait.error', { for: condition, target, error: cause?.message });
-    throw new CamoError({ code: 'E_IO_TIMEOUT', details: { profileId: pid, for: condition, target, timeout: timeoutMs, reason: cause?.message }, cause });
+    emit(pid, 'wait.error', { for: forCondition, condition, error: cause?.message });
+    throw new CamoError({ code: 'E_IO_TIMEOUT', details: { profileId: pid, targetId: target.targetId, for: forCondition, condition, timeout: timeoutMs, reason: cause?.message }, cause });
   }
-  const result = { profileId: pid, waited: true, satisfied: true, for: condition, target, timeout: timeoutMs };
+  const result = { profileId: pid, targetId: target.targetId, waited: true, satisfied: true, for: forCondition, condition, timeout: timeoutMs };
   emit(pid, 'wait.done', result);
   return result;
 }
@@ -53,9 +54,9 @@ export async function wait({ profileId, for_: condition = 'load', target = null,
  * @param {number} [opts.pollInterval] - Poll interval in ms (default 500)
  * @returns {Object} DOM stability result
  */
-export async function waitForDomStable({ profileId, timeout, pollInterval }) {
+export async function waitForDomStable({ profileId, target, timeout, pollInterval }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   const t = typeof timeout === 'number' && timeout > 0 ? timeout : 5000;
   const poll = typeof pollInterval === 'number' && pollInterval > 0 ? pollInterval : 500;
   emit(pid, 'waitForDomStable.start', { timeout: t, pollInterval: poll });
@@ -80,7 +81,7 @@ export async function waitForDomStable({ profileId, timeout, pollInterval }) {
         setTimeout(check, pollMs);
       });
     }, { timeoutMs: t, pollMs: poll });
-    const output = { profileId: pid, ...result };
+    const output = { profileId: pid, targetId: target.targetId, ...result };
     emit(pid, 'waitForDomStable.done', { stable: result.stable });
     return output;
   } catch (cause) {

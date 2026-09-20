@@ -1,6 +1,15 @@
-# `camo new-tab`
+# camo new-tab
 
-OpenMinis-aligned browser action. See `camo new-tab --help` for usage.
+Create a page in the browser context and allocate a new stable target.
+
+## Usage
+
+```
+camo new-tab [--url <https://...>] [--target <t_id>] [--profile <id>]
+```
+
+`--target` identifies the existing browser context to use when the profile has
+multiple targets. The result contains the newly allocated `target` and `page`.
 
 ## Wiring
 
@@ -10,6 +19,6 @@ OpenMinis-aligned browser action. See `camo new-tab --help` for usage.
 
 ## Hard Guards
 
-- Requires active session (`camo start` first).
+- Requires an active browser session (`camo start` first).
+- The new page is addressed by its returned stable target, never by array index.
 - No fallback; first failure is reported.
-- Profile id must match `[a-zA-Z0-9._-]+`.

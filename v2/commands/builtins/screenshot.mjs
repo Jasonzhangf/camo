@@ -1,4 +1,4 @@
-// camo v2 builtin: `camo screenshot [--path <file>] [--profile <id>]`
+// camo v2 builtin: `camo screenshot [--path <file>] [--target <t_id>] [--profile <id>]`
 //
 // Take a screenshot of the active page. Defaults to PNG in temp dir.
 
@@ -25,6 +25,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
     throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'transport' } });
   }
   const profile = safeProfile(parsed.profile);
+  const target = parsed.named?.target || null;
   const path = parsed.named?.path || resolve(tmpdir(), `camo-screenshot-${Date.now()}.png`);
 
   if (typeof path !== 'string' || !path) {
@@ -33,11 +34,12 @@ export async function run(transport, parsed = {}, ctx = {}) {
 
   const reply = await sendCommand(transport, {
     cmd: 'screenshot',
-    args: { profile, path },
+    args: { profile, target, path },
   });
   return {
     cmd: 'screenshot',
     profile,
+    target: reply.payload?.target || target,
     path,
     saved: reply.payload?.saved === true,
     issuedAt: new Date().toISOString(),

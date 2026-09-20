@@ -43,6 +43,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
     cmd: 'start',
     sessionId: reply.payload?.sessionId || null,
     profile: reply.payload?.profile || profile,
+    target: reply.payload?.target || null,
     ephemeral: reply.payload?.ephemeral === true,
     reused: reply.payload?.reused === true,
     headless,

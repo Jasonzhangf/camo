@@ -3,7 +3,7 @@
 // Query: screenshot, snapshot, getText, getPageInfo, findElements, getReadable.
 
 import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
-import { safeId, getPageOrThrow, emit } from './_page_helpers.mjs';
+import { safeId, getTargetPageOrThrow, emit } from './_page_helpers.mjs';
 
 /**
  * Take a screenshot.
@@ -13,9 +13,9 @@ import { safeId, getPageOrThrow, emit } from './_page_helpers.mjs';
  * @param {string} [opts.path] - File path to save screenshot (optional)
  * @returns {Object} screenshot result with base64 data and saved path
  */
-export async function screenshot({ profileId, fullPage = false, path: destPath }) {
+export async function screenshot({ profileId, target, fullPage = false, path: destPath }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   emit(pid, 'screenshot.start', { fullPage, path: destPath || null });
   try {
     const screenshotOpts = { fullPage, type: 'png' };
@@ -24,6 +24,7 @@ export async function screenshot({ profileId, fullPage = false, path: destPath }
     const base64 = buffer.toString('base64');
     const result = {
       profileId: pid,
+      targetId: target.targetId,
       screenshot: true,
       format: 'png',
       size: buffer.length,
@@ -46,13 +47,20 @@ export async function screenshot({ profileId, fullPage = false, path: destPath }
  * @param {string} opts.profileId
  * @returns {Object} snapshot result with HTML
  */
-export async function snapshot({ profileId }) {
+export async function snapshot({ profileId, target }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   emit(pid, 'snapshot.start', {});
   try {
     const content = await page.content();
-    const result = { profileId: pid, snapshot: true, url: page.url(), htmlLength: content.length, html: content };
+    const result = {
+      profileId: pid,
+      targetId: target.targetId,
+      snapshot: true,
+      url: page.url(),
+      htmlLength: content.length,
+      html: content,
+    };
     emit(pid, 'snapshot.done', { htmlLength: content.length });
     return result;
   } catch (cause) {
@@ -68,9 +76,9 @@ export async function snapshot({ profileId }) {
  * @param {string} [opts.selector] - Element selector
  * @returns {Object} text result
  */
-export async function getText({ profileId, selector }) {
+export async function getText({ profileId, target, selector }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   emit(pid, 'getText.start', { selector });
   try {
     let text;
@@ -79,7 +87,7 @@ export async function getText({ profileId, selector }) {
     } else {
       text = await page.evaluate(() => document.body?.innerText || '');
     }
-    const result = { profileId: pid, text: text || '', length: (text || '').length };
+    const result = { profileId: pid, targetId: target.targetId, text: text || '', length: (text || '').length };
     emit(pid, 'getText.done', { length: result.length });
     return result;
   } catch (cause) {
@@ -94,9 +102,9 @@ export async function getText({ profileId, selector }) {
  * @param {string} opts.profileId
  * @returns {Object} page info result
  */
-export async function getPageInfo({ profileId }) {
+export async function getPageInfo({ profileId, target }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   emit(pid, 'getPageInfo.start', {});
   try {
     const info = await page.evaluate(() => ({
@@ -104,7 +112,7 @@ export async function getPageInfo({ profileId }) {
       scrollWidth: document.documentElement.scrollWidth, scrollHeight: document.documentElement.scrollHeight,
       scrollX: window.scrollX, scrollY: window.scrollY, readyState: document.readyState,
     }));
-    const result = { profileId: pid, ...info };
+    const result = { profileId: pid, targetId: target.targetId, ...info };
     emit(pid, 'getPageInfo.done', { title: info.title, url: info.url });
     return result;
   } catch (cause) {
@@ -121,9 +129,9 @@ export async function getPageInfo({ profileId }) {
  * @param {string} [opts.text] - Text to search for
  * @returns {Object} elements result
  */
-export async function findElements({ profileId, selector, text }) {
+export async function findElements({ profileId, target, selector, text }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   const hasSelector = typeof selector === 'string' && selector.length > 0;
   const hasText = typeof text === 'string' && text.length > 0;
   if (!hasSelector && !hasText) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'selector or text' } });
@@ -146,7 +154,7 @@ export async function findElements({ profileId, selector, text }) {
       }
       return results;
     }, { sel: hasSelector ? selector : '', txt: hasText ? text : '' });
-    const result = { profileId: pid, count: elements.length, elements };
+    const result = { profileId: pid, targetId: target.targetId, count: elements.length, elements };
     emit(pid, 'findElements.done', { count: elements.length });
     return result;
   } catch (cause) {
@@ -162,9 +170,9 @@ export async function findElements({ profileId, selector, text }) {
  * @param {number} [opts.maxLength] - Maximum text length
  * @returns {Object} readable text result
  */
-export async function getReadable({ profileId, maxLength }) {
+export async function getReadable({ profileId, target, maxLength }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   const max = typeof maxLength === 'number' && maxLength > 0 ? maxLength : 50000;
   emit(pid, 'getReadable.start', { maxLength: max });
   try {
@@ -175,7 +183,7 @@ export async function getReadable({ profileId, maxLength }) {
       const text = (clone.textContent || '').trim();
       return text.length > maxLen ? text.slice(0, maxLen) + '\n... [truncated]' : text;
     }, max);
-    const output = { profileId: pid, text: result, length: result.length };
+    const output = { profileId: pid, targetId: target.targetId, text: result, length: result.length };
     emit(pid, 'getReadable.done', { length: result.length });
     return output;
   } catch (cause) {

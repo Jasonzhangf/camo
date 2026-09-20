@@ -3,7 +3,7 @@
 // Config: getCookies, setCookies, setViewport.
 
 import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
-import { safeId, getPageOrThrow, emit } from './_page_helpers.mjs';
+import { safeId, getTargetPageOrThrow, emit } from './_page_helpers.mjs';
 
 let _bridge = null;
 async function getBridge() {
@@ -17,15 +17,16 @@ async function getBridge() {
  * @param {string} opts.profileId
  * @returns {Object} cookies result
  */
-export async function getCookies({ profileId }) {
+export async function getCookies({ profileId, target }) {
   const pid = safeId(profileId, 'profileId');
   const bridge = await getBridge();
   const record = bridge.getBrowser(pid);
   if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
+  getTargetPageOrThrow(target);
   emit(pid, 'getCookies.start', {});
   try {
     const cookies = await record.context.cookies();
-    const result = { profileId: pid, count: cookies.length, cookies };
+    const result = { profileId: pid, targetId: target.targetId, count: cookies.length, cookies };
     emit(pid, 'getCookies.done', { count: cookies.length });
     return result;
   } catch (cause) {
@@ -41,16 +42,17 @@ export async function getCookies({ profileId }) {
  * @param {Object[]} opts.cookies - Array of cookie objects
  * @returns {Object} set cookies result
  */
-export async function setCookies({ profileId, cookies }) {
+export async function setCookies({ profileId, target, cookies }) {
   const pid = safeId(profileId, 'profileId');
   const bridge = await getBridge();
   const record = bridge.getBrowser(pid);
   if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
+  getTargetPageOrThrow(target);
   if (!Array.isArray(cookies) || cookies.length === 0) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'cookies' } });
   emit(pid, 'setCookies.start', { count: cookies.length });
   try {
     await record.context.addCookies(cookies);
-    const result = { profileId: pid, count: cookies.length, set: true };
+    const result = { profileId: pid, targetId: target.targetId, count: cookies.length, set: true };
     emit(pid, 'setCookies.done', { count: cookies.length });
     return result;
   } catch (cause) {
@@ -67,15 +69,15 @@ export async function setCookies({ profileId, cookies }) {
  * @param {number} opts.height - Viewport height
  * @returns {Object} set viewport result
  */
-export async function setViewport({ profileId, width, height }) {
+export async function setViewport({ profileId, target, width, height }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   const w = typeof width === 'number' && width > 0 ? width : 1280;
   const h = typeof height === 'number' && height > 0 ? height : 800;
   emit(pid, 'setViewport.start', { width: w, height: h });
   try {
     await page.setViewportSize({ width: w, height: h });
-    const result = { profileId: pid, width: w, height: h, set: true };
+    const result = { profileId: pid, targetId: target.targetId, width: w, height: h, set: true };
     emit(pid, 'setViewport.done', { width: w, height: h });
     return result;
   } catch (cause) {

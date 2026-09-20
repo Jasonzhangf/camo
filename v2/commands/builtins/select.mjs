@@ -1,4 +1,4 @@
-// camo v2 builtin: `camo select --selector <css> --value <val> [--profile <id>]`
+// camo v2 builtin: `camo select --selector <css> --value <val> [--target <t_id>] [--profile <id>]`
 //
 // Select an option in a <select> element by value.
 
@@ -23,6 +23,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
     throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'transport' } });
   }
   const profile = safeProfile(parsed.profile);
+  const target = parsed.named?.target ?? null;
   const selector = parsed.named?.selector || '';
   const value = parsed.named?.value || '';
 
@@ -35,11 +36,12 @@ export async function run(transport, parsed = {}, ctx = {}) {
 
   const reply = await sendCommand(transport, {
     cmd: 'select',
-    args: { profile, selector, value },
+    args: { profile, target, selector, value },
   });
   return {
     cmd: 'select',
     profile,
+    target: reply.payload?.target || target,
     selector,
     value,
     selected: reply.payload?.selected === true,

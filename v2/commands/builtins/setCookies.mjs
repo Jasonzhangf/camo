@@ -1,4 +1,4 @@
-// camo v2 builtin: `camo set-cookies --cookies <json> [--profile <id>]`
+// camo v2 builtin: `camo set-cookies --cookies <json> [--target <t_id>] [--profile <id>]`
 import { CamoError } from '../../contracts/error_envelope/projector.mjs';
 import { sendCommand } from '../../transports/client/api.mjs';
 export const cmd = 'set-cookies';
@@ -11,9 +11,10 @@ function safeProfile(profileId) {
 export async function run(transport, parsed = {}, ctx = {}) {
   if (!transport || typeof transport.sendFrame !== 'function') throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'transport' } });
   const profile = safeProfile(parsed.profile);
+  const target = parsed.named?.target ?? null;
   let cookies = parsed.named?.cookies;
   if (typeof cookies === 'string') { try { cookies = JSON.parse(cookies); } catch { throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'cookies', reason: 'invalid JSON' } }); } }
   if (!Array.isArray(cookies) || cookies.length === 0) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'cookies' } });
-  const reply = await sendCommand(transport, { cmd: 'set-cookies', args: { profile, cookies } });
-  return { cmd: 'set-cookies', profile, count: reply.payload?.count ?? 0, set: reply.payload?.set === true, issuedAt: new Date().toISOString(), traceId: ctx.traceId || null };
+  const reply = await sendCommand(transport, { cmd: 'set-cookies', args: { profile, target, cookies } });
+  return { cmd: 'set-cookies', profile, target: reply.payload?.target || target, count: reply.payload?.count ?? 0, set: reply.payload?.set === true, issuedAt: new Date().toISOString(), traceId: ctx.traceId || null };
 }

@@ -64,6 +64,45 @@ test('positive: every successful profile command refreshes idle activity', () =>
   assert.equal(containsString(guard.test, 'daemon'), true, 'daemon status must not count as profile activity');
 });
 
+test('positive: status fast path returns before progress and in-flight writes', () => {
+  const source = fs.readFileSync(
+    new URL('../../../shell/daemon/index.mjs', import.meta.url),
+    'utf8',
+  );
+  const ast = parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
+  const handleCommand = findNode(ast, (node) => (
+    node.type === 'FunctionDeclaration' && node.id?.name === 'handleCommand'
+  ));
+  const statusGuard = findNode(handleCommand.body, (node) => (
+    node.type === 'IfStatement'
+    && node.test?.type === 'BinaryExpression'
+    && node.test.left?.type === 'Identifier'
+    && node.test.left.name === 'cmd'
+    && node.test.right?.value === 'status'
+  ));
+  assert.ok(statusGuard, 'status fast path must exist');
+  assert.equal(
+    statusGuard.start < findNode(handleCommand.body, (node) => (
+      node.type === 'CallExpression'
+      && node.callee?.type === 'Identifier'
+      && node.callee.name === 'emit'
+    )).start,
+    true,
+    'status fast path must return before command.start progress write',
+  );
+  assert.equal(
+    statusGuard.start < findNode(handleCommand.body, (node) => (
+      node.type === 'CallExpression'
+      && node.callee?.type === 'MemberExpression'
+      && node.callee.object?.type === 'Identifier'
+      && node.callee.object.name === 'inFlightProfiles'
+      && node.callee.property?.name === 'set'
+    )).start,
+    true,
+    'status fast path must return before in-flight write',
+  );
+});
+
 function findGuard(node, target) {
   if (!node || typeof node !== 'object') return null;
   if (node === target) return node.type === 'IfStatement' ? node : true;

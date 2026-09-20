@@ -3,7 +3,7 @@
 // Interaction: click, hover, type, scroll, upload, select.
 
 import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
-import { safeId, getPageOrThrow, emit, resolveLocator } from './_page_helpers.mjs';
+import { safeId, getTargetPageOrThrow, emit, resolveLocator } from './_page_helpers.mjs';
 
 function throwIfAborted(signal) {
   if (signal?.aborted) throw signal.reason || new CamoError({ code: 'E_IO_TIMEOUT', details: { reason: 'operation aborted' } });
@@ -166,9 +166,9 @@ async function moveLocatorIntoViewport(page, locator, profileId, selector, text,
  * @param {string} [opts.button] - 'left'|'right'|'middle'
  * @returns {Object} click result
  */
-export async function click({ profileId, selector, text, button = 'left', dialogAction = null, dialogText = null }, signal) {
+export async function click({ profileId, target, selector, text, button = 'left', dialogAction = null, dialogText = null }, signal) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   const { locator, hasSelector, hasText } = resolveLocator(page, selector, text);
   if (!locator) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'selector or text' } });
   const allowedButtons = new Set(['left', 'right', 'middle']);
@@ -215,6 +215,7 @@ export async function click({ profileId, selector, text, button = 'left', dialog
 
     const result = {
       profileId: pid,
+      targetId: target.targetId,
       clicked: true,
       selector: hasSelector ? selector : null,
       text: hasText ? text : null,
@@ -239,9 +240,9 @@ export async function click({ profileId, selector, text, button = 'left', dialog
  * @param {string} [opts.text] - Text to find and hover
  * @returns {Object} hover result
  */
-export async function hover({ profileId, selector, text }) {
+export async function hover({ profileId, target, selector, text }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   const { locator, hasSelector, hasText } = resolveLocator(page, selector, text);
   if (!locator) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'selector or text' } });
   emit(pid, 'hover.start', { selector, text });
@@ -249,7 +250,13 @@ export async function hover({ profileId, selector, text }) {
     const loc = await chooseVisibleLocator(page, locator, pid, selector, text, 'E_BROWSER_HOVER_FAILED');
     const point = await moveLocatorIntoViewport(page, loc, pid, selector, text, 'E_BROWSER_HOVER_FAILED');
     await page.mouse.move(point.x, point.y);
-    const result = { profileId: pid, hovered: true, selector: hasSelector ? selector : null, text: hasText ? text : null };
+    const result = {
+      profileId: pid,
+      targetId: target.targetId,
+      hovered: true,
+      selector: hasSelector ? selector : null,
+      text: hasText ? text : null,
+    };
     emit(pid, 'hover.done', result);
     return result;
   } catch (cause) {
@@ -272,9 +279,9 @@ export async function hover({ profileId, selector, text }) {
  * @param {number} [opts.delay] - Delay between keystrokes in ms
  * @returns {Object} type result
  */
-export async function type({ profileId, text, selector, delay }) {
+export async function type({ profileId, target, text, selector, delay }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   if (!text || typeof text !== 'string') throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'text' } });
   const delayMs = typeof delay === 'number' && delay >= 0 ? delay : 0;
   emit(pid, 'type.start', { length: text.length, delay: delayMs, selector });
@@ -290,7 +297,14 @@ export async function type({ profileId, text, selector, delay }) {
       await page.keyboard.press('Backspace');
     }
     await page.keyboard.type(text, { delay: delayMs });
-    const result = { profileId: pid, typed: true, length: text.length, delay: delayMs, selector: selector || null };
+    const result = {
+      profileId: pid,
+      targetId: target.targetId,
+      typed: true,
+      length: text.length,
+      delay: delayMs,
+      selector: selector || null,
+    };
     emit(pid, 'type.done', result);
     return result;
   } catch (cause) {
@@ -308,9 +322,9 @@ export async function type({ profileId, text, selector, delay }) {
  * @param {number} [opts.y] - Y offset
  * @returns {Object} scroll result
  */
-export async function scroll({ profileId, x = 0, y = 0, atX = null, atY = null }) {
+export async function scroll({ profileId, target, x = 0, y = 0, atX = null, atY = null }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   const scrollX = typeof x === 'number' ? x : 0;
   const scrollY = typeof y === 'number' ? y : 0;
   emit(pid, 'scroll.start', { x: scrollX, y: scrollY });
@@ -323,7 +337,7 @@ export async function scroll({ profileId, x = 0, y = 0, atX = null, atY = null }
     const cy = Number.isFinite(atY) ? Math.max(0, Math.min(viewport.height - 1, Math.floor(atY))) : Math.floor(viewport.height / 2);
     await page.mouse.move(cx, cy);
     await page.mouse.wheel(scrollX, scrollY);
-    const result = { profileId: pid, scrolled: true, x: scrollX, y: scrollY, atX: cx, atY: cy };
+    const result = { profileId: pid, targetId: target.targetId, scrolled: true, x: scrollX, y: scrollY, atX: cx, atY: cy };
     emit(pid, 'scroll.done', result);
     return result;
   } catch (cause) {
@@ -340,15 +354,15 @@ export async function scroll({ profileId, x = 0, y = 0, atX = null, atY = null }
  * @param {string[]} opts.files - Array of file paths
  * @returns {Object} upload result
  */
-export async function upload({ profileId, selector, files }) {
+export async function upload({ profileId, target, selector, files }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   if (!selector || typeof selector !== 'string') throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'selector' } });
   if (!Array.isArray(files) || files.length === 0) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'files' } });
   emit(pid, 'upload.start', { selector, fileCount: files.length });
   try {
     await page.locator(selector).setInputFiles(files);
-    const result = { profileId: pid, uploaded: true, selector, fileCount: files.length };
+    const result = { profileId: pid, targetId: target.targetId, uploaded: true, selector, fileCount: files.length };
     emit(pid, 'upload.done', result);
     return result;
   } catch (cause) {
@@ -365,15 +379,15 @@ export async function upload({ profileId, selector, files }) {
  * @param {string} opts.value - Value to select
  * @returns {Object} select result
  */
-export async function select({ profileId, selector, value }) {
+export async function select({ profileId, target, selector, value }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   if (!selector || typeof selector !== 'string') throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'selector' } });
   if (!value || typeof value !== 'string') throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'value' } });
   emit(pid, 'select.start', { selector, value });
   try {
     await page.locator(selector).selectOption(value);
-    const result = { profileId: pid, selected: true, selector, value };
+    const result = { profileId: pid, targetId: target.targetId, selected: true, selector, value };
     emit(pid, 'select.done', result);
     return result;
   } catch (cause) {

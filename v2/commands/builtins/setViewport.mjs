@@ -1,4 +1,4 @@
-// camo v2 builtin: `camo set-viewport --width <px> --height <px> [--profile <id>]`
+// camo v2 builtin: `camo set-viewport --width <px> --height <px> [--target <t_id>] [--profile <id>]`
 import { CamoError } from '../../contracts/error_envelope/projector.mjs';
 import { sendCommand } from '../../transports/client/api.mjs';
 export const cmd = 'set-viewport';
@@ -11,13 +11,14 @@ function safeProfile(profileId) {
 export async function run(transport, parsed = {}, ctx = {}) {
   if (!transport || typeof transport.sendFrame !== 'function') throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'transport' } });
   const profile = safeProfile(parsed.profile);
+  const target = parsed.named?.target ?? null;
   const width = parseInt(parsed.named?.width, 10);
   const height = parseInt(parsed.named?.height, 10);
   if (isNaN(width) || width <= 0) throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'width', value: parsed.named?.width } });
   if (isNaN(height) || height <= 0) throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'height', value: parsed.named?.height } });
-  const reply = await sendCommand(transport, { cmd: 'set-viewport', args: { profile, width, height } });
+  const reply = await sendCommand(transport, { cmd: 'set-viewport', args: { profile, target, width, height } });
   if (reply.payload?.set !== true || reply.payload?.width !== width || reply.payload?.height !== height) {
     throw new CamoError({ code: 'E_PROTO_BAD_ENVELOPE', details: { cmd, expected: { set: true, width, height }, actual: reply.payload || null } });
   }
-  return { cmd: 'set-viewport', profile, width, height, set: true, issuedAt: new Date().toISOString(), traceId: ctx.traceId || null };
+  return { cmd: 'set-viewport', profile, target: reply.payload?.target || target, width, height, set: true, issuedAt: new Date().toISOString(), traceId: ctx.traceId || null };
 }

@@ -1,6 +1,15 @@
-# `camo fetch-page`
+# camo fetch-page
 
-OpenMinis-aligned browser action. See `camo fetch-page --help` for usage.
+Fetch a URL in the browser context bound to a target.
+
+## Usage
+
+```
+camo fetch-page <url> [--timeout <ms>] [--target <t_id>] [--profile <id>]
+```
+
+`--target` is required when the profile has multiple active targets. The page
+runtime receives the resolved internal page handle from the daemon.
 
 ## Wiring
 
@@ -10,6 +19,6 @@ OpenMinis-aligned browser action. See `camo fetch-page --help` for usage.
 
 ## Hard Guards
 
-- Requires active session (`camo start` first).
+- Requires an active target (`camo start` first).
+- A stale or cross-profile target fails explicitly.
 - No fallback; first failure is reported.
-- Profile id must match `[a-zA-Z0-9._-]+`.

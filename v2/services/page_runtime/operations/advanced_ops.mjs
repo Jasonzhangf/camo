@@ -3,7 +3,7 @@
 // Advanced: evaluate, scrollAndCollect, fetch.
 
 import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
-import { safeId, getPageOrThrow, emit } from './_page_helpers.mjs';
+import { safeId, getTargetPageOrThrow, emit } from './_page_helpers.mjs';
 
 /**
  * Evaluate JavaScript in the page context.
@@ -12,14 +12,14 @@ import { safeId, getPageOrThrow, emit } from './_page_helpers.mjs';
  * @param {string} opts.script - JavaScript code to execute
  * @returns {Object} evaluation result
  */
-export async function evaluate({ profileId, script }) {
+export async function evaluate({ profileId, target, script }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   if (!script || typeof script !== 'string') throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'script' } });
   emit(pid, 'evaluate.start', { scriptLength: script.length });
   try {
     const result = await page.evaluate(script);
-    const output = { profileId: pid, evaluated: true, result };
+    const output = { profileId: pid, targetId: target.targetId, evaluated: true, result };
     emit(pid, 'evaluate.done', { resultType: typeof result });
     return output;
   } catch (cause) {
@@ -36,9 +36,9 @@ export async function evaluate({ profileId, script }) {
  * @param {number} [opts.scrollDelay] - Delay between scrolls in ms (default 1000)
  * @returns {Object} scroll and collect result
  */
-export async function scrollAndCollect({ profileId, scrollCount, scrollDelay }) {
+export async function scrollAndCollect({ profileId, target, scrollCount, scrollDelay }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   const count = typeof scrollCount === 'number' && scrollCount > 0 ? scrollCount : 5;
   const delay = typeof scrollDelay === 'number' && scrollDelay > 0 ? scrollDelay : 1000;
   emit(pid, 'scrollAndCollect.start', { scrollCount: count, scrollDelay: delay });
@@ -81,7 +81,7 @@ export async function scrollAndCollect({ profileId, scrollCount, scrollDelay }) 
         await new Promise((r) => setTimeout(r, delay));
       }
     }
-    const output = { profileId: pid, collected, scrolls, totalChars: collected.reduce((n, c) => n + c.text.length, 0) };
+    const output = { profileId: pid, targetId: target.targetId, collected, scrolls, totalChars: collected.reduce((n, c) => n + c.text.length, 0) };
     emit(pid, 'scrollAndCollect.done', { scrolls, items: collected.length });
     return output;
   } catch (cause) {
@@ -98,9 +98,9 @@ export async function scrollAndCollect({ profileId, scrollCount, scrollDelay }) 
  * @param {number} [opts.timeout] - Request timeout in ms (default 30000)
  * @returns {Object} fetch result
  */
-export async function fetch({ profileId, url, timeout }) {
+export async function fetch({ profileId, target, url, timeout }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   if (!url || typeof url !== 'string') throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'url' } });
   const t = typeof timeout === 'number' && timeout > 0 ? timeout : 30000;
   emit(pid, 'fetch.start', { url, timeout: t });
@@ -118,7 +118,7 @@ export async function fetch({ profileId, url, timeout }) {
         return { ok: false, error: e.message };
       }
     }, { fetchUrl: url, timeoutMs: t });
-    const output = { profileId: pid, url, ...result };
+    const output = { profileId: pid, targetId: target.targetId, url, ...result };
     emit(pid, 'fetch.done', { ok: result.ok, status: result.status });
     return output;
   } catch (cause) {

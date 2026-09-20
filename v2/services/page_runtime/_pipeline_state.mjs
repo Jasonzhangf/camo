@@ -19,7 +19,7 @@ export function __resetForTest() {
   _state.clear();
 }
 
-export const ALLOWED_KINDS = new Set(['goto', 'back', 'forward', 'reload', 'click', 'type', 'scroll', 'screenshot', 'snapshot', 'wait', 'evaluate', 'upload', 'select', 'switchPage', 'hover', 'getText', 'getPageInfo', 'findElements', 'getReadable', 'newTab', 'closeTab', 'listTabs', 'switchTab', 'multiOpen', 'getCookies', 'setCookies', 'setUserAgent', 'setuseragent', 'setViewport', 'waitForDomStable', 'scrollAndCollect', 'fetch']);
+export const ALLOWED_KINDS = new Set(['goto', 'back', 'forward', 'reload', 'click', 'type', 'scroll', 'screenshot', 'snapshot', 'wait', 'evaluate', 'upload', 'select', 'hover', 'getText', 'getPageInfo', 'findElements', 'getReadable', 'newTab', 'closeTab', 'listTabs', 'switchTab', 'multiOpen', 'getCookies', 'setCookies', 'setUserAgent', 'setuseragent', 'setViewport', 'waitForDomStable', 'scrollAndCollect', 'fetch']);
 
 const _state = new Map();
 const DEFAULT_OPERATION_TIMEOUT_MS = 30_000;
@@ -99,6 +99,11 @@ export function getState(profileId) {
   return s;
 }
 
+export function peekState(profileId) {
+  const pid = safeId(profileId, 'profileId');
+  return _state.get(pid) || null;
+}
+
 export function normalizeKind(kind) {
   const k = String(kind || '').trim().toLowerCase();
   if (!ALLOWED_KINDS.has(k)) {
@@ -147,9 +152,22 @@ export { recordFailure, withOperationTimeout };
  * @returns {Object} status snapshot
  */
 export function getStatus(profileId) {
-  const s = getState(profileId);
+  const pid = safeId(profileId, 'profileId');
+  const s = peekState(pid);
+  if (!s) {
+    return {
+      profileId: pid,
+      running: false,
+      op: null,
+      startedAt: null,
+      finishedAt: null,
+      lastKind: null,
+      lastError: null,
+      queueDepth: 0,
+    };
+  }
   return {
-    profileId: safeId(profileId, 'profileId'),
+    profileId: pid,
     running: s.running,
     op: s.op,
     startedAt: s.startedAt,

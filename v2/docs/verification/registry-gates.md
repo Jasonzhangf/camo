@@ -24,13 +24,22 @@ stays in sync with the v2 module skeleton. Per resource.
 | registry.resources.forbidden_paths_unique | hard | no two resources share a forbidden_path string |
 | registry.modules.probe_files_exist | hard | each module's owned_paths[0] exists with README.md |
 | registry.resources.gates_resolvable | soft | each resource has a real gate script (warn while status=design) |
-| per-resource (16) | design-time | resource's forbidden_paths are physically absent from v1 |
+| per-resource | resource-status | resource's forbidden_paths are physically absent from v1 |
+
+`browser_target` has its own per-resource gate at
+`registry_gates/gates/registry.resources.browser_target.mjs`. The gate checks
+the target registry's forbidden v1 shadows while the resource's
+`browser.target.lifecycle` feature test binds target allocation, resolution,
+invalidation, and daemon resolution behavior.
 
 ## Status policy
 
 - `status=design`: per-resource gates may fail. Aggregated gate exits 0
   while registry integrity passes.
 - `status=active`: per-resource gate must pass. CI runs `--strict`.
+- The registry currently declares active v2 resources, including
+  `browser_target`; strict mode therefore treats every per-resource gate
+  failure as fatal.
 
 ## CI integration
 

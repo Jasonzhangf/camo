@@ -1,175 +1,166 @@
-# camo CLI Usage (camo 0.4.3)
+# camo CLI Usage
 
 ## 0. Enforcement
 
-Use `camo` commands only. No `curl` API calls, no `node scripts/...`
-browser-control scripts, no ad-hoc wrappers that bypass `camo`.
+Use the installed `camo` CLI only. Do not use `curl`, direct service imports,
+CDP, DOM action injection, or ad-hoc browser-control scripts.
 
-If a command is uncertain, check the installed CLI:
+Check the installed command surface when uncertain:
 
 ```bash
 camo --help
 camo <command> --help
 ```
 
-Any command not listed by `camo --help` does not exist in this installed build.
-Do not use v1 leftovers (`init`, `profile create`, `sessions`, `status`,
-`cleanup`, `force-stop`, `shutdown`, `back`, `new-page`, `container`,
-`autoscript`, `events`, `highlight`, `mouse`, `window`, `cookies save/load`, ...).
+The current v2 CLI has no v1 commands such as `init`, `profile create`,
+`sessions`, `cleanup`, `force-stop`, `shutdown`, `new-page`, `container`,
+`autoscript`, `events`, `highlight`, `mouse`, or `window`.
 
-## 1. Quick Start
+## 1. Quick start
 
 ```bash
-# 1) Start the shared daemon (persistent default profile is implicit)
-camo daemon start
-
-# 2) Start a browser session
+# Ordinary browser commands auto-start or reuse the shared daemon.
 camo start --url https://example.com
-
-# 3) Inspect the page
-camo get-page-info
-camo snapshot
-
-# 4) Stop the session, then the daemon
+# Save the returned target.
+camo get-page-info --target <target>
+camo snapshot --target <target>
 camo stop
+```
+
+`camo daemon start` is optional process management; it is not required before
+`start` or another browser action.
+
+## 2. Target and profile resolution
+
+`camo start` returns `{ profile, sessionId, target }`.
+
+- `target` is the external page handle.
+- `profile` is the persistent data boundary.
+- `sessionId`, `pageId`, and `generation` are internal control fields.
+- Explicit `--profile` wins; otherwise `CAMO_PROFILE` is used, then `default`.
+- If a profile has multiple active targets, every browser action must pass
+  `--target`. Camo does not guess the current, foreground, newest, or indexed
+  page.
+- A stale target or a target from another profile fails explicitly.
+
+## 3. Command map
+
+### Lifecycle
+
+```bash
+camo start [--profile <id>] [--url <https://...>] [--headless] [--ephemeral]
+camo stop [--profile <id>]
+camo status [--profile <id>] [--target <t_id>]
+camo daemon status
 camo daemon stop
 ```
 
-## 2. Command Map
+`start` without `--url` does not navigate. With `--url`, only the target
+allocated by that start is navigated.
 
-All `--profile` flags are `--profile <id>`; there are no positional profile
-arguments in 0.4.3.
-
-### Daemon and session lifecycle
+### Navigation and page reads
 
 ```bash
-camo daemon start [--profile <id>] [--ephemeral]
-camo daemon status [--profile <id>]
-camo daemon stop  [--profile <id>]
-camo start [--profile <id>] [--url <url>] [--headless]
-camo stop  [--profile <id>]
-```
-
-Profile resolution: explicit `--profile` > `CAMO_PROFILE` > `default`.
-`camo start` without `--profile` uses persistent `default` implicitly as an
-implicit parameter. `default` currently holds persisted Weibo (微博) and
-Xiaohongshu / XHS (小红书) login cookies; it may also hold OpenCode / Google
-cookies. Cookies alone are not a live login guarantee: verify the target page
-state (`camo get-page-info`) before relying on the Weibo or Xiaohongshu session.
-Do not create a parallel profile for a platform `default` already covers.
-
-### Navigation / page state
-
-```bash
-camo goto <url> [--profile <id>] [--waitUntil load|domcontentloaded|networkidle]
-camo back [--profile <id>]
-camo forward [--profile <id>]
-camo reload [--waitUntil load|domcontentloaded|networkidle|commit] [--profile <id>]
-camo fetch-page <url> [--profile <id>] [--timeout <ms>]
-camo get-page-info [--profile <id>]
-camo get-text [--selector <css>] [--profile <id>]
-camo get-readable [--maxLength <n>] [--profile <id>]
-camo find-elements [--selector <css>|--text <text>] [--profile <id>]
-camo snapshot [--format json|yaml] [--profile <id>]
-camo screenshot [--profile <id>] [--path <file>]
+camo goto [--target <t_id>] <url> [--waitUntil load|domcontentloaded|networkidle]
+camo back [--target <t_id>]
+camo forward [--target <t_id>]
+camo reload [--target <t_id>] [--waitUntil load|domcontentloaded|networkidle|commit]
+camo fetch-page [--target <t_id>] <url> [--timeout <ms>]
+camo get-page-info [--target <t_id>]
+camo get-text [--target <t_id>] [--selector <css>]
+camo get-readable [--target <t_id>] [--maxLength <n>]
+camo find-elements [--target <t_id>] (--selector <css>|--text <text>)
+camo snapshot [--target <t_id>] [--format json|yaml]
+camo screenshot [--target <t_id>] [--path <file>]
 ```
 
 ### Interaction
 
 ```bash
-camo click (--selector <css>|--text <text>) [--button left|middle|right] [--profile <id>]
-camo hover (--selector <css>|--text <text>) [--profile <id>]
-camo type <text> [--selector <css>] [--delay <ms>] [--profile <id>]
-camo scroll [--x <px>] [--y <px>] [--profile <id>]
-camo select --selector <css> --value <value> [--profile <id>]
-camo upload --selector <css> --file <path> [--profile <id>]
-camo wait [--for load|domcontentloaded|networkidle|selector|text|url] \
-  [--target <value>] [--timeout <ms>] [--ms <ms>] [--profile <id>]
-camo wait-dom-stable [--timeout <ms>] [--poll <ms>] [--profile <id>]
-camo scroll-and-collect [--scrollCount <n>] [--delay <ms>] [--profile <id>]
+camo click [--target <t_id>] (--selector <css>|--text <text>)
+camo hover [--target <t_id>] (--selector <css>|--text <text>)
+camo type [--target <t_id>] <text> [--selector <css>] [--delay <ms>]
+camo scroll [--target <t_id>] [--x <px>] [--y <px>] [--at-x <px>] [--at-y <px>]
+camo select [--target <t_id>] --selector <css> --value <value>
+camo upload [--target <t_id>] --selector <css> --file <path>
+camo wait [--target <t_id>] [--for load|domcontentloaded|networkidle|selector|text|url] [--condition <value>] [--timeout <ms>] [--ms <ms>]
+camo wait-dom-stable [--target <t_id>] [--timeout <ms>] [--poll <ms>]
+camo scroll-and-collect [--target <t_id>] [--scrollCount <n>] [--delay <ms>]
 ```
 
-### Tabs / cookies / browser settings
+### Tabs, cookies, and settings
 
 ```bash
-camo new-tab [--url <url>] [--profile <id>]
-camo list-tabs [--profile <id>]
-camo switch-tab --tabId <index> [--profile <id>]
-camo close-tab --tabId <index> [--profile <id>]
-camo get-cookies [--profile <id>]
-camo set-cookies --cookies '<json-array>' [--profile <id>]
-camo set-user-agent --ua <string> [--profile <id>]
-camo set-viewport --width <px> --height <px> [--profile <id>]
+camo new-tab [--target <t_id>] [--url <url>]
+camo list-tabs [--target <t_id>]
+camo switch-tab --target <t_id>
+camo close-tab --target <t_id>
+camo multi-open [--target <t_id>] --urls <u1,u2,...> [--out-dir <dir>] [--prefix <name>]
+camo get-cookies [--target <t_id>]
+camo set-cookies [--target <t_id>] --cookies '<json-array>'
+camo set-user-agent [--target <t_id>] --ua <string>
+camo set-viewport [--target <t_id>] --width <px> --height <px>
 ```
 
-### Search
+`new-tab` and `multi-open` return new stable target/page ids. `list-tabs` and
+`switch-tab` return stable target/page information; array position is
+presentation only.
+
+## 4. Practical flows
+
+### Headless verification
 
 ```bash
-camo search <platform> <query> [--profile <id>] [--max-results <n>] [--cookies <file>]
-```
-
-## 3. Practical Flows
-
-### A) Headless page verification
-
-```bash
-camo daemon start
 camo start --headless --url https://example.com
-camo get-page-info
-camo screenshot --path /tmp/example.png
+# target
+camo get-page-info --target <target>
+camo screenshot --target <target> --path /tmp/example.png
 camo stop
-camo daemon stop
 ```
 
-### B) Search bootstrap (in-process search command)
+### Multiple targets in one profile
 
 ```bash
-camo daemon start
-camo search xhs "咖啡探店" --max-results 20
-camo stop
-camo daemon stop
+camo start --profile task-a --url https://example.com/a
+# target-a
+camo new-tab --profile task-a --target <target-a> --url https://example.com/b
+# target-b
+camo get-page-info --profile task-a --target <target-a>
+camo get-page-info --profile task-a --target <target-b>
+camo stop --profile task-a
 ```
 
-### C) Isolated multi-command check (temporary profile)
+### Temporary profile
 
 ```bash
-camo daemon start
-camo start --profile temp --url https://example.com
-# Save the returned profile, for example: _temp_12345_1735689600000
-camo get-page-info --profile <returned-temp-id>
-camo snapshot --profile <returned-temp-id>
+camo start --profile temp --headless --url https://example.com
+# Save the returned profile and target.
+camo get-page-info --profile <returned-profile> --target <target>
 camo stop --profile temp
-test ! -e "$HOME/.camo/profiles/<returned-temp-id>"
-camo daemon stop
 ```
 
-Documented at `SKILL.md`: temp profiles are disposable and Camo owns cleanup.
-Never accept a stop that leaves a `_temp_*` directory behind.
+`stop` closes the browser before deleting temporary data. If deletion fails,
+preserve `E_BROWSER_CLEANUP_FAILED` and inspect `camo status`; do not manually
+delete the profile as a substitute.
 
-### D) Failure evidence
+## 5. Failure handling
 
 ```bash
-camo get-page-info --profile <id>
-camo snapshot --profile <id>
-camo screenshot --profile <id> --path /tmp/camo-failure.png
-grep command.error "$(ls -dt ~/.camo/runs/run-*/events.jsonl | head -1)"
+camo status --profile <profile>
+camo status --target <target>
+camo get-page-info --target <target>
+camo snapshot --target <target>
+camo screenshot --target <target> --path /tmp/camo-failure.png
 ```
 
-Cleanup is sequential: wait for `camo stop` to return, then run
-`camo daemon stop`. Do not run them concurrently.
+- `E_STATE_INVALID`: stale target, cross-profile target, or multiple targets
+  without `--target`.
+- `E_STATE_NOT_FOUND`: session, target, or daemon resource is absent.
+- `E_BROWSER_CLEANUP_FAILED`: temporary profile deletion failed; pending
+  cleanup remains visible in `status`.
+- `E_BROWSER_CLOSE_FAILED`: context close failed; live ownership truth is
+  retained instead of reporting a false close.
 
-## 4. Troubleshooting
-
-- No active daemon: run `camo daemon start --profile <id>` first, or set
-  `CAMO_AUTOSTART=1` when calling `camo start`.
-- `E_STATE_DUPLICATE`: the profile already has a session. Inspect it on the same
-  profile; only then decide to `camo stop` and start fresh. Never start a second
-  session for the same profile.
-- Invalid selector: use CSS syntax; do not pass v1 pseudo-selectors like `:visible`.
-- `goto` timeout: retry with `--waitUntil domcontentloaded` on the same profile;
-  do not switch profiles or fall back to `evaluate`.
-- Daemon lifecycle: use `camo daemon status` / `camo daemon stop`, never edit
-  `~/.camo/daemon/*.json` by hand.
-- `E_DAEMON_STOP_FAILED ... pid still alive after SIGTERM + 5s`: browser teardown
-  can exceed 5s. Check `camo daemon status`; `not_running` means shutdown succeeded,
-  otherwise re-run `camo daemon stop` once.
+Do not switch profiles or fall back to `evaluate` after a failure. Diagnose on
+the same target, then explicitly start a new session/target if the old one is
+stale.

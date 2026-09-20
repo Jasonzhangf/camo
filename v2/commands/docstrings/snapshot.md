@@ -1,11 +1,11 @@
 # camo snapshot
 
-Return the current session/page state as a structured snapshot.
+Return a target's page state as a structured snapshot.
 
 ## Usage
 
 ```
-camo snapshot [--format json|yaml] [--profile <id>]
+camo snapshot [--format json|yaml] [--target <t_id>] [--profile <id>]
 ```
 
 ## Arguments
@@ -14,6 +14,7 @@ camo snapshot [--format json|yaml] [--profile <id>]
 |------|------|----------|-------------|
 | `--format` | enum | No | Output format: json or yaml (default: json) |
 | `--profile` | string | No | Profile id (default: $CAMO_PROFILE or 'default') |
+| `--target` | string | No | Stable target id returned by `start`; required when the profile has multiple active targets |
 
 ## Examples
 
@@ -26,9 +27,14 @@ camo snapshot --format yaml
 
 # Specific profile
 camo snapshot --profile my-profile --format json
+
+# Specific target
+camo snapshot --target t_abc --format json
 ```
 
 ## Errors
 
 - `E_INPUT_INVALID`: --format value is not json or yaml
 - `E_INPUT_MISSING_FIELD`: profile id is empty
+- `E_STATE_INVALID`: the target is stale or belongs to another profile
+- `E_STATE_LOCKED`: another action for the same profile is in flight
