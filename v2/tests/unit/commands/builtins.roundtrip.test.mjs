@@ -23,6 +23,7 @@ test('positive: start builtin roundtrips through WS', async () => {
       cmd: env.payload?.cmd || null,
       sessionId: 'srv-1',
       profile: '_temp_123_456',
+      target: 't_abc123',
       ephemeral: true,
       reused: true,
       ok: true,
@@ -51,6 +52,7 @@ test('positive: start builtin roundtrips through WS', async () => {
   assert.equal(out.reused, true);
   assert.match(out.issuedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/); // sanity: ISO-8601
   assert.equal(out.sessionId, 'srv-1');
+  assert.equal(out.target, 't_abc123');
 });
 
 test('positive: stop builtin projects the daemon-resolved temp profile', async () => {
@@ -103,6 +105,7 @@ test('positive: goto builtin sends the right wire args', async () => {
   assert.equal(captured.url, 'https://example.com/path');
   assert.equal(captured.waitUntil, 'networkidle');
   assert.equal(captured.profile, 'default');
+  assert.equal(captured.target, null);
 });
 
 test('positive: snapshot builtin preserves HTML payload from server', async () => {

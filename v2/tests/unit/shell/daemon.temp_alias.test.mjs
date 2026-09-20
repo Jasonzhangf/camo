@@ -80,6 +80,7 @@ function stubBrowser(profileId) {
       goto: async () => {},
       content: async () => '<html><body>temp</body></html>',
       url: () => 'about:blank',
+      close: async () => {},
     },
     browser: () => ({ close: async () => {} }),
     context: { pages: () => [{ url: () => 'about:blank' }], close: async () => {} },
@@ -135,6 +136,20 @@ test('positive: browser command after temp start reuses the allocated profile', 
   await handleCommand('snapshot', {}, ctx);
   assert.equal(allocations.get('temp'), start.profile);
   assert.equal(launchCount, 1, 'snapshot must not launch a second temporary browser');
+});
+
+test('positive: closing a temp target keeps profile data until stop', async () => {
+  const allocations = new Map();
+  const ctx = fakeCtx({ allocations });
+  const start = await handleCommand('start', {}, ctx);
+  const profileDir = path.join(profileRoot, start.profile);
+
+  const closed = await handleCommand('close-tab', { target: start.target }, ctx);
+  assert.equal(closed.closed, true);
+  assert.equal(fs.existsSync(profileDir), true, 'closing a page must not delete temporary profile data');
+
+  await handleCommand('stop', {}, ctx);
+  assert.equal(fs.existsSync(profileDir), false, 'stop must delete the temporary profile');
 });
 
 test('negative: browser command on unallocated temp surfaces not-found and never launches', async () => {

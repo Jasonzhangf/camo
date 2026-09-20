@@ -460,6 +460,12 @@
       "reason": "dispatch parsed CLI commands"
     },
     {
+      "from": "shell.bin_entry",
+      "to": "shell.daemon",
+      "kind": "call",
+      "reason": "share the canonical browser command set for autostart"
+    },
+    {
       "from": "shell.cli",
       "to": "contracts.error_envelope",
       "kind": "call",

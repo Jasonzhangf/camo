@@ -1,4 +1,4 @@
-// camo v2 builtin: `camo upload --selector <css> --file <path> [--profile <id>]`
+// camo v2 builtin: `camo upload --selector <css> --file <path> [--target <t_id>] [--profile <id>]`
 //
 // Upload a file to an input[type=file] element.
 
@@ -23,6 +23,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
     throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'transport' } });
   }
   const profile = safeProfile(parsed.profile);
+  const target = parsed.named?.target ?? null;
   const selector = parsed.named?.selector || '';
   const file = parsed.named?.file || '';
 
@@ -35,11 +36,12 @@ export async function run(transport, parsed = {}, ctx = {}) {
 
   const reply = await sendCommand(transport, {
     cmd: 'upload',
-    args: { profile, selector, files: [file] },
+    args: { profile, target, selector, files: [file] },
   });
   return {
     cmd: 'upload',
     profile,
+    target: reply.payload?.target || target,
     selector,
     file,
     uploaded: reply.payload?.uploaded === true,

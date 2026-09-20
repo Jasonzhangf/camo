@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { list, isBuiltin } from '../../../commands/builtins/index.mjs';
 
 describe('builtins.new-commands.index', () => {
-  test('list returns all 35 builtins', () => {
+  test('list returns all 36 builtins', () => {
     const cmds = list();
     assert.equal(cmds.includes('scroll'), true, 'scroll missing');
     assert.equal(cmds.includes('screenshot'), true, 'screenshot missing');
@@ -12,7 +12,7 @@ describe('builtins.new-commands.index', () => {
     assert.equal(cmds.includes('evaluate'), true, 'evaluate missing');
     assert.equal(cmds.includes('upload'), true, 'upload missing');
     assert.equal(cmds.includes('select'), true, 'select missing');
-    assert.equal(cmds.length, 35, `expected 35 builtins, got ${cmds.length}`);
+    assert.equal(cmds.length, 36, `expected 36 builtins, got ${cmds.length}`);
   });
 
   test('isBuiltin returns true for all new commands', () => {

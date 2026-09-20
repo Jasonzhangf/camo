@@ -339,6 +339,20 @@ export function listRegistrations({ includeStale = false } = {}) {
   return includeStale || claimOwnerIsCurrent(registration) ? [registration] : [];
 }
 
+export function listStaleRegistrations() {
+  const file = claimPath();
+  if (!fs.existsSync(file)) return [];
+  const claim = readClaim(file);
+  if (claim.state !== 'active') return [];
+  let registration;
+  try {
+    registration = activeRegistration(claim, file);
+  } catch {
+    return [];
+  }
+  return claimOwnerIsCurrent(registration) ? [] : [registration];
+}
+
 export function findActiveDaemon({ pid } = {}) {
   return listRegistrations().find((registration) => !pid || registration.pid === pid) || null;
 }

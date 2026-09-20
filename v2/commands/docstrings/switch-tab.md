@@ -1,28 +1,28 @@
-# `camo switch-tab`
+# camo switch-tab
 
-Switch the active browser tab to the given tab index (from `camo list-tabs`).
+Bring a target's page to the foreground.
 
 ## Usage
 
 ```
-camo switch-tab --tab-id <n> [--profile <id>]
+camo switch-tab --target <t_id> [--profile <id>]
 ```
 
 ## Arguments
 
 | Flag | Type | Required | Description |
 |------|------|----------|-------------|
-| `--tab-id` | integer | Yes | Zero-based tab index from `camo list-tabs` |
+| `--target` | string | Yes | Stable target id returned by `start`, `new-tab`, or `multi-open` |
 | `--profile` | string | No | Profile id (default: $CAMO_PROFILE or 'default') |
 
 ## Examples
 
 ```bash
-# List tabs to find the index
+# List tabs to find a target
 camo list-tabs --profile my-profile
 
-# Switch to tab 1
-camo switch-tab --tab-id 1 --profile my-profile
+# Bring that target's page to the foreground
+camo switch-tab --target t_abc123 --profile my-profile
 ```
 
 ## Wiring
@@ -33,7 +33,8 @@ camo switch-tab --tab-id 1 --profile my-profile
 
 ## Hard Guards
 
-- Requires an active browser session with the profile already started.
-- `tab-id` must be a valid index into `list-tabs`; out of range is an error.
+- Requires an active browser session with the target already allocated.
+- The result returns stable `target` and `page` ids; array indices are never caller identity.
+- A stale or cross-profile target fails explicitly.
 - No fallback; first failure is reported.
 - Protocol-level: brings the target tab to front (no JS DOM hack).

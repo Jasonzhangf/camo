@@ -3,7 +3,7 @@
 // Navigation: goto, newTab, closeTab, listTabs.
 
 import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
-import { safeId, getPageOrThrow, emit, normalizeUrl } from './_page_helpers.mjs';
+import { safeId, getTargetPageOrThrow, emit, normalizeUrl } from './_page_helpers.mjs';
 
 let _bridge = null;
 async function getBridge() {
@@ -19,16 +19,24 @@ async function getBridge() {
  * @param {string} [opts.waitUntil] - 'load'|'domcontentloaded'|'networkidle'|'commit'
  * @returns {Object} navigation result
  */
-export async function goto({ profileId, url, waitUntil = 'load' }) {
+export async function goto({ profileId, target, url, waitUntil = 'load' }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   const validUrl = normalizeUrl(url);
   const allowedWaitUntil = new Set(['load', 'domcontentloaded', 'networkidle', 'commit']);
   const waitVal = allowedWaitUntil.has(waitUntil) ? waitUntil : 'load';
   emit(pid, 'goto.start', { url: validUrl, waitUntil: waitVal });
   try {
     const response = await page.goto(validUrl, { waitUntil: waitVal, timeout: 30000 });
-    const result = { profileId: pid, url: validUrl, statusCode: response?.status() ?? null, ok: response?.ok() ?? false, navigated: true, finalUrl: page.url() };
+    const result = {
+      profileId: pid,
+      targetId: target.targetId,
+      url: validUrl,
+      statusCode: response?.status() ?? null,
+      ok: response?.ok() ?? false,
+      navigated: true,
+      finalUrl: page.url(),
+    };
     emit(pid, 'goto.done', result);
     return result;
   } catch (cause) {
@@ -43,13 +51,13 @@ export async function goto({ profileId, url, waitUntil = 'load' }) {
  * @param {string} opts.profileId
  * @returns {Object} navigation result
  */
-export async function back({ profileId }) {
+export async function back({ profileId, target }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   emit(pid, 'back.start', {});
   try {
     const response = await page.goBack({ waitUntil: 'domcontentloaded', timeout: 30000 });
-    const result = { profileId: pid, navigated: response !== null, finalUrl: page.url() };
+    const result = { profileId: pid, targetId: target.targetId, navigated: response !== null, finalUrl: page.url() };
     emit(pid, 'back.done', result);
     return result;
   } catch (cause) {
@@ -64,13 +72,13 @@ export async function back({ profileId }) {
  * @param {string} opts.profileId
  * @returns {Object} navigation result
  */
-export async function forward({ profileId }) {
+export async function forward({ profileId, target }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   emit(pid, 'forward.start', {});
   try {
     const response = await page.goForward({ waitUntil: 'domcontentloaded', timeout: 30000 });
-    const result = { profileId: pid, navigated: response !== null, finalUrl: page.url() };
+    const result = { profileId: pid, targetId: target.targetId, navigated: response !== null, finalUrl: page.url() };
     emit(pid, 'forward.done', result);
     return result;
   } catch (cause) {
@@ -86,15 +94,22 @@ export async function forward({ profileId }) {
  * @param {string} [opts.waitUntil] - 'load'|'domcontentloaded'|'networkidle'|'commit'
  * @returns {Object} navigation result
  */
-export async function reload({ profileId, waitUntil = 'load' }) {
+export async function reload({ profileId, target, waitUntil = 'load' }) {
   const pid = safeId(profileId, 'profileId');
-  const page = getPageOrThrow(pid);
+  const page = getTargetPageOrThrow(target);
   const allowedWaitUntil = new Set(['load', 'domcontentloaded', 'networkidle', 'commit']);
   const waitVal = allowedWaitUntil.has(waitUntil) ? waitUntil : 'load';
   emit(pid, 'reload.start', { waitUntil: waitVal });
   try {
     const response = await page.reload({ waitUntil: waitVal, timeout: 30000 });
-    const result = { profileId: pid, reloaded: true, statusCode: response?.status() ?? null, ok: response?.ok() ?? false, finalUrl: page.url() };
+    const result = {
+      profileId: pid,
+      targetId: target.targetId,
+      reloaded: true,
+      statusCode: response?.status() ?? null,
+      ok: response?.ok() ?? false,
+      finalUrl: page.url(),
+    };
     emit(pid, 'reload.done', result);
     return result;
   } catch (cause) {
@@ -104,14 +119,20 @@ export async function reload({ profileId, waitUntil = 'load' }) {
 }
 
 /**
- * Create a new tab.
+ * Create a new tab in the target's browser context.
+ *
+ * The returned page handle is internal. The daemon allocates the external
+ * target id for the new page; page runtime never mints caller-visible ids.
+ *
  * @param {Object} opts
  * @param {string} opts.profileId
+ * @param {Object} opts.target - Resolved target handle owned by daemon
  * @param {string} [opts.url] - URL to open in new tab
- * @returns {Object} new tab result
+ * @returns {Object} new tab result with internal page handle
  */
-export async function newTab({ profileId, url }) {
+export async function newTab({ profileId, target, url }) {
   const pid = safeId(profileId, 'profileId');
+  getTargetPageOrThrow(target);
   const targetUrl = url == null || url === '' ? null : normalizeUrl(url);
   const bridge = await getBridge();
   const record = bridge.getBrowser(pid);
@@ -123,9 +144,7 @@ export async function newTab({ profileId, url }) {
     if (targetUrl) {
       await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     }
-    const tabId = bridge.getTabPages(pid).indexOf(page);
-    if (tabId < 0) throw new Error('opened page missing from context page list');
-    const result = { profileId: pid, tabId, url: page.url(), created: true };
+    const result = { profileId: pid, page, url: page.url(), created: true };
     emit(pid, 'newTab.done', { url: page.url() });
     return result;
   } catch (cause) {
@@ -144,52 +163,50 @@ export async function newTab({ profileId, url }) {
 }
 
 /**
- * Close a tab by index.
+ * Close the page owned by a target.
  * @param {Object} opts
  * @param {string} opts.profileId
- * @param {number} opts.tabId - Tab index to close
+ * @param {Object} opts.target - Resolved target handle owned by daemon
  * @returns {Object} close tab result
  */
-export async function closeTab({ profileId, tabId }) {
+export async function closeTab({ profileId, target }) {
   const pid = safeId(profileId, 'profileId');
-  const bridge = await getBridge();
-  const record = bridge.getBrowser(pid);
-  if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
-  emit(pid, 'closeTab.start', { tabId });
+  const page = getTargetPageOrThrow(target);
+  emit(pid, 'closeTab.start', { targetId: target.targetId });
   try {
-    const pages = bridge.getTabPages(pid);
-    if (typeof tabId === 'number' && tabId >= 0 && tabId < pages.length) {
-      await pages[tabId].close({ runBeforeUnload: false });
-    } else {
-      throw new CamoError({ code: 'E_INPUT_OUT_OF_RANGE', details: { field: 'tabId', value: tabId, available: pages.length } });
-    }
-    const result = { profileId: pid, tabId, closed: true };
-    emit(pid, 'closeTab.done', { tabId });
+    await page.close({ runBeforeUnload: false });
+    const result = { profileId: pid, targetId: target.targetId, closed: true };
+    emit(pid, 'closeTab.done', { targetId: target.targetId });
     return result;
   } catch (cause) {
-    emit(pid, 'closeTab.error', { tabId, error: cause?.message });
-    throw new CamoError({ code: 'E_BROWSER_CLOSETAB_FAILED', details: { profileId: pid, tabId, reason: cause?.message }, cause });
+    emit(pid, 'closeTab.error', { targetId: target.targetId, error: cause?.message });
+    throw new CamoError({ code: 'E_BROWSER_CLOSETAB_FAILED', details: { profileId: pid, targetId: target.targetId, reason: cause?.message }, cause });
   }
 }
 
 /**
- * List all open tabs.
+ * List open tabs for the profile's resolved targets.
+ *
+ * The daemon resolves targets first; page runtime only reads each target's
+ * internal page handle and never invents indices as external identity.
+ *
  * @param {Object} opts
  * @param {string} opts.profileId
+ * @param {Object[]} opts.targets - Resolved target handles
  * @returns {Object} list tabs result
  */
-export async function listTabs({ profileId }) {
+export async function listTabs({ profileId, targets }) {
   const pid = safeId(profileId, 'profileId');
-  const bridge = await getBridge();
-  const record = bridge.getBrowser(pid);
-  if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
+  if (!Array.isArray(targets) || targets.length === 0) {
+    throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser_target', profileId: pid } });
+  }
   emit(pid, 'listTabs.start', {});
   try {
-    const pages = bridge.getTabPages(pid);
-    const tabs = await Promise.all(pages.map(async (page, tabId) => ({
-      tabId,
-      url: page.url(),
-      title: await page.title(),
+    const tabs = await Promise.all(targets.map(async (target) => ({
+      target: target.targetId,
+      page: target.pageId,
+      url: target.page.url(),
+      title: await target.page.title(),
     })));
     const result = { profileId: pid, count: tabs.length, tabs };
     emit(pid, 'listTabs.done', { count: tabs.length });
@@ -201,27 +218,25 @@ export async function listTabs({ profileId }) {
 }
 
 /**
- * Switch the active tab to the given tabId (zero-based index into listTabs).
- * Protocol-level: brings the target tab to front and makes it the active page.
+ * Bring a target's page to front. The target is the stable external handle;
+ * no mutable tab index is accepted.
  * @param {Object} opts
  * @param {string} opts.profileId
- * @param {number} opts.tabId - Zero-based tab index from listTabs
+ * @param {Object} opts.target - Resolved target handle owned by daemon
  * @returns {Object} switch result
  */
-export async function switchTab({ profileId, tabId }) {
+export async function switchTab({ profileId, target }) {
   const pid = safeId(profileId, 'profileId');
-  const bridge = await getBridge();
-  const record = bridge.getBrowser(pid);
-  if (!record) throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser', profileId: pid } });
-  emit(pid, 'switchTab.start', { tabId });
+  const page = getTargetPageOrThrow(target);
+  emit(pid, 'switchTab.start', { targetId: target.targetId });
   try {
-    const r = await bridge.switchPage(pid, tabId);
-    const result = { profileId: pid, tabId: r.tabId, url: r.url, switched: true };
-    emit(pid, 'switchTab.done', { tabId: r.tabId, url: r.url });
+    await page.bringToFront();
+    const result = { profileId: pid, targetId: target.targetId, url: page.url(), switched: true };
+    emit(pid, 'switchTab.done', { targetId: target.targetId, url: result.url });
     return result;
   } catch (cause) {
-    emit(pid, 'switchTab.error', { tabId, error: cause?.message });
-    throw new CamoError({ code: 'E_BROWSER_SWITCHTAB_FAILED', details: { profileId: pid, tabId, reason: cause?.message }, cause });
+    emit(pid, 'switchTab.error', { targetId: target.targetId, error: cause?.message });
+    throw new CamoError({ code: 'E_BROWSER_SWITCHTAB_FAILED', details: { profileId: pid, targetId: target.targetId, reason: cause?.message }, cause });
   }
 }
 
@@ -235,10 +250,11 @@ export async function switchTab({ profileId, tabId }) {
  * @param {string[]} opts.urls - List of absolute http(s) URLs to open
  * @param {string} [opts.outDir] - Directory to save screenshots (default: temp dir)
  * @param {string} [opts.prefix] - Filename prefix for screenshots (default: 'multi-open')
- * @returns {Object} results: { profileId, opened, screenshots: [{tabId,url,path,size}], errors: [] }
+ * @returns {Object} results: { profileId, opened: [{page,url}], screenshots: [{page,url,path,size}], errors: [] }
  */
-export async function multiOpen({ profileId, urls, outDir = null, prefix = 'multi-open' }) {
+export async function multiOpen({ profileId, target, urls, outDir = null, prefix = 'multi-open' }) {
   const pid = safeId(profileId, 'profileId');
+  getTargetPageOrThrow(target);
   if (!Array.isArray(urls) || urls.length === 0) {
     throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'urls', reason: 'at least one http(s) url required' } });
   }
@@ -256,9 +272,7 @@ export async function multiOpen({ profileId, urls, outDir = null, prefix = 'mult
       const page = await record.context.newPage();
       createdPages.push(page);
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      const tabId = bridge.getTabPages(pid).indexOf(page);
-      if (tabId < 0) throw new Error('opened page missing from context page list');
-      opened.push({ tabId, url: page.url() });
+      opened.push({ page, url: page.url() });
       let destPath = null;
       if (outDir) {
         const { join } = await import('node:path');
@@ -266,7 +280,7 @@ export async function multiOpen({ profileId, urls, outDir = null, prefix = 'mult
         destPath = join(outDir, `${prefix}-${safe}.png`);
       }
       const buffer = await page.screenshot({ fullPage: false, type: 'png', path: destPath || undefined });
-      screenshots.push({ tabId, url: page.url(), size: buffer?.length ?? 0, path: destPath || null });
+      screenshots.push({ page, url: page.url(), size: buffer?.length ?? 0, path: destPath || null });
     }
   } catch (cause) {
     const cleanupFailures = [];

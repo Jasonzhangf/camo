@@ -31,10 +31,11 @@ export async function run(transport, parsed = {}, ctx = {}) {
   }
   const selector = parsed.named?.selector ?? null;
   const delay = parsed.named?.delay != null ? Number(parsed.named.delay) : 0;
+  const target = parsed.named?.target ?? null;
 
   const reply = await sendCommand(transport, {
     cmd: 'type',
-    args: { profile, text, selector, delay },
+    args: { profile, target, text, selector, delay },
   });
   const typedChars = reply.payload?.typedChars;
   if (!Number.isInteger(typedChars) || typedChars < 0) {
@@ -46,6 +47,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
   return {
     cmd: 'type',
     profile,
+    target: reply.payload?.target || target,
     selector,
     text,
     delay,

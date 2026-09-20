@@ -6,6 +6,7 @@
 import { CamoError, project as projectError } from '../../contracts/error_envelope/projector.mjs';
 import { append as appendProgress } from '../../services/progress_event/log.mjs';
 import { browserCommandNames, isBrowserCommand } from './browser_commands.mjs';
+import { projectStatus } from './status_projection.mjs';
 
 function emit(profileId, type, payload) {
   appendProgress({ event: type, source: 'daemon_handler', profileId, payload, ts: new Date().toISOString() });
@@ -14,6 +15,52 @@ function emit(profileId, type, payload) {
 async function importOp(opName) {
   const { [opName]: fn } = await import('../../services/page_runtime/input_pipeline.mjs');
   return fn;
+}
+
+async function resolveTarget(args, ctx) {
+  const { resolveTarget: resolveOwnedTarget } = await import('../../services/browser_service/bootstrap.mjs');
+  const target = await resolveOwnedTarget({
+    target: args?.target || null,
+    profileId: ctx.profile || null,
+  });
+  return {
+    targetId: target.targetId,
+    profileId: target.profileId,
+    pageId: target.pageId,
+    page: target.page,
+    status: target.status,
+  };
+}
+
+async function resolveProfileTargets(profileId) {
+  const { listTargets, resolveTarget: resolveOwnedTarget } = await import('../../services/browser_service/bootstrap.mjs');
+  const listed = await listTargets({ profileId });
+  const active = [];
+  for (const target of listed) {
+    try {
+      active.push(await resolveOwnedTarget({ target: target.targetId, profileId }));
+    } catch (cause) {
+      if (cause?.code !== 'E_STATE_INVALID') throw cause;
+    }
+  }
+  if (active.length === 0) {
+    throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'browser_target', profileId } });
+  }
+  return active;
+}
+
+function withTargetArgs(target, args = {}) {
+  return {
+    ...args,
+    profileId: target.profileId,
+    target: {
+      targetId: target.targetId,
+      profileId: target.profileId,
+      pageId: target.pageId,
+      page: target.page,
+      status: target.status,
+    },
+  };
 }
 
 /**
@@ -45,8 +92,13 @@ export async function handleCommand(cmd, args, ctx) {
   }
 
   switch (cmd) {
+    case 'status': {
+      return projectStatus({ args, opts });
+    }
+
     case 'start': {
-      const { startSession, hasBrowser, getCurrentPage, getSession } = await import('../../services/browser_service/bootstrap.mjs');
+      const { startSession, hasBrowser, getSession, resolveTarget: resolveOwnedTarget } = await import('../../services/browser_service/bootstrap.mjs');
+      const goto = await importOp('goto');
       const requestedProfile = profile;
       const ephemeralRequested = (args && args.ephemeral === true) || requestedProfile === 'temp';
 
@@ -76,14 +128,16 @@ export async function handleCommand(cmd, args, ctx) {
             },
           });
         }
-        const page = getCurrentPage(aliasedProfile);
-        const targetUrl = (args && typeof args.url === 'string' && args.url) ? args.url : 'about:blank';
-        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        const target = await resolveOwnedTarget({ profileId: aliasedProfile });
+        if (args && typeof args.url === 'string' && args.url) {
+          await goto(withTargetArgs(target, { url: args.url, waitUntil: 'domcontentloaded' }));
+        }
         if (allocatedProfile) ctx.ephemeralAllocations.set(requestedProfile, aliasedProfile);
         return {
           ok: true,
           sessionId: (await getSession(aliasedProfile))?.instanceId || null,
           profile: aliasedProfile,
+          target: target.targetId,
           ephemeral: allocatedProfile !== undefined,
           reused: true,
         };
@@ -96,14 +150,20 @@ export async function handleCommand(cmd, args, ctx) {
       const effectiveProfile = session.profileId || requestedProfile;
       if (session.ephemeral === true) ctx.ephemeralAllocations.set(requestedProfile, effectiveProfile);
       if (args && typeof args.url === 'string' && args.url) {
-        const fresh = getCurrentPage(effectiveProfile);
-        await fresh.goto(args.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        const target = await resolveOwnedTarget({ profileId: effectiveProfile });
+        await goto(withTargetArgs(target, { url: args.url, waitUntil: 'domcontentloaded' }));
       }
-      return { ok: true, sessionId: session.sessionId, profile: effectiveProfile, ephemeral: session.ephemeral === true };
+      return {
+        ok: true,
+        sessionId: session.sessionId,
+        profile: effectiveProfile,
+        target: session.target,
+        ephemeral: session.ephemeral === true,
+      };
     }
 
     case 'stop': {
-      const { stopSession } = await import('../../services/browser_service/bootstrap.mjs');
+      const { stopSession, deleteTempProfile } = await import('../../services/browser_service/bootstrap.mjs');
       // Resolve the alias 'temp' to the allocated ephemeral id; do NOT match
       // by prefix, that would let any profile whose id starts with the
       // literal "temp" close a different allocated session.
@@ -113,6 +173,19 @@ export async function handleCommand(cmd, args, ctx) {
           throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'ephemeral_allocations', alias: 'temp' } });
       }
       const result = await stopSession(resolvedProfile);
+      if (result.ephemeral === true) {
+        const cleanup = await deleteTempProfile(resolvedProfile);
+        if (cleanup.cleaned !== true) {
+          throw new CamoError({
+            code: 'E_BROWSER_CLEANUP_FAILED',
+            details: {
+              resource: 'temporary_profile',
+              profileId: resolvedProfile,
+              cleanup: cleanup.pendingCleanup,
+            },
+          });
+        }
+      }
       // Clean up any tracked ephemeral allocation maps for this alias.
       for (const [alias, alloc] of [...ctx.ephemeralAllocations.entries()]) {
         if (alloc === resolvedProfile) ctx.ephemeralAllocations.delete(alias);
@@ -122,100 +195,116 @@ export async function handleCommand(cmd, args, ctx) {
 
     case 'goto': {
       const goto = await importOp('goto');
-      const r = await goto({ profileId: profile, url: args.url, waitUntil: args.waitUntil || 'load' });
-      return { ok: true, navigated: true, url: args.url, finalUrl: r.finalUrl, statusCode: r.statusCode };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await goto(withTargetArgs(target, { url: args.url, waitUntil: args.waitUntil || 'load' }));
+      return { ok: true, target: target.targetId, navigated: true, url: args.url, finalUrl: r.finalUrl, statusCode: r.statusCode };
     }
 
     case 'back': {
       const back = await importOp('back');
-      const r = await back({ profileId: profile });
-      return { ok: true, navigated: r.navigated === true, finalUrl: r.finalUrl };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await back(withTargetArgs(target));
+      return { ok: true, target: target.targetId, navigated: r.navigated === true, finalUrl: r.finalUrl };
     }
 
     case 'forward': {
       const forward = await importOp('forward');
-      const r = await forward({ profileId: profile });
-      return { ok: true, navigated: r.navigated === true, finalUrl: r.finalUrl };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await forward(withTargetArgs(target));
+      return { ok: true, target: target.targetId, navigated: r.navigated === true, finalUrl: r.finalUrl };
     }
 
     case 'reload': {
       const reload = await importOp('reload');
-      const r = await reload({ profileId: profile, waitUntil: args.waitUntil || 'load' });
-      return { ok: true, reloaded: true, finalUrl: r.finalUrl, statusCode: r.statusCode };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await reload(withTargetArgs(target, { waitUntil: args.waitUntil || 'load' }));
+      return { ok: true, target: target.targetId, reloaded: true, finalUrl: r.finalUrl, statusCode: r.statusCode };
     }
 
     case 'click': {
       const click = await importOp('click');
-      const r = await click({
-        profileId: profile,
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await click(withTargetArgs(target, {
         selector: args.selector,
         text: args.text,
         button: args.button || 'left',
         dialogAction: args.dialogAction,
         dialogText: args.dialogText,
         timeout: args.timeout,
-      });
-      return { ok: true, clicked: true, dialog: r.dialog || null };
+      }));
+      return { ok: true, target: target.targetId, clicked: true, dialog: r.dialog || null };
     }
 
     case 'type': {
       const type = await importOp('type');
-      const r = await type({ profileId: profile, text: args.text, selector: args.selector, delay: args.delay });
-      return { ok: true, typed: true, typedChars: r.length };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await type(withTargetArgs(target, { text: args.text, selector: args.selector, delay: args.delay }));
+      return { ok: true, target: target.targetId, typed: true, typedChars: r.length };
     }
 
     case 'scroll': {
       const scroll = await importOp('scroll');
-      const r = await scroll({ profileId: profile, x: args.dx, y: args.dy, atX: args.atX, atY: args.atY });
-      return { ok: true, scrolled: true };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await scroll(withTargetArgs(target, { x: args.dx, y: args.dy, atX: args.atX, atY: args.atY }));
+      return { ok: true, target: target.targetId, scrolled: true };
     }
 
     case 'screenshot': {
       const screenshot = await importOp('screenshot');
-      const r = await screenshot({ profileId: profile, fullPage: args.fullPage === true, path: args.path });
-      return { ok: true, screenshot: true, format: r.format, size: r.size, saved: r.saved || false, savedPath: r.savedPath || null };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await screenshot(withTargetArgs(target, { fullPage: args.fullPage === true, path: args.path }));
+      return { ok: true, target: target.targetId, screenshot: true, format: r.format, size: r.size, saved: r.saved || false, savedPath: r.savedPath || null };
     }
 
     case 'snapshot': {
       const snapshot = await importOp('snapshot');
-      const r = await snapshot({ profileId: profile });
-      return { ok: true, snapshot: true, url: r.url, htmlLength: r.htmlLength, html: r.html };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await snapshot(withTargetArgs(target));
+      return { ok: true, target: target.targetId, snapshot: true, url: r.url, htmlLength: r.htmlLength, html: r.html };
     }
 
     case 'wait': {
       const wait = await importOp('wait');
-      const r = await wait({ profileId: profile, for_: args.for || 'load', target: args.target || null, timeout: args.timeout, ms: args.ms });
-      return { ok: true, waited: true, satisfied: r.satisfied === true, for: r.for, target: r.target, timeout: r.timeout };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await wait(withTargetArgs(target, { for_: args.for || 'load', condition: args.condition || null, timeout: args.timeout, ms: args.ms }));
+      return { ok: true, target: target.targetId, waited: true, satisfied: r.satisfied === true, for: r.for, condition: r.condition, timeout: r.timeout };
     }
 
     case 'evaluate': {
       const evaluate = await importOp('evaluate');
-      const r = await evaluate({ profileId: profile, script: args.script });
-      return { ok: true, evaluated: true, result: r.result };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await evaluate(withTargetArgs(target, { script: args.script }));
+      return { ok: true, target: target.targetId, evaluated: true, result: r.result };
     }
 
     case 'upload': {
       const upload = await importOp('upload');
-      const r = await upload({ profileId: profile, selector: args.selector, files: args.files });
-      return { ok: true, uploaded: true, fileCount: r.fileCount };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await upload(withTargetArgs(target, { selector: args.selector, files: args.files }));
+      return { ok: true, target: target.targetId, uploaded: true, fileCount: r.fileCount };
     }
 
     case 'select': {
       const select = await importOp('select');
-      const r = await select({ profileId: profile, selector: args.selector, value: args.value });
-      return { ok: true, selected: true };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await select(withTargetArgs(target, { selector: args.selector, value: args.value }));
+      return { ok: true, target: target.targetId, selected: true };
     }
 
     case 'close-tab': {
       const closeTab = await importOp('closeTab');
-      const r = await closeTab({ profileId: profile, tabId: args.tabId });
-      return { ok: true, closed: r.closed === true };
+      const { invalidateTarget } = await import('../../services/browser_service/bootstrap.mjs');
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await closeTab(withTargetArgs(target));
+      await invalidateTarget(target.targetId);
+      return { ok: true, target: target.targetId, page: target.pageId, closed: r.closed === true };
     }
 
     case 'switch-tab': {
       const switchTab = await importOp('switchTab');
-      const r = await switchTab({ profileId: profile, tabId: args.tabId });
-      return { ok: true, switched: true, tabId: r.tabId, url: r.url };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await switchTab(withTargetArgs(target));
+      return { ok: true, target: target.targetId, page: target.pageId, switched: true, url: r.url };
     }
 
     case 'daemon': {
@@ -233,91 +322,138 @@ export async function handleCommand(cmd, args, ctx) {
 
     case 'fetch-page': {
       const fetch = await importOp('fetch');
-      const r = await fetch({ profileId: profile, url: args.url, timeout: args.timeout });
-      return { ok: true, fetched: true, statusCode: r.statusCode, headers: r.headers, body: r.body };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await fetch(withTargetArgs(target, { url: args.url, timeout: args.timeout }));
+      return { ok: true, target: target.targetId, fetched: true, fetchOk: r.ok === true, status: r.status, bodyLength: r.bodyLength, body: r.body };
     }
 
     case 'find-elements': {
       const findElements = await importOp('findElements');
-      const r = await findElements({ profileId: profile, selector: args.selector, text: args.text });
-      return { ok: true, found: true, count: r.count, elements: r.elements };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await findElements(withTargetArgs(target, { selector: args.selector, text: args.text }));
+      return { ok: true, target: target.targetId, found: true, count: r.count, elements: r.elements };
     }
 
     case 'get-cookies': {
       const getCookies = await importOp('getCookies');
-      const r = await getCookies({ profileId: profile });
-      return { ok: true, count: r.count, cookies: r.cookies };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await getCookies(withTargetArgs(target));
+      return { ok: true, target: target.targetId, count: r.count, cookies: r.cookies };
     }
 
     case 'get-page-info': {
       const getPageInfo = await importOp('getPageInfo');
-      const r = await getPageInfo({ profileId: profile });
-      return { ok: true, url: r.url, title: r.title, viewport: r.viewport };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await getPageInfo(withTargetArgs(target));
+      return {
+        ok: true,
+        target: target.targetId,
+        page: target.pageId,
+        url: r.url,
+        title: r.title,
+        viewportWidth: r.viewportWidth,
+        viewportHeight: r.viewportHeight,
+        scrollWidth: r.scrollWidth,
+        scrollHeight: r.scrollHeight,
+        scrollX: r.scrollX,
+        scrollY: r.scrollY,
+        readyState: r.readyState,
+      };
     }
 
     case 'get-readable': {
       const getReadable = await importOp('getReadable');
-      const r = await getReadable({ profileId: profile, maxLength: args.maxLength });
-      return { ok: true, text: r.text, length: r.length };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await getReadable(withTargetArgs(target, { maxLength: args.maxLength }));
+      return { ok: true, target: target.targetId, text: r.text, length: r.length };
     }
 
     case 'get-text': {
       const getText = await importOp('getText');
-      const r = await getText({ profileId: profile, selector: args.selector });
-      return { ok: true, text: r.text };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await getText(withTargetArgs(target, { selector: args.selector }));
+      return { ok: true, target: target.targetId, text: r.text };
     }
 
     case 'hover': {
       const hover = await importOp('hover');
-      const r = await hover({ profileId: profile, selector: args.selector, text: args.text });
-      return { ok: true, hovered: true };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await hover(withTargetArgs(target, { selector: args.selector, text: args.text }));
+      return { ok: true, target: target.targetId, hovered: true };
     }
 
     case 'list-tabs': {
       const listTabs = await importOp('listTabs');
-      const r = await listTabs({ profileId: profile });
+      const targets = args?.target
+        ? [await resolveTarget(args, { ...ctx, profile })]
+        : await resolveProfileTargets(profile);
+      const r = await listTabs({ profileId: profile, targets });
       return { ok: true, count: r.count, tabs: r.tabs };
     }
 
     case 'new-tab': {
       const newTab = await importOp('newTab');
-      const r = await newTab({ profileId: profile, url: args.url });
-      return { ok: true, newTab: true, created: true, tabId: r.tabId, url: r.url };
+      const { allocateTargetForPage } = await import('../../services/browser_service/bootstrap.mjs');
+      const parent = await resolveTarget(args, { ...ctx, profile });
+      const r = await newTab(withTargetArgs(parent, { url: args.url }));
+      const created = await allocateTargetForPage(profile, r.page);
+      return { ok: true, newTab: true, created: true, target: created.targetId, page: created.pageId, url: r.url };
     }
 
     case 'multi-open': {
       const multiOpen = await importOp('multiOpen');
-      const r = await multiOpen({ profileId: profile, urls: args.urls, outDir: args.outDir || null, prefix: args.prefix || 'multi-open' });
-      return { ok: true, opened: r.opened, screenshots: r.screenshots, errors: r.errors };
+      const { allocateTargetForPage } = await import('../../services/browser_service/bootstrap.mjs');
+      const parent = await resolveTarget(args, { ...ctx, profile });
+      const r = await multiOpen(withTargetArgs(parent, { urls: args.urls, outDir: args.outDir || null, prefix: args.prefix || 'multi-open' }));
+      const opened = [];
+      const screenshots = [];
+      for (const entry of r.opened) {
+        const created = await allocateTargetForPage(profile, entry.page);
+        opened.push({ target: created.targetId, page: created.pageId, url: entry.url });
+        const shotIndex = r.screenshots.findIndex((shot) => shot.page === entry.page);
+        const shot = shotIndex >= 0 ? r.screenshots[shotIndex] : null;
+        screenshots.push({
+          target: created.targetId,
+          page: created.pageId,
+          url: entry.url,
+          size: shot?.size ?? 0,
+          path: shot?.path ?? null,
+        });
+      }
+      return { ok: true, opened, screenshots, errors: r.errors };
     }
 
     case 'scroll-and-collect': {
       const scrollAndCollect = await importOp('scrollAndCollect');
-      const r = await scrollAndCollect({ profileId: profile, scrollCount: args.scrollCount, scrollDelay: args.scrollDelay });
-      return { ok: true, scrolled: true, collected: r.collected };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await scrollAndCollect(withTargetArgs(target, { scrollCount: args.scrollCount, scrollDelay: args.scrollDelay }));
+      return { ok: true, target: target.targetId, scrolled: true, collected: r.collected };
     }
 
     case 'set-cookies': {
       const setCookies = await importOp('setCookies');
-      const r = await setCookies({ profileId: profile, cookies: args.cookies });
-      return { ok: true, count: r.count, set: r.set };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await setCookies(withTargetArgs(target, { cookies: args.cookies }));
+      return { ok: true, target: target.targetId, count: r.count, set: r.set };
     }
 
     case 'set-user-agent': {
       const { run: runSerialized } = await import('../../services/page_runtime/input_pipeline.mjs');
       const { setSessionUserAgent } = await import('../../services/browser_service/bootstrap.mjs');
+      const target = await resolveTarget(args, { ...ctx, profile });
       const r = await runSerialized(
         profile,
-        { kind: 'setuseragent', params: { userAgent: args.userAgent } },
+        { kind: 'setuseragent', params: { userAgent: args.userAgent, targetId: target.targetId } },
         () => setSessionUserAgent({ profileId: profile, userAgent: args.userAgent }),
       );
-      return { ok: true, set: r.set === true, userAgent: r.userAgent };
+      return { ok: true, target: r.target, previousTarget: target.targetId, set: r.set === true, userAgent: r.userAgent };
     }
 
     case 'set-viewport': {
       const setViewport = await importOp('setViewport');
-      const r = await setViewport({ profileId: profile, width: args.width, height: args.height });
-      return { ok: true, set: r.set === true, width: r.width, height: r.height };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await setViewport(withTargetArgs(target, { width: args.width, height: args.height }));
+      return { ok: true, target: target.targetId, set: r.set === true, width: r.width, height: r.height };
     }
 
     case 'search': {
@@ -346,8 +482,9 @@ export async function handleCommand(cmd, args, ctx) {
 
     case 'wait-dom-stable': {
       const waitForDomStable = await importOp('waitForDomStable');
-      const r = await waitForDomStable({ profileId: profile, timeout: args.timeout, pollInterval: args.pollInterval });
-      return { ok: true, stable: true, durationMs: r.durationMs };
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await waitForDomStable(withTargetArgs(target, { timeout: args.timeout, pollInterval: args.pollInterval }));
+      return { ok: true, target: target.targetId, stable: r.stable === true, reason: r.reason ?? null, elapsed: r.elapsed ?? null };
     }
 
     default:

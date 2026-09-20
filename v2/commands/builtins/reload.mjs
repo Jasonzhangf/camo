@@ -1,4 +1,4 @@
-// camo v2 builtin: `camo reload [--waitUntil <...>] [--profile <id>]`
+// camo v2 builtin: `camo reload [--waitUntil <...>] [--target <t_id>] [--profile <id>]`
 //
 // Reload the active page.
 
@@ -19,15 +19,17 @@ export async function run(transport, parsed = {}, ctx = {}) {
     throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'transport' } });
   }
   const profile = safeProfile(parsed.profile);
+  const target = parsed.named?.target || null;
   const waitUntil = parsed.named?.waitUntil || 'load';
   const allowed = ['load', 'domcontentloaded', 'networkidle', 'commit'];
   if (!allowed.includes(waitUntil)) {
     throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'waitUntil', value: waitUntil, allowed } });
   }
-  const reply = await sendCommand(transport, { cmd: 'reload', args: { profile, waitUntil } });
+  const reply = await sendCommand(transport, { cmd: 'reload', args: { profile, target, waitUntil } });
   return {
     cmd: 'reload',
     profile,
+    target: reply.payload?.target || target,
     reloaded: reply.payload?.reloaded === true,
     finalUrl: reply.payload?.finalUrl || null,
     statusCode: reply.payload?.statusCode ?? null,

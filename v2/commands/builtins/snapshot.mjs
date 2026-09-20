@@ -24,6 +24,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
   }
   const profile = safeProfile(parsed.profile);
   const format = parsed.named?.format || 'json';
+  const target = parsed.named?.target || null;
   
   if (!['json', 'yaml'].includes(format)) {
     throw new CamoError({
@@ -34,11 +35,12 @@ export async function run(transport, parsed = {}, ctx = {}) {
 
   const reply = await sendCommand(transport, {
     cmd: 'snapshot',
-    args: { profile, format },
+    args: { profile, target, format },
   });
   return {
     cmd: 'snapshot',
     profile,
+    target: reply.payload?.target || target,
     format,
     data: {
       url: reply.payload?.url ?? null,

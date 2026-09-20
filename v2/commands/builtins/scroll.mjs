@@ -1,4 +1,4 @@
-// camo v2 builtin: `camo scroll --x <dx> --y <dy> [--at-x <px>] [--at-y <px>] [--profile <id>]`
+// camo v2 builtin: `camo scroll --x <dx> --y <dy> [--target <t_id>] [--profile <id>]`
 //
 // Scroll the active page by delta pixels at the given pointer position
 // (default: viewport center). At least one of x/y must be non-zero.
@@ -24,6 +24,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
     throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'transport' } });
   }
   const profile = safeProfile(parsed.profile);
+  const target = parsed.named?.target || null;
   const dx = parsed.named?.x ?? 0;
   const dy = parsed.named?.y ?? 0;
   const atX = parsed.named?.atX != null ? Number(parsed.named.atX) : null;
@@ -49,11 +50,12 @@ export async function run(transport, parsed = {}, ctx = {}) {
 
   const reply = await sendCommand(transport, {
     cmd: 'scroll',
-    args: { profile, dx, dy, atX, atY },
+    args: { profile, target, dx, dy, atX, atY },
   });
   return {
     cmd: 'scroll',
     profile,
+    target: reply.payload?.target || target,
     dx,
     dy,
     atX,

@@ -88,16 +88,16 @@ test.after(() => {
 
 test('positive: session transition returns exact UA truth', async () => {
   const profile = 'ua-session-success';
-  await start(profile);
+  const started = await start(profile);
   let received;
   relaunch = async (profileId, options) => {
     received = { profileId, ...options };
-    return { restoredUrl: 'https://example.test/login' };
+    return { ...stubRecord(profileId), restoredUrl: 'https://example.test/login' };
   };
 
   const result = await handleCommand(
     'set-user-agent',
-    { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)' },
+    { target: started.target, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)' },
     context(profile),
   );
 
@@ -105,21 +105,22 @@ test('positive: session transition returns exact UA truth', async () => {
     profileId: profile,
     userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
   });
-  assert.deepEqual(result, {
-    ok: true,
-    set: true,
-    userAgent: received.userAgent,
-  });
+  assert.equal(result.ok, true);
+  assert.equal(result.set, true);
+  assert.equal(result.userAgent, received.userAgent);
+  assert.equal(result.previousTarget, started.target);
+  assert.match(result.target, /^t_/);
+  assert.notEqual(result.target, started.target);
   await handleCommand('stop', {}, context(profile));
 });
 
 test('negative: failed transition clears browser, session, and lock truth', async () => {
   const profile = 'ua-session-failure';
-  await start(profile);
+  const started = await start(profile);
   relaunch = async () => { throw new Error('context launch failed'); };
 
   await assert.rejects(
-    () => handleCommand('set-user-agent', { userAgent: 'Mozilla/5.0 (iPhone)' }, context(profile)),
+    () => handleCommand('set-user-agent', { target: started.target, userAgent: 'Mozilla/5.0 (iPhone)' }, context(profile)),
     (cause) => cause?.code === 'E_BROWSER_SETUSERAGENT_FAILED',
   );
   assert.deepEqual(bridge.listActive(), []);
@@ -129,17 +130,17 @@ test('negative: failed transition clears browser, session, and lock truth', asyn
 
 test('negative: concurrent same-profile transitions are serialized', async () => {
   const profile = 'ua-session-serialized';
-  await start(profile);
+  const started = await start(profile);
   let release;
   relaunch = async () => new Promise((resolve) => { release = resolve; });
-  const first = handleCommand('set-user-agent', { userAgent: 'Mozilla/5.0 (iPhone)' }, context(profile));
+  const first = handleCommand('set-user-agent', { target: started.target, userAgent: 'Mozilla/5.0 (iPhone)' }, context(profile));
   await new Promise((resolve) => setImmediate(resolve));
 
   await assert.rejects(
-    () => handleCommand('set-user-agent', { userAgent: 'Mozilla/5.0 (Android)' }, context(profile)),
+    () => handleCommand('set-user-agent', { target: started.target, userAgent: 'Mozilla/5.0 (Android)' }, context(profile)),
     (cause) => cause?.code === 'E_STATE_LOCKED',
   );
-  release({ restoredUrl: 'https://example.test/login' });
+  release({ ...stubRecord(profile), restoredUrl: 'https://example.test/login' });
   await first;
   await handleCommand('stop', {}, context(profile));
 });

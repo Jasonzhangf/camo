@@ -3,587 +3,147 @@
 [![CI](https://github.com/Jasonzhangf/camo/actions/workflows/ci.yml/badge.svg)](https://github.com/Jasonzhangf/camo/actions/workflows/ci.yml)
 [![npm version](https://badge.fury.io/js/@web-auto%2Fcamo.svg)](https://www.npmjs.com/package/@web-auto/camo)
 
-A cross-platform command-line interface for Camoufox browser automation.
+Camo is a Camoufox browser automation CLI and shared runtime. Browser actions
+are addressed by stable target ids returned by `camo start`, `camo new-tab`, or
+`camo multi-open`.
 
-## What Camo Provides
-
-- Browser lifecycle management: start/stop/list sessions, idle cleanup, lock cleanup.
-- Profile-first automation: persistent profile dirs, fingerprint support, remembered window size.
-- Browser control primitives: navigation, tabs, viewport/window, mouse and keyboard actions.
-- Devtools debugging helpers: open devtools, evaluate JS quickly, collect browser console logs.
-- Session recorder: JSONL interaction capture (click/input/scroll/keyboard + page visits) with runtime toggle.
-- Container subscription layer: selector registration, filter/list/watch in viewport.
-- Autoscript runtime: validate/explain/run/resume/mock-run with snapshot and replay.
-- Progress stream: local websocket daemon (`/events`) with tail/recent/emit commands.
-
-## Installation
-
-### npm (Recommended)
+## Install
 
 ```bash
 npm install -g @web-auto/camo
 ```
 
-### From Source
+From a source checkout:
 
 ```bash
-git clone https://github.com/Jasonzhangf/camo.git
-cd camo
 npm run build:global
 ```
 
-## Quick Start
+## Quick start
 
 ```bash
-# Initialize environment
-camo init
-
-# Create a profile
-camo profile create myprofile
-
-# Set as default
-camo profile default myprofile
-
-# Start browser (with alias)
-camo start --url https://example.com --alias main
-
-# Start headless worker (auto-kill after idle timeout)
-camo start worker-1 --headless --alias shard1 --idle-timeout 30m
-
-# Start with devtools (headful only)
-camo start worker-1 --devtools
-
-# Evaluate JS (devtools-style input in page context)
-camo devtools eval worker-1 "document.title"
-
-# Read captured console entries
-camo devtools logs worker-1 --levels error,warn --limit 50
-
-# Start recording into JSONL (with in-page toggle)
-camo record start worker-1 --name run-a --output ./logs/run-a.jsonl --overlay
-
-# Navigate
-camo goto https://www.xiaohongshu.com
-
-# Interact
-camo highlight-mode on
-camo click "#search-input" --highlight
-camo type "#search-input" "hello world" --highlight
-camo scroll --down --amount 500 --selector ".feed-list"
+camo start --url https://example.com
+# copy the returned target id
+camo get-page-info --target t_abc123
+camo click --target t_abc123 --selector "h1"
+camo status --target t_abc123
+camo stop
 ```
 
-## Codex Skill (`camoufox`)
+An ordinary browser command auto-starts or reuses the shared daemon when
+needed. A separate `camo daemon start` is not required. `camo start` without
+`--url` creates or reuses the session and target without navigating the page.
 
-This repository includes a Codex skill at `skills/camoufox`.
+`status` is different from other commands: it never starts a daemon or browser.
+With no active daemon it returns `service.state: unavailable`; with a daemon it
+reads the current session, target, execution, and reclamation projections
+without refreshing idle time or changing runtime state.
 
-Install or refresh it locally:
+## Target model
 
-```bash
-mkdir -p ~/.codex/skills
-rsync -a ./skills/camoufox/ ~/.codex/skills/camoufox/
-```
+`target` is the external operation handle. It binds a profile, session
+generation, and stable page identity. The daemon resolves the target; page
+runtime receives only the internal page handle.
 
-Use it in Codex with `$camoufox` (or by asking for camo CLI workflows directly).
+- `profile` is the persistent data and account boundary.
+- `session` is one browser runtime generation.
+- `target` is the caller-visible handle for a page.
+- `pageId`, `sessionId`, and `generation` are internal control fields.
 
-Layered capability model:
-- Observe/Debug: visible DOM filtering, URL/context checks, devtools eval/logs.
-- User Ops: click/type/scroll/keyboard/tab/window operations with optional highlight.
-- Orchestration: container subscription + autoscript flows.
-- Progress/Recovery: events/status/cleanup for runtime diagnostics.
-
-## Core Workflows
-
-### 1) Interactive browser session
-
-```bash
-camo init
-camo profile create myprofile
-camo profile default myprofile
-camo start --url https://example.com --alias main
-camo click "#search-input"
-camo type "#search-input" "hello world"
-```
-
-### 2) Headless worker with idle auto-stop
-
-```bash
-camo start worker-1 --headless --alias shard1 --idle-timeout 30m
-camo instances
-camo stop idle
-```
-
-### 3) Devtools-style debugging
-
-```bash
-camo start myprofile --devtools
-camo devtools eval myprofile "document.title"
-camo devtools eval myprofile "(console.error('check-error'), location.href)"
-camo devtools logs myprofile --levels error,warn --limit 50
-camo devtools clear myprofile
-```
-
-### 4) Run autoscript with live progress
-
-```bash
-camo autoscript validate ./autoscripts/xhs.autoscript.json
-camo autoscript run ./autoscripts/xhs.autoscript.json --profile myprofile \
-  --jsonl-file ./runs/xhs/run.jsonl \
-  --summary-file ./runs/xhs/summary.json
-camo events tail --profile myprofile --mode autoscript
-```
-
-### 5) Record manual interactions as JSONL
-
-```bash
-camo start myprofile --record --record-name xhs-debug --record-output ./logs/xhs-debug.jsonl --record-overlay
-camo record status myprofile
-camo record stop myprofile
-```
+If a profile has multiple active targets, browser actions must pass
+`--target`. Camo does not guess the current, foreground, newest, or indexed
+page. A target from a stopped session or another profile fails explicitly.
 
 ## Commands
 
-### Profile Management
+### Lifecycle
 
 ```bash
-camo profiles                          # List profiles with default profile
-camo profile create <profileId>        # Create a profile
-camo profile delete <profileId>        # Delete a profile
-camo profile default [profileId]       # Get or set default profile
+camo start [--profile <id>] [--url <https://...>] [--headless] [--ephemeral]
+camo stop [--profile <id>]
+camo status [--profile <id>] [--target <t_id>]
+camo daemon status
+camo daemon stop
 ```
 
-### Initialization
+- `start` returns `{ profile, sessionId, target }`.
+- `stop` closes the browser session and invalidates its targets.
+- `temp` or `--ephemeral` allocates a temporary profile that is reused until
+  `stop`; `stop` closes the browser first and then deletes the temporary data.
+- If temporary data deletion fails, `stop` returns
+  `E_BROWSER_CLEANUP_FAILED`; the pending cleanup remains visible in `status`.
+- `daemon status` is the low-level process/registration probe. Use `camo
+  status` for the runtime projection.
+
+### Browser actions
+
+All actions below accept `[--target <t_id>]` and `[--profile <id>]` where
+applicable:
 
 ```bash
-camo init                              # Ensure camoufox + browser-service
-camo init geoip                        # Download GeoIP database
-camo init list                         # List available OS and regions
-camo create fingerprint --os <os> --region <region>
+camo goto <url> [--waitUntil load|domcontentloaded|networkidle]
+camo back
+camo forward
+camo reload [--waitUntil load|domcontentloaded|networkidle|commit]
+camo click (--selector <css>|--text <text>)
+camo type <text> [--selector <css>] [--delay <ms>]
+camo scroll [--x <px>] [--y <px>] [--at-x <px>] [--at-y <px>]
+camo hover (--selector <css>|--text <text>)
+camo snapshot [--format json|yaml]
+camo screenshot [--path <file>]
+camo evaluate --script <js>
+camo wait [--for load|domcontentloaded|networkidle|selector|text|url] [--condition <value>] [--timeout <ms>] [--ms <ms>]
+camo find-elements (--selector <css>|--text <text>)
+camo get-text [--selector <css>]
+camo get-readable [--maxLength <n>]
+camo get-page-info
+camo fetch-page <url> [--timeout <ms>]
 ```
 
-### Config
+### Tabs and settings
 
 ```bash
-camo config repo-root [path]           # Get/set persisted camo repo root
-camo highlight-mode [status|on|off]    # Global highlight mode for click/type/scroll
+camo new-tab [--url <https://...>] [--target <t_id>]
+camo list-tabs [--target <t_id>]
+camo switch-tab --target <t_id>
+camo close-tab --target <t_id>
+camo multi-open --urls <u1,u2,...> [--target <t_id>] [--out-dir <dir>] [--prefix <name>]
+camo get-cookies [--target <t_id>]
+camo set-cookies --cookies '<json-array>' [--target <t_id>]
+camo set-user-agent --ua <string> [--target <t_id>]
+camo set-viewport --width <px> --height <px> [--target <t_id>]
+camo upload --selector <css> --file <path> [--target <t_id>]
+camo select --selector <css> --value <value> [--target <t_id>]
 ```
 
-### Browser Control
-
-```bash
-camo start [profileId] [--url <url>] [--headless] [--devtools] [--record] [--record-name <name>] [--record-output <path>] [--record-overlay|--no-record-overlay] [--alias <name>] [--idle-timeout <duration>] [--width <w> --height <h>]
-camo stop [profileId]
-camo stop --id <instanceId>
-camo stop --alias <alias>
-camo stop idle
-camo stop all
-camo status [profileId]                  # Show resolved per-profile session view
-camo shutdown                          # Shutdown browser-service (all sessions)
-```
-
-`camo start` in headful mode now persists window size per profile and reuses that size on next start.  
-If no saved size exists, it defaults to near-fullscreen (full width, slight vertical reserve).  
-Use `--width/--height` to override and update the saved profile size.
-For headless sessions, default idle timeout is `30m` (auto-stop on inactivity). Use `--idle-timeout` (e.g. `45m`, `1800s`, `0`) to customize.
-Use `--devtools` to open browser developer tools in headed mode (cannot be combined with `--headless`).
-Use `--record` to auto-enable JSONL recording at startup; `--record-name`, `--record-output`, and `--record-overlay` customize file naming/output and floating toggle UI.
-Set `CAMO_BRING_TO_FRONT_MODE=never` to keep protocol-level input and page lifecycle operations from forcing the browser window to front during headed runs.
-`CAMO_SKIP_BRING_TO_FRONT=1` remains supported as a legacy alias.
-
-### Lifecycle & Cleanup
-
-```bash
-camo instances                         # List resolved session view (live + registered + idle state)
-camo sessions                          # List resolved session view for all profiles
-camo cleanup [profileId]               # Cleanup only one profile (remote stop + local registry/lock/watchdog)
-camo cleanup all                       # Cleanup all active sessions
-camo cleanup locks                     # Cleanup stale lock files
-camo force-stop [profileId]            # Force stop only one profile (no alias/id targeting)
-camo lock list                         # List active session locks
-```
-
-Session isolation rules:
-- `profileId` is the lifecycle primary key across browser-service session, local registry, watchdog, and lock.
-- `camo start/stop/cleanup/force-stop <profileId>` only target that exact profile and must not affect other profiles.
-- `camo stop --id` and `camo stop --alias` are stop-only convenience selectors; `cleanup` and `force-stop` intentionally reject indirect targeting.
-- `camo status`, `camo sessions`, and `camo instances` share the same resolved session view fields:
-  - `live`: browser-service currently has this profile session
-  - `registered`: local registry has metadata for this profile
-  - `orphaned`: registry exists but the service session is gone
-  - `needsRecovery`: registry still says active but browser-service no longer has that profile
-
-Isolation examples:
-
-```bash
-# Observe both profiles independently
-camo sessions
-camo status finger
-camo status xhs-qa-1
-
-# Stop only finger; xhs-qa-1 must remain live
-camo stop finger
-camo status finger
-camo status xhs-qa-1
-
-# cleanup / force-stop require direct profile targeting
-camo cleanup finger
-camo force-stop finger
-
-# Invalid on purpose: indirect targeting is rejected
-camo cleanup --alias shard1
-camo force-stop --id inst_xxxxxxxx
-```
-
-### Navigation
-
-```bash
-camo goto [profileId] <url>            # Navigate to URL
-camo back [profileId]                  # Navigate back
-camo screenshot [profileId] [--output <file>] [--full]
-```
-
-### Interaction
-
-```bash
-camo scroll [profileId] [--down|--up|--left|--right] [--amount <px>] [--selector <css>] [--highlight|--no-highlight]
-camo click [profileId] <selector> [--highlight|--no-highlight]  # Click visible element by CSS selector
-camo type [profileId] <selector> <text> [--highlight|--no-highlight]  # Type into visible input element
-camo highlight [profileId] <selector>          # Highlight element (red border, 2s)
-camo clear-highlight [profileId]               # Clear all highlights
-camo viewport [profileId] --width <w> --height <h>
-```
-
-### Devtools
-
-```bash
-camo devtools logs [profileId] [--limit 120] [--since <unix_ms>] [--levels error,warn] [--clear]
-camo devtools eval [profileId] <expression> [--profile <id>]
-camo devtools clear [profileId]
-```
-
-`devtools logs` reads entries from an injected in-page console collector.
-Supported levels: `log`, `info`, `warn`, `error`, `debug`.
-
-### Recording
-
-```bash
-camo record start [profileId] [--name <name>] [--output <file>] [--overlay|--no-overlay]
-camo record stop [profileId] [--reason <text>]
-camo record status [profileId]
-```
-
-Recorder JSONL events include:
-- `page.visit`
-- `interaction.click`
-- `interaction.keydown`
-- `interaction.input`
-- `interaction.wheel`
-- `interaction.scroll`
-- `recording.start|stop|toggled|runtime_ready`
-
-### Pages
-
-```bash
-camo new-page [profileId] [--url <url>]
-camo close-page [profileId] [index]
-camo switch-page [profileId] <index>
-camo list-pages [profileId]             # Requires live=true for that profile
-```
-
-### Cookies
-
-```bash
-camo cookies get [profileId]                          Get all cookies for profile
-camo cookies save [profileId] --path <file>           Save cookies to file
-camo cookies load [profileId] --path <file>           Load cookies from file
-camo cookies auto start [profileId] [--interval <ms>] Start auto-saving cookies
-camo cookies auto stop [profileId]                    Stop auto-saving
-camo cookies auto status [profileId]                  Check auto-save status
-```
-
-### Window Control
-
-```bash
-camo window move [profileId] --x <x> --y <y>
-camo window resize [profileId] --width <w> --height <h>
-```
-
-### Mouse Control
-
-```bash
-camo mouse click [profileId] --x <x> --y <y> [--button left|right|middle] [--clicks <n>] [--delay <ms>]
-camo mouse wheel [profileId] [--deltax <px>] [--deltay <px>]
-```
-
-### System
-
-```bash
-camo system display                    # Show display metrics
-```
-
-### Container Subscription
-
-```bash
-camo container init [--source <container-library-dir>] [--force]
-camo container sets [--site <siteKey>]
-camo container register [profileId] <setId...> [--append]
-camo container targets [profileId]
-camo container filter [profileId] <selector...>
-camo container watch [profileId] [--selector <css>] [--throttle <ms>]
-camo container list [profileId]
-```
-
-### Autoscript
-
-```bash
-camo autoscript validate <file>
-camo autoscript explain <file>
-camo autoscript snapshot <jsonl-file> [--out <snapshot-file>]
-camo autoscript replay <jsonl-file> [--summary-file <path>]
-camo autoscript run <file> [--profile <id>] [--jsonl-file <path>] [--summary-file <path>]
-camo autoscript resume <file> --snapshot <snapshot-file> [--from-node <nodeId>] [--profile <id>] [--jsonl-file <path>] [--summary-file <path>]
-camo autoscript mock-run <file> --fixture <fixture.json> [--profile <id>] [--jsonl-file <path>] [--summary-file <path>]
-```
-
-### Progress Events (WS)
-
-```bash
-camo events serve [--host 127.0.0.1] [--port 7788]
-camo events tail [--profile <id>] [--run-id <id>] [--events e1,e2] [--replay 50]
-camo events recent [--limit 50]
-```
-
-By default, non-`events` commands auto-start the progress daemon (`/events`) in background.
-
-## Fingerprint Options
-
-### OS Options
-
-- `mac` (default) - macOS (auto architecture)
-- `mac-m1` - macOS with Apple Silicon
-- `mac-intel` - macOS with Intel
-- `windows` - Windows 11
-- `windows-10` - Windows 10
-- `linux` - Ubuntu 22.04
-
-### Region Options
-
-- `us` (default) - United States (New York)
-- `us-west` - United States (Los Angeles)
-- `uk` - United Kingdom (London)
-- `de` - Germany (Berlin)
-- `fr` - France (Paris)
-- `jp` - Japan (Tokyo)
-- `sg` - Singapore
-- `au` - Australia (Sydney)
-- `hk` - Hong Kong
-- `tw` - Taiwan (Taipei)
-- `br` - Brazil (Sao Paulo)
-- `in` - India (Mumbai)
-
-## Configuration
-
-- Config file: `~/.camo/camo-cli.json`
-- Profiles directory: `~/.camo/profiles/`
-- Per-profile fingerprints: `~/.camo/profiles/<id>/fingerprint.json`
-- Per-profile cookie backups: `~/.camo/profiles/<id>/cookie-backups/`
-- Legacy `~/.camo/fingerprints/<id>.json` and
-  `~/.camo/cookies/<id>/` data migrates once, before profile launch.
-- Session registry: `~/.camo/sessions/`
-- Lock files: `~/.camo/locks/`
-- GeoIP database: `~/.camo/geoip/GeoLite2-City.mmdb`
-- User container root: `~/.camo/container-lib/`
-- Subscription root: `~/.camo/container-subscriptions/`
-
-### Subscription-driven Watch
-
-```bash
-# 1) Migrate container-library into subscription sets
-camo container init --source /Users/fanzhang/Documents/github/camo/container-library
-
-# 2) Register sets to a profile
-camo container register xiaohongshu-batch-1 xiaohongshu_home xiaohongshu_home.search_input
-
-# 3) Start watch using registered selectors (no --selector needed)
-camo container watch xiaohongshu-batch-1 --throttle 500
-```
-
-### Autoscript Mode (Subscription + Operations)
-
-```bash
-# Validate + explain + run
-camo autoscript validate ./autoscripts/my-flow.autoscript.json
-camo autoscript explain ./autoscripts/my-flow.autoscript.json
-camo autoscript run ./autoscripts/my-flow.autoscript.json \
-  --profile my-profile \
-  --jsonl-file ./runs/my-flow/run.jsonl \
-  --summary-file ./runs/my-flow/run.summary.json
-
-# Build snapshot + replay summary from existing JSONL
-camo autoscript snapshot ./runs/my-flow/run.jsonl \
-  --out ./runs/my-flow/run.snapshot.json
-camo autoscript replay ./runs/my-flow/run.jsonl \
-  --summary-file ./runs/my-flow/replay.summary.json
-
-# Resume from a snapshot (optionally force rerun from a node)
-camo autoscript resume ./autoscripts/my-flow.autoscript.json \
-  --snapshot ./runs/my-flow/run.snapshot.json \
-  --from-node some_operation \
-  --profile my-profile
-
-# Mock replay mode for deterministic local debugging
-camo autoscript mock-run ./autoscripts/my-flow.autoscript.json \
-  --fixture ./autoscripts/fixtures/mock-run.json \
-  --summary-file ./runs/my-flow/mock.summary.json
-```
-
-Example script:
-
-```json
-{
-  "name": "generic-login-flow",
-  "profileId": "my-profile",
-  "throttle": 500,
-  "subscriptions": [
-    { "id": "login_input", "selector": "#login-input" },
-    { "id": "submit_btn", "selector": "button.submit" }
-  ],
-  "operations": [
-    {
-      "id": "fill_login",
-      "action": "type",
-      "selector": "#login-input",
-      "text": "demo@example.com",
-      "trigger": "login_input.appear"
-    },
-    {
-      "id": "click_submit",
-      "action": "click",
-      "selector": "button.submit",
-      "trigger": { "subscription": "submit_btn", "event": "exist" },
-      "conditions": [
-        { "type": "operation_done", "operationId": "fill_login" },
-        { "type": "subscription_exist", "subscriptionId": "submit_btn" }
-      ]
-    }
-  ]
-}
-```
-
-Condition types:
-- `operation_done`: previous operation completed
-- `subscription_exist`: subscribed element currently exists
-- `subscription_appear`: subscribed element has appeared at least once
-
-### Environment Variables
-
-- `CAMO_INPUT_MODE` - Input mode: `playwright` (default) or `cdp`. CDP mode uses `Input.dispatchMouseEvent` via Chrome DevTools Protocol, bypassing OS-level input system. Does not require window foreground. See [CDP Input Mode](#cdp-input-mode) below.
-- `CAMO_BROWSER_URL` - Browser service URL (default: `http://127.0.0.1:7704`)
-- `CAMO_INSTALL_DIR` - `@web-auto/camo` 安装目录（可选，首次安装兜底）
-- `CAMO_REPO_ROOT` - Camo repository root (optional, dev mode)
-- `CAMO_DATA_ROOT` / `CAMO_HOME` - 用户数据目录（Windows 默认 `D:/camo`，无 D 盘回退 `~/.camo`）
-- `CAMO_PROFILE_ROOT` - Profile 目录覆盖（默认 `<data-root>/profiles`）
-- `CAMO_ROOT` - 兼容旧变量（当值不是 `camo/.camo` 目录时会自动补 `.camo`）
-- `CAMO_CONTAINER_ROOT` - User container root override (default: `~/.camo/container-lib`)
-- `CAMO_PROGRESS_EVENTS_FILE` - Optional progress event JSONL path override
-- `CAMO_PROGRESS_WS_HOST` / `CAMO_PROGRESS_WS_PORT` - Progress websocket daemon bind address (default: `127.0.0.1:7788`)
-- `CAMO_DEFAULT_WINDOW_VERTICAL_RESERVE` - Reserved vertical pixels for default headful auto-size
-
-### CDP Input Mode
-
-By default, Camo uses Playwright's high-level input API (`page.mouse.click`), which goes through the OS input system and requires the browser window to be in the foreground. This can cause hangs (up to 30s timeout) on Windows when the window loses focus.
-
-CDP mode sends mouse events directly via the Chrome DevTools Protocol (`Input.dispatchMouseEvent`), which:
-
-- **Does not require window foreground** — works with minimized, background, or headless windows
-- **Does not depend on OS input system** — no `bringToFront`, no `ensureInputReady`
-- **Bypasses input pipeline checks** — no 30s timeout risk from `ensureInputReady` hanging
-
-#### How to enable
-
-```bash
-# Environment variable (recommended)
-CAMO_INPUT_MODE=cdp camo start xhs-qa-1 --url https://www.xiaohongshu.com
-
-# Or set in shell profile
-export CAMO_INPUT_MODE=cdp
-```
-
-#### Behavior differences
-
-| Feature | Playwright (default) | CDP mode |
-|---------|---------------------|----------|
-| Window foreground required | Yes | No |
-| OS input system | Yes | No |
-| Auto-scroll to element | Yes (via Playwright) | No (caller must ensure element in viewport) |
-| `ensureInputReady` check | Yes (can hang 30s) | Skipped |
-| `bringToFront` | Yes (default) | Skipped |
-| Nudge/recovery on timeout | Yes | No (fast fail) |
-| Input coordinate system | Viewport-relative | Viewport-relative (same) |
-
-#### Limitations
-
-- **Element must be in viewport**: CDP clicks at coordinates only. If the target element is scrolled out of view, the click will miss. Callers (like webauto's `clickPoint`) already resolve viewport-relative coordinates via `getBoundingClientRect`.
-- **No auto-scroll**: Unlike Playwright's `page.click(selector)`, CDP mode does not scroll to bring elements into view.
-- **keyboard operations still use Playwright**: `keyboard:press` and `keyboard:type` are not affected by CDP mode (they already work reliably in background via Playwright's keyboard API).
-
-#### Related environment variables
-
-- `CAMO_INPUT_ACTION_TIMEOUT_MS` — Max wait for input action (default: 30000)
-- `CAMO_INPUT_ACTION_MAX_ATTEMPTS` — Retry count on failure (default: 2)
-- `CAMO_INPUT_READY_SETTLE_MS` — Settle time after input ready (default: 80)
-- `CAMO_BRING_TO_FRONT_MODE` — `never` (skip) or `auto` (default, bring window to front)
-
-## Session Persistence
-
-Camo CLI persists session information locally:
-
-- Sessions are registered in `~/.camo/sessions/`
-- On restart, `camo sessions` / `camo instances` shows live + orphaned sessions
-- Stale sessions (>7 days) are automatically cleaned up
-
-## Requirements
-
-- Node.js >= 20.0.0
-- Python 3 with `camoufox` package
+`new-tab` and `multi-open` return newly allocated stable target/page ids.
+`list-tabs` and `switch-tab` return stable target/page information; array
+position is presentation only.
+
+## Profiles and temporary state
+
+Explicit `--profile` wins. When omitted, `CAMO_PROFILE` is used, then
+`default`. A persistent profile keeps its data under
+`~/.camo/profiles/<profile>/`. `close-tab` closes a page but never deletes
+profile data. Only `stop` owns temporary-profile cleanup.
 
 ## Development
 
 ```bash
-# Install dependencies
-npm install
-
-# Build
-npm run build
-
-# Test
+npm run test:v2
 npm test
-
-# Global install (build + test + install)
-npm run build:global
-
-# Bump version
-npm run version:bump
+npm run test:all
+npm run gates
+npm run check:file-size
+npm pack --dry-run --json
 ```
 
-## Release
+The v2 resource registry is the machine truth for ownership and verification:
 
-```bash
-# Create a release (bumps version, runs tests, creates tag)
-./scripts/release.sh
+- `v2/resources/registry/`
+- `v2/docs/function_map.json`
+- `v2/docs/mainline_call_map.json`
+- `v2/docs/feature_tests.json`
+- `v2/docs/verification/`
 
-# Or manually:
-npm run version:bump
-npm test
-git add package.json
-git commit -m "chore: release v$(node -p "require('./package.json').version")"
-git tag "v$(node -p "require('./package.json').version")"
-git push --follow-tags
-```
-
-GitHub Actions will automatically:
-1. Run tests on push to main
-2. Publish to npm when a release is created
-
-## License
-
-MIT
+The Codex skill lives at `skills/camoufox`.

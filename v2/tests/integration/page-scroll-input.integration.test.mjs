@@ -44,8 +44,9 @@ test('scroll operations use Camoufox page input and expose failures', () => {
         },
       });
 
-      const direct = await scroll({ profileId, x: 12, y: 34 });
-      const collected = await scrollAndCollect({ profileId, scrollCount: 2, scrollDelay: 1 });
+      const target = { targetId: 't_scroll_input', page: (await import('./v2/services/browser_service/internal/camoufox_bridge.mjs')).getPage(profileId), status: 'active' };
+      const direct = await scroll({ profileId, target, x: 12, y: 34 });
+      const collected = await scrollAndCollect({ profileId, target, scrollCount: 2, scrollDelay: 1 });
 
       __setBrowserForTest('_ephemeral_scroll_failure', {
         profileId: '_ephemeral_scroll_failure',
@@ -58,7 +59,8 @@ test('scroll operations use Camoufox page input and expose failures', () => {
       });
       let failureCode = null;
       try {
-        await scroll({ profileId: '_ephemeral_scroll_failure', x: 0, y: 10 });
+        const failedPage = (await import('./v2/services/browser_service/internal/camoufox_bridge.mjs')).getPage('_ephemeral_scroll_failure');
+        await scroll({ profileId: '_ephemeral_scroll_failure', target: { targetId: 't_scroll_failure', page: failedPage, status: 'active' }, x: 0, y: 10 });
       } catch (cause) {
         failureCode = cause?.code;
       }

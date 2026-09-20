@@ -21,6 +21,7 @@ import { loadConfig } from '../config/loader.mjs';
 import { findActiveDaemon } from '../../services/daemon_registration/registry.mjs';
 import { spawnDaemonProcess } from '../../services/daemon_process/spawn.mjs';
 import { checkCamoufoxHealth, ensureCamoufox } from '../camoufox_health.mjs';
+import { isBrowserCommand } from '../daemon/browser_commands.mjs';
 
 // PKG_ROOT is set by the bin/camo.mjs entry shim via CAMO_PKG_ROOT env var;
 // fallback 到本文件位置向上推导（bin_entry -> shell -> v2 -> 仓库根），
@@ -30,12 +31,13 @@ const PKG_ROOT = process.env.CAMO_PKG_ROOT
 const DAEMON_SCRIPT = path.join(PKG_ROOT, 'v2', 'shell', 'daemon', 'index.mjs');
 const DAEMON_DIR = path.join(os.homedir(), '.camo', 'daemon');
 
-function makeWsTransport(url) {
+function makeWsTransport(url, { quiet = false } = {}) {
+  const endpoint = quiet ? `${url}?quiet=status` : url;
   return {
     async sendFrame(env) {
       const { WebSocket } = await import('ws');
       return new Promise((resolve, reject) => {
-        const ws = new WebSocket(url);
+        const ws = new WebSocket(endpoint);
         const timeout = setTimeout(() => {
           ws.close();
           reject(Object.assign(new Error('WS timeout'), { code: 'E_IO_TIMEOUT' }));
@@ -43,7 +45,6 @@ function makeWsTransport(url) {
         ws.on('open', () => { ws.send(JSON.stringify(env)); });
         ws.on('message', (data) => {
           clearTimeout(timeout);
-          ws.close();
           try { resolve(JSON.parse(String(data))); }
           catch(e) { reject(e); }
         });
@@ -62,8 +63,9 @@ const NO_TRANSPORT_CMDS = new Set([
     '--version', 'version', 'daemon',
     'list-profiles', 'remove-profile', 'clean', 'init',
     'search',
-  ]);
+]);
 const PROCESS_ONLY_CMDS = new Set(['daemon']);
+const STATUS_CMD = 'status';
 
 async function waitForDaemon(profile, timeoutMs = 15000) {
   const start = Date.now();
@@ -112,12 +114,11 @@ async function main(argv) {
   }
 
   const hasHelpFlag = args.includes('--help') || args.includes('-h');
-  const isBrowserCmd = args.length > 0 && !hasHelpFlag && (
-    ['goto', 'back', 'forward', 'reload', 'click', 'type', 'scroll', 'screenshot', 'get-page-info', 'get-cookies', 
-     'set-cookies', 'evaluate', 'find-elements', 'wait', 'hover', 'select', 'upload',
-     'fetch-page', 'snapshot', 'scroll-and-collect', 'get-readable', 'get-text',
-     'new-tab', 'close-tab', 'list-tabs', 'set-viewport', 'set-user-agent', 'multi-open', 'start'].includes(args[0])
-  );
+  // `start` shares the browser-command autostart path but is owned by the
+  // daemon lifecycle rather than the generic browser action set.
+  const isBrowserCmd = args.length > 0
+    && !hasHelpFlag
+    && (args[0] === 'start' || isBrowserCommand(args[0]));
 
   // Surface input errors before any daemon discovery / health work. Browser
   // commands must validate required args first so `camo goto` (no url) returns
@@ -193,7 +194,7 @@ async function main(argv) {
   }
 
   let profile = config.profile;
-  let isEphemeral = true;
+  let isEphemeral = false;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--profile' && args[i + 1]) {
       profile = args[i + 1];
@@ -204,19 +205,40 @@ async function main(argv) {
       profile = `_ephemeral_${process.pid}_${Date.now()}`;
     }
   }
-  if (isEphemeral && !profile && args[0] !== 'start') profile = `_ephemeral_${process.pid}_${Date.now()}`;
-  // For `start` without --profile, default to the 'default' profile so
-  // the single-command boot flow lands on a real persistent profile.
-  if (args[0] === 'start' && !profile) { profile = 'default'; isEphemeral = false; }
+  // Ordinary commands use the configured persistent profile. Temporary
+  // profiles are allocated only by an explicit --ephemeral request.
+  if (!profile) profile = 'default';
 
   let transport;
   let daemonChild = null;
   
   const existing = findActiveDaemon();
   if (existing) {
-    transport = makeWsTransport(`ws://${existing.host}:${existing.wsPort}`);
-  } else if (process.env.CAMO_AUTOSTART === '1' || args[0] === 'start') {
+    transport = makeWsTransport(`ws://${existing.host}:${existing.wsPort}`, {
+      quiet: args[0] === STATUS_CMD,
+    });
+  } else if (args[0] === STATUS_CMD) {
+    process.stdout.write(JSON.stringify({
+      cmd: 'status',
+      service: {
+        state: 'unavailable',
+        reason: 'no active daemon',
+      },
+      profiles: [],
+      targets: [],
+      execution: [],
+      reclamation: {
+        idleTimeoutMs: null,
+        pending: [],
+        staleLocks: [],
+        staleRegistrations: [],
+      },
+      errors: [],
+    }, null, 2) + '\n');
+    return 0;
+  } else if (process.env.CAMO_AUTOSTART === '1' || isBrowserCmd) {
     const daemon = await startDaemon(profile, isEphemeral ? 'ephemeral' : 'persistent');
+    daemonChild = daemon.child;
     transport = makeWsTransport(daemon.wsUrl);
   } else {
     process.stderr.write(`camo: no active daemon for profile "${profile}". Run 'camo daemon start --profile ${profile}' first, or set CAMO_AUTOSTART=1.\n`);

@@ -1,11 +1,11 @@
 # `camo forward`
 
-Navigate the active page forward one history entry.
+Navigate a target's page forward one history entry.
 
 ## Usage
 
 ```
-camo forward [--profile <id>]
+camo forward [--target <t_id>] [--profile <id>]
 ```
 
 ## Arguments
@@ -13,12 +13,13 @@ camo forward [--profile <id>]
 | Flag | Type | Required | Description |
 |------|------|----------|-------------|
 | `--profile` | string | No | Profile id (default: $CAMO_PROFILE or 'default') |
+| `--target` | string | No | Stable target id returned by `start`; required when the profile has multiple active targets |
 
 ## Examples
 
 ```bash
 # Redo a back navigation
-camo forward --profile my-profile
+camo forward --target t_abc --profile my-profile
 ```
 
 ## Wiring
@@ -30,5 +31,7 @@ camo forward --profile my-profile
 ## Hard Guards
 
 - Requires an active browser session with the profile already started.
+- A stale target or a target from another profile is rejected explicitly.
+- Concurrent actions for the same profile return `E_STATE_LOCKED`.
 - No fallback; first failure is reported.
 - `navigated` is `false` when there is no next history entry.

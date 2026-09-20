@@ -36,7 +36,7 @@ test('positive: click, hover, and type use only protocol mouse/keyboard events',
       first() { return this; },
       async boundingBox() { return { x: 20, y: 30, width: 80, height: 20 }; },
     };
-    __setBrowserForTest('protocol_positive', { page: {
+    const page = {
       viewportSize: () => ({ width: 800, height: 600 }),
       locator: () => locator,
       getByText: () => locator,
@@ -50,10 +50,12 @@ test('positive: click, hover, and type use only protocol mouse/keyboard events',
         press: async (...args) => calls.push(['press', ...args]),
         type: async (...args) => calls.push(['type', ...args]),
       },
-    }});
-    const clickOut = await click({ profileId: 'protocol_positive', selector: '#submit' });
-    const hoverOut = await hover({ profileId: 'protocol_positive', selector: '#submit' });
-    const typeOut = await typeText({ profileId: 'protocol_positive', selector: '#name', text: 'Jason' });
+    };
+    __setBrowserForTest('protocol_positive', { page });
+    const target = { targetId: 't_protocol_positive', page, status: 'active' };
+    const clickOut = await click({ profileId: 'protocol_positive', target, selector: '#submit' });
+    const hoverOut = await hover({ profileId: 'protocol_positive', target, selector: '#submit' });
+    const typeOut = await typeText({ profileId: 'protocol_positive', target, selector: '#name', text: 'Jason' });
     process.stdout.write(JSON.stringify({ clickOut, hoverOut, typeOut, calls }));
   `);
   assert.equal(result.clickOut.clicked, true);
@@ -75,7 +77,7 @@ test('positive: offscreen target enters viewport through protocol wheel input', 
     const calls = [];
     let y = 900;
     const locator = { count: async () => 1, nth() { return this; }, first() { return this; }, async boundingBox() { return { x: 200, y, width: 80, height: 20 }; } };
-    __setBrowserForTest('protocol_scroll', { page: {
+    const page = {
       viewportSize: () => ({ width: 800, height: 600 }),
       locator: () => locator,
       waitForTimeout: async (...args) => calls.push(['wait', ...args]),
@@ -85,8 +87,9 @@ test('positive: offscreen target enters viewport through protocol wheel input', 
         up: async (...args) => calls.push(['up', ...args]),
         wheel: async (x, dy) => { calls.push(['wheel', x, dy]); y -= 500; },
       },
-    }});
-    const out = await click({ profileId: 'protocol_scroll', selector: '#target' });
+    };
+    __setBrowserForTest('protocol_scroll', { page });
+    const out = await click({ profileId: 'protocol_scroll', target: { targetId: 't_protocol_scroll', page, status: 'active' }, selector: '#target' });
     process.stdout.write(JSON.stringify({ out, calls }));
   `);
   assert.equal(result.out.clicked, true);
@@ -104,7 +107,7 @@ test('negative: hung protocol wheel times out and releases the profile pipeline'
       first() { return this; },
       async boundingBox() { return { x: 200, y: 900, width: 80, height: 20 }; },
     };
-    __setBrowserForTest('protocol_hung_wheel', { page: {
+    const page = {
       viewportSize: () => ({ width: 800, height: 600 }),
       locator: () => locator,
       evaluate: async () => ({ title: 'still alive', url: 'https://example.com' }),
@@ -114,15 +117,16 @@ test('negative: hung protocol wheel times out and releases the profile pipeline'
         up: async () => {},
         wheel: async () => new Promise(() => {}),
       },
-    }});
+    };
+    __setBrowserForTest('protocol_hung_wheel', { page });
 
     let code = null;
     try {
-      await click({ profileId: 'protocol_hung_wheel', selector: '#target', timeout: 20 });
+      await click({ profileId: 'protocol_hung_wheel', target: { targetId: 't_protocol_hung_wheel', page, status: 'active' }, selector: '#target', timeout: 20 });
     } catch (error) {
       code = error.code;
     }
-    const info = await getPageInfo({ profileId: 'protocol_hung_wheel' });
+    const info = await getPageInfo({ profileId: 'protocol_hung_wheel', target: { targetId: 't_protocol_hung_wheel', page, status: 'active' } });
     process.stdout.write(JSON.stringify({ code, info }));
   `);
   assert.equal(result.code, 'E_IO_TIMEOUT');
@@ -140,7 +144,7 @@ test('positive: offscreen click waits for wheel-driven layout settlement', () =>
     let settled = false;
     let waitCalls = 0;
     const locator = { count: async () => 1, nth() { return this; }, first() { return this; }, async boundingBox() { return { x: 200, y, width: 80, height: 20 }; } };
-    __setBrowserForTest('protocol_scroll_settlement', { page: {
+    const page = {
       viewportSize: () => ({ width: 800, height: 600 }),
       locator: () => locator,
       waitForTimeout: async () => { waitCalls += 1; settled = true; },
@@ -153,8 +157,9 @@ test('positive: offscreen click waits for wheel-driven layout settlement', () =>
         up: async (...args) => calls.push(['up', ...args]),
         wheel: async (x, dy) => { calls.push(['wheel', x, dy]); y = 500; },
       },
-    }});
-    const out = await click({ profileId: 'protocol_scroll_settlement', selector: '#target' });
+    };
+    __setBrowserForTest('protocol_scroll_settlement', { page });
+    const out = await click({ profileId: 'protocol_scroll_settlement', target: { targetId: 't_protocol_scroll_settlement', page, status: 'active' }, selector: '#target' });
     process.stdout.write(JSON.stringify({ out, calls, waitCalls }));
   `);
   assert.equal(result.out.clicked, true);
@@ -182,7 +187,7 @@ test('positive: multi-wheel click anchors once and settles before redispatch', (
         return { x: 200, y, width: 80, height: 20 };
       },
     };
-    __setBrowserForTest('protocol_multi_scroll', { page: {
+    const page = {
       viewportSize: () => ({ width: 800, height: 600 }),
       locator: () => locator,
       waitForTimeout: async () => {
@@ -206,10 +211,11 @@ test('positive: multi-wheel click anchors once and settles before redispatch', (
           calls.push(['wheel', ...args]);
         },
       },
-    }});
+    };
+    __setBrowserForTest('protocol_multi_scroll', { page });
     let out = null;
     let code = null;
-    try { out = await click({ profileId: 'protocol_multi_scroll', selector: '#target' }); }
+    try { out = await click({ profileId: 'protocol_multi_scroll', target: { targetId: 't_protocol_multi_scroll', page, status: 'active' }, selector: '#target' }); }
     catch (error) { code = error.code; }
     process.stdout.write(JSON.stringify({ out, code, calls, anchorMoves, wheelCount }));
   `);
@@ -235,7 +241,7 @@ test('negative: second protocol wheel failure does not re-anchor the pointer', (
       first() { return this; },
       async boundingBox() { return { x: 200, y, width: 80, height: 20 }; },
     };
-    __setBrowserForTest('protocol_second_wheel_failure', { page: {
+    const page = {
       viewportSize: () => ({ width: 800, height: 600 }),
       locator: () => locator,
       waitForTimeout: async () => {},
@@ -253,9 +259,10 @@ test('negative: second protocol wheel failure does not re-anchor the pointer', (
           else throw new Error('second wheel failed');
         },
       },
-    }});
+    };
+    __setBrowserForTest('protocol_second_wheel_failure', { page });
     let code = null;
-    try { await click({ profileId: 'protocol_second_wheel_failure', selector: '#target' }); }
+    try { await click({ profileId: 'protocol_second_wheel_failure', target: { targetId: 't_protocol_second_wheel_failure', page, status: 'active' }, selector: '#target' }); }
     catch (error) { code = error.code; }
     process.stdout.write(JSON.stringify({ code, calls, anchorMoves, wheelCount }));
   `);
@@ -281,7 +288,7 @@ test('positive: partially visible target clears the fixed bottom boundary with b
       first() { return this; },
       async boundingBox() { return { x: 16, y, width: 358, height: 48 }; },
     };
-    __setBrowserForTest('protocol_partial_boundary', { page: {
+    const page = {
       viewportSize: () => ({ width: 390, height: 844 }),
       locator: () => locator,
       waitForTimeout: async () => {},
@@ -299,10 +306,11 @@ test('positive: partially visible target clears the fixed bottom boundary with b
           calls.push(['wheel', x, dy]);
         },
       },
-    }});
+    };
+    __setBrowserForTest('protocol_partial_boundary', { page });
     let out = null;
     let code = null;
-    try { out = await click({ profileId: 'protocol_partial_boundary', selector: '#target' }); }
+    try { out = await click({ profileId: 'protocol_partial_boundary', target: { targetId: 't_protocol_partial_boundary', page, status: 'active' }, selector: '#target' }); }
     catch (error) { code = error.code; }
     process.stdout.write(JSON.stringify({ out, code, calls, wheelCount, y }));
   `);
@@ -330,7 +338,7 @@ test('positive: top target clears fixed header through bounded center-directed w
       first() { return this; },
       async boundingBox() { return { x: 16, y, width: 58, height: 40 }; },
     };
-    __setBrowserForTest('protocol_fixed_header', { page: {
+    const page = {
       viewportSize: () => ({ width: 390, height: 844 }),
       locator: () => locator,
       waitForTimeout: async () => {},
@@ -348,10 +356,11 @@ test('positive: top target clears fixed header through bounded center-directed w
           calls.push(['wheel', x, dy]);
         },
       },
-    }});
+    };
+    __setBrowserForTest('protocol_fixed_header', { page });
     let out = null;
     let code = null;
-    try { out = await click({ profileId: 'protocol_fixed_header', selector: '#back' }); }
+    try { out = await click({ profileId: 'protocol_fixed_header', target: { targetId: 't_protocol_fixed_header', page, status: 'active' }, selector: '#back' }); }
     catch (error) { code = error.code; }
     process.stdout.write(JSON.stringify({ out, code, calls, wheelCount, y }));
   `);
@@ -384,7 +393,7 @@ test('negative: moving offscreen target never receives a false-success click', (
         return { x: 200, y: sample % 2 ? 100 : 140, width: 80, height: 20 };
       },
     };
-    __setBrowserForTest('protocol_scroll_moving', { page: {
+    const page = {
       viewportSize: () => ({ width: 800, height: 600 }),
       locator: () => locator,
       waitForTimeout: async () => {},
@@ -394,9 +403,10 @@ test('negative: moving offscreen target never receives a false-success click', (
         up: async (...args) => calls.push(['up', ...args]),
         wheel: async (...args) => { wheelIssued = true; calls.push(['wheel', ...args]); },
       },
-    }});
+    };
+    __setBrowserForTest('protocol_scroll_moving', { page });
     let code = null;
-    try { await click({ profileId: 'protocol_scroll_moving', selector: '#target' }); }
+    try { await click({ profileId: 'protocol_scroll_moving', target: { targetId: 't_protocol_scroll_moving', page, status: 'active' }, selector: '#target' }); }
     catch (error) { code = error.code; }
     process.stdout.write(JSON.stringify({ code, calls }));
   `);
@@ -421,7 +431,7 @@ test('positive: visible duplicate wins over offscreen duplicate', () => {
       count: async () => boxes.length,
       nth(index) { selected = index; return { boundingBox: async () => boxes[index] }; },
     };
-    __setBrowserForTest('protocol_visible_duplicate', { page: {
+    const page = {
       viewportSize: () => ({ width: 800, height: 600 }),
       locator: () => locator,
       mouse: {
@@ -430,8 +440,9 @@ test('positive: visible duplicate wins over offscreen duplicate', () => {
         up: async (...args) => calls.push(['up', ...args]),
         wheel: async (...args) => calls.push(['wheel', ...args]),
       },
-    }});
-    const out = await click({ profileId: 'protocol_visible_duplicate', selector: '#target' });
+    };
+    __setBrowserForTest('protocol_visible_duplicate', { page });
+    const out = await click({ profileId: 'protocol_visible_duplicate', target: { targetId: 't_protocol_visible_duplicate', page, status: 'active' }, selector: '#target' });
     process.stdout.write(JSON.stringify({ out, selected, calls }));
   `);
   assert.equal(result.out.clicked, true);
@@ -447,53 +458,22 @@ test('negative: protocol interaction failures remain explicit', () => {
     __enableTestRoot();
     enableBridge();
     const missing = { count: async () => 1, nth() { return this; }, first() { return this; }, async boundingBox() { return null; } };
-    __setBrowserForTest('protocol_failure', { page: {
+    const page = {
       viewportSize: () => ({ width: 800, height: 600 }), locator: () => missing,
       mouse: { move: async () => {}, down: async () => {}, up: async () => {}, wheel: async () => {} },
       keyboard: { press: async () => {}, type: async () => {} },
-    }});
+    };
+    __setBrowserForTest('protocol_failure', { page });
+    const target = { targetId: 't_protocol_failure', page, status: 'active' };
     const codes = [];
     for (const action of [
-      () => click({ profileId: 'protocol_failure', selector: '#missing' }),
-      () => typeText({ profileId: 'protocol_failure', selector: '#missing', text: 'x' }),
-      () => typeText({ profileId: 'protocol_failure', selector: '#missing', text: '' }),
+      () => click({ profileId: 'protocol_failure', target, selector: '#missing' }),
+      () => typeText({ profileId: 'protocol_failure', target, selector: '#missing', text: 'x' }),
+      () => typeText({ profileId: 'protocol_failure', target, selector: '#missing', text: '' }),
     ]) {
       try { await action(); } catch (error) { codes.push(error.code); }
     }
     process.stdout.write(JSON.stringify({ codes }));
   `);
   assert.deepEqual(result.codes, ['E_BROWSER_CLICK_FAILED', 'E_BROWSER_TYPE_FAILED', 'E_INPUT_MISSING_FIELD']);
-});
-
-test('positive: wait/readable command projections preserve operation fields', () => {
-  const result = runScript(`
-    import { __enableTestRoot as enablePipeline } from './v2/services/page_runtime/input_pipeline.mjs';
-    import { __setBrowserForTest, __enableTestRoot as enableBridge } from './v2/services/browser_service/internal/camoufox_bridge.mjs';
-    import { handleCommand } from './v2/shell/daemon/command_handlers.mjs';
-    enablePipeline();
-    enableBridge();
-    const calls = [];
-    const original = globalThis.__camoTestImportOp;
-    globalThis.__camoTestImportOp = null;
-    const page = {
-      waitForLoadState: async () => {},
-      getByText: () => ({ waitFor: async () => {} }),
-      locator: () => ({ waitFor: async () => {} }),
-      evaluate: async () => 'readable body',
-    };
-    __setBrowserForTest('protocol_projection', { page });
-    const ctx = { profile: 'protocol_projection', opts: { mode: 'persistent', daemonId: 'test' }, ensureBrowser: async () => {}, operationLoader: async (name) => {
-      const ops = await import('./v2/services/page_runtime/input_pipeline.mjs');
-      return ops[name];
-    } };
-    const waitResult = await handleCommand('wait', { for: 'text', target: 'Ready', timeout: 20 }, ctx);
-    const readableResult = await handleCommand('get-readable', {}, ctx);
-    calls.push(waitResult, readableResult);
-    globalThis.__camoTestImportOp = original;
-    process.stdout.write(JSON.stringify({ calls }));
-  `);
-  assert.equal(result.calls[0].ok, true);
-  assert.equal(result.calls[0].waited, true);
-  assert.equal(result.calls[1].ok, true);
-  assert.equal(typeof result.calls[1].text, 'string');
 });

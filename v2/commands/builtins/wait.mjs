@@ -1,4 +1,4 @@
-// camo v2 builtin: `camo wait [--for <selector|text|url>] [--timeout <ms>] [--ms <ms>] [--profile <id>]`
+// camo v2 builtin: `camo wait [--for <selector|text|url>] [--condition <value>] [--target <t_id>] [--profile <id>]`
 //
 // Wait for a condition to be satisfied. Default timeout 30000ms.
 
@@ -40,18 +40,20 @@ export async function run(transport, parsed = {}, ctx = {}) {
   }
 
   const target = parsed.named?.target || null;
+  const condition = parsed.named?.condition || null;
 
   const reply = await sendCommand(transport, {
     cmd: 'wait',
-    args: { profile, for: for_, timeout, target, ms },
+    args: { profile, target, for: for_, condition, timeout, ms },
   });
   return {
     cmd: 'wait',
     profile,
+    target: reply.payload?.target || target,
     for: for_,
+    condition: reply.payload?.condition || condition,
     timeout,
     ms,
-    target,
     satisfied: reply.payload?.satisfied === true,
     issuedAt: new Date().toISOString(),
     traceId: ctx.traceId || null,

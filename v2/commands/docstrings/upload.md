@@ -5,7 +5,7 @@ Upload a file to an `<input type="file">` element.
 ## Usage
 
 ```
-camo upload --selector <css> --file <path> [--profile <id>]
+camo upload --selector <css> --file <path> [--target <t_id>] [--profile <id>]
 ```
 
 ## Arguments
@@ -14,6 +14,7 @@ camo upload --selector <css> --file <path> [--profile <id>]
 |------|------|----------|-------------|
 | `--selector` | string | Yes | CSS selector for the file input element |
 | `--file` | string | Yes | Path to the file to upload |
+| `--target` | string | No | Stable target id returned by `start`; required when the profile has multiple active targets |
 | `--profile` | string | No | Profile id (default: $CAMO_PROFILE or 'default') |
 
 ## Examples
@@ -24,9 +25,13 @@ camo upload --selector "input[type=file]" --file ./document.pdf
 
 # Specific profile
 camo upload --profile my-profile --selector "#file-upload" --file ./image.png
+
+# Specific target
+camo upload --target t_abc123 --selector "#file-upload" --file ./image.png
 ```
 
 ## Errors
 
 - `E_INPUT_MISSING_FIELD`: --selector or --file is empty
 - `E_INPUT_MISSING_FIELD`: profile id is empty
+- `E_STATE_INVALID`: target is stale, belongs to another profile, or is ambiguous

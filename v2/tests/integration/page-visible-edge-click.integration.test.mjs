@@ -37,7 +37,7 @@ test('positive: visible edge target clicks without protocol wheel input', () => 
       first() { return this; },
       async boundingBox() { return { x: 5.5, y: 744, width: 44, height: 40 }; },
     };
-    __setBrowserForTest('protocol_visible_edge', { page: {
+    const page = {
       viewportSize: () => ({ width: 390, height: 844 }),
       locator: () => locator,
       mouse: {
@@ -46,8 +46,9 @@ test('positive: visible edge target clicks without protocol wheel input', () => 
         up: async (...args) => calls.push(['up', ...args]),
         wheel: async (...args) => calls.push(['wheel', ...args]),
       },
-    }});
-    const out = await click({ profileId: 'protocol_visible_edge', selector: '#teams' });
+    };
+    __setBrowserForTest('protocol_visible_edge', { page });
+    const out = await click({ profileId: 'protocol_visible_edge', target: { targetId: 't_visible_edge', page, status: 'active' }, selector: '#teams' });
     process.stdout.write(JSON.stringify({ out, calls }));
   `);
   assert.equal(result.out.clicked, true);

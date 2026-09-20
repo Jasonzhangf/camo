@@ -1,11 +1,22 @@
-# services-session (design)
+# services-session
 
-Module owner placeholder. Real implementation will live in this directory.
-See `v2/resources/registry/modules.json` for the canonical id.
+Single truth owner for `browser_session` and `browser_target`.
 
-Layer: see modules.json.
+`manager.mjs` owns the in-process session and target registries:
 
-Skeletons to land here before this module becomes active:
-- `manager.mjs` (or equivalent) with single owner of the resource(s) listed in resources.json.
-- One thin `index.mjs` re-exporting public surface.
-- Tests under `v2/tests/unit/<path>/`.
+- a session records `profileId`, `instanceId`, `generation`, status, and
+  activity time;
+- a target records `targetId`, profile, session generation, stable `pageId`,
+  status, and the internal page handle;
+- `allocateTarget`, `resolveTarget`, `resolveTargetForProfile`, `listTargets`,
+  and `invalidateTarget` are the only target lifecycle surface;
+- closing a session invalidates every target bound to that session generation.
+
+External callers use `targetId`. `profileId`, `sessionId`, `pageId`, and
+`generation` remain internal control fields. Page runtime receives a resolved
+target with an internal page handle and must not resolve targets or write this
+registry.
+
+When a profile has more than one active target, resolution without `--target`
+returns `E_STATE_INVALID`; the daemon never selects the current, foreground,
+newest, or indexed page as a substitute.

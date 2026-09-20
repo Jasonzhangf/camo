@@ -32,13 +32,15 @@ export async function run(transport, parsed = {}, ctx = {}) {
     throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'url', value: url } });
   }
   const waitUntil = parsed.named?.waitUntil || 'load';
+  const target = parsed.named?.target || null;
   const reply = await sendCommand(transport, {
     cmd: 'goto',
-    args: { profile, url, waitUntil },
+    args: { profile, target, url, waitUntil },
   });
   return {
     cmd: 'goto',
     profile,
+    target: reply.payload?.target || target,
     url,
     waitUntil,
     navigated: reply.payload?.navigated === true,

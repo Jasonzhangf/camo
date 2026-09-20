@@ -101,6 +101,21 @@
       "default_user_message": "Failed to launch browser."
     },
     {
+      "code": "E_BROWSER_RELAUNCH_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to relaunch the browser."
+    },
+    {
+      "code": "E_BROWSER_CLOSE_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to close the browser."
+    },
+    {
+      "code": "E_BROWSER_CLEANUP_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to clean up temporary browser state."
+    },
+    {
       "code": "E_BROWSER_CLICK_FAILED",
       "category": "io",
       "default_user_message": "Failed to click the target."

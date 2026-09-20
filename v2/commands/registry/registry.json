@@ -57,6 +57,28 @@
       "docstring": "commands/docstrings/stop.md"
     },
     {
+      "cmd": "status",
+      "module": "commands/builtins/status.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "optional profile filter"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "optional target filter"
+          }
+        },
+        "positional": []
+      },
+      "docstring": "commands/docstrings/status.md"
+    },
+    {
       "cmd": "login",
       "module": "commands/builtins/login.mjs",
       "args_schema": {
@@ -105,6 +127,12 @@
             "required": false,
             "doc": "profile id"
           },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
+          },
           "waitUntil": {
             "type": "enum",
             "values": [
@@ -138,6 +166,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           }
         },
         "positional": []
@@ -154,6 +188,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           }
         },
         "positional": []
@@ -170,6 +210,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           },
           "waitUntil": {
             "type": "enum",
@@ -197,6 +243,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           },
           "selector": {
             "type": "string",
@@ -256,6 +308,12 @@
             "required": false,
             "doc": "profile id"
           },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
+          },
           "selector": {
             "type": "string",
             "min_len": 1,
@@ -292,6 +350,12 @@
             "required": false,
             "doc": "profile id"
           },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
+          },
           "format": {
             "type": "enum",
             "values": [
@@ -316,6 +380,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           },
           "x": {
             "type": "integer",
@@ -353,6 +423,12 @@
             "required": false,
             "doc": "profile id"
           },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
+          },
           "path": {
             "type": "string",
             "required": false,
@@ -373,6 +449,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           },
           "for": {
             "type": "enum",
@@ -399,10 +481,10 @@
             "required": false,
             "doc": "duration in ms"
           },
-          "target": {
+          "condition": {
             "type": "string",
             "required": false,
-            "doc": "target for selector/text/url conditions"
+            "doc": "selector, text, or URL value for selector/text/url conditions"
           }
         },
         "positional": []
@@ -419,6 +501,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           },
           "script": {
             "type": "string",
@@ -441,6 +529,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           },
           "selector": {
             "type": "string",
@@ -469,6 +563,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           },
           "selector": {
             "type": "string",
@@ -526,6 +626,12 @@
             "required": false,
             "doc": "profile id"
           },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
+          },
           "selector": {
             "type": "string",
             "min_len": 1,
@@ -554,6 +660,12 @@
             "required": false,
             "doc": "profile id"
           },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
+          },
           "selector": {
             "type": "string",
             "min_len": 1,
@@ -575,6 +687,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           }
         },
         "positional": []
@@ -591,6 +709,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           },
           "selector": {
             "type": "string",
@@ -620,6 +744,12 @@
             "required": false,
             "doc": "profile id"
           },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
+          },
           "maxLength": {
             "type": "integer",
             "min": 100,
@@ -641,6 +771,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           },
           "url": {
             "type": "string",
@@ -664,11 +800,11 @@
             "required": false,
             "doc": "profile id"
           },
-          "tabId": {
-            "type": "integer",
-            "min": 0,
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
             "required": true,
-            "doc": "tab index to close"
+            "doc": "stable target id returned by start"
           }
         },
         "positional": []
@@ -685,6 +821,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "optional target filter"
           }
         },
         "positional": []
@@ -702,11 +844,11 @@
             "required": false,
             "doc": "profile id"
           },
-          "tabId": {
-            "type": "integer",
-            "min": 0,
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
             "required": true,
-            "doc": "tab index to switch to (from list-tabs)"
+            "doc": "stable target id returned by start"
           }
         },
         "positional": []
@@ -723,6 +865,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           }
         },
         "positional": []
@@ -739,6 +887,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           },
           "cookies": {
             "type": "string",
@@ -762,6 +916,12 @@
             "required": false,
             "doc": "profile id"
           },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
+          },
           "ua": {
             "type": "string",
             "min_len": 10,
@@ -783,6 +943,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           },
           "width": {
             "type": "integer",
@@ -811,6 +977,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           },
           "timeout": {
             "type": "integer",
@@ -880,6 +1052,12 @@
             "required": false,
             "doc": "profile id"
           },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
+          },
           "scrollCount": {
             "type": "integer",
             "min": 1,
@@ -907,6 +1085,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           },
           "timeout": {
             "type": "integer",
@@ -937,6 +1121,12 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "required": false,
             "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
           },
           "urls": {
             "type": "string",

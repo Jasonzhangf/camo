@@ -8,13 +8,13 @@ const EXPECTED_CMDS = [
   'back', 'click', 'close-tab', 'daemon', 'evaluate', 'fetch-page', 'find-elements',
   'forward', 'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'goto', 'hover',
   'list-tabs', 'login', 'multi-open', 'new-tab', 'reload', 'screenshot', 'scroll', 'scroll-and-collect', 'search', 'select',
-  'set-cookies', 'set-user-agent', 'set-viewport', 'snapshot', 'start', 'stop',
+  'set-cookies', 'set-user-agent', 'set-viewport', 'snapshot', 'start', 'status', 'stop',
   'switch-tab', 'type', 'upload', 'wait', 'wait-dom-stable',
 ];
 
-test('positive: list returns all 35 commands sorted', () => {
+test('positive: list returns all 36 commands sorted', () => {
   const a = list();
-  assert.equal(a.length, 35);
+  assert.equal(a.length, 36);
   assert.deepEqual(a, EXPECTED_CMDS);
 });
 
@@ -33,7 +33,7 @@ test('negative: look throws for unknown cmd', () => {
 
 test('positive: describe includes count', () => {
   const d = describe();
-  assert.equal(d.count, 35);
+  assert.equal(d.count, 36);
   assert.equal(d.layer, 'L4_command');
   assert.equal(d.moduleId, 'commands.registry');
 });

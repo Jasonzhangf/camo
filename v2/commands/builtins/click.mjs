@@ -31,6 +31,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
   const dialogAction = parsed.named?.dialogAction ?? null;
   const dialogText = parsed.named?.dialogText ?? null;
   const timeout = parsed.named?.timeout ?? null;
+  const target = parsed.named?.target ?? null;
 
   const hasSelector = typeof selector === 'string' && selector.length > 0;
   const hasText = typeof text === 'string' && text.length > 0;
@@ -43,11 +44,12 @@ export async function run(transport, parsed = {}, ctx = {}) {
 
   const reply = await sendCommand(transport, {
     cmd: 'click',
-    args: { profile, selector, text, button, dialogAction, dialogText, timeout },
+    args: { profile, target, selector, text, button, dialogAction, dialogText, timeout },
   });
   return {
     cmd: 'click',
     profile,
+    target: reply.payload?.target || target,
     selector,
     text,
     button,

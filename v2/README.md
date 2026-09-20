@@ -1,8 +1,9 @@
-# camo v2 (in-design)
+# camo v2
 
-This directory holds the v2 rebuild of camo. v2 is rebuilt clean from
-zero using the resource registry as the machine truth. v1 lives in
-`../src/` and is not modified by the v2 work.
+This directory holds the v2 runtime of camo. The resource registry is the
+machine truth for resource ownership, read/write paths, verification gates, and
+module edges. `../src/` is retained only as legacy material and is not the v2
+execution path.
 
 ## Read order (top-down)
 
@@ -13,16 +14,18 @@ zero using the resource registry as the machine truth. v1 lives in
 5. `v2/docs/verification/`          per-gate narrative
 6. `v2/gates/run-all.mjs`           gate runner
 
-## Status
+## Current target contract
 
-Every entry in `v2/resources/registry/*` is currently `design`. No
-production path may cite a design entry as live truth (hard guard 22b).
+Browser actions use the stable `target` returned by `camo start`, `camo
+new-tab`, or `camo multi-open`. The daemon resolves that external handle
+through the session owner and passes an internal page handle to page runtime.
+It never substitutes the current page, foreground page, newest page, or array
+index for an explicit target.
 
-A resource flips to `active` after:
-
-1. The owning module file is wired.
-2. `forbidden_paths` are physically absent from `../src/`.
-3. The corresponding gate runs green in CI.
+`camo status` is a read-only projection. With no daemon it reports
+`service.state: unavailable`; with a daemon it reports sessions, targets,
+execution, and reclamation without refreshing idle time or changing browser
+state.
 
 ## Run gates locally
 
@@ -33,7 +36,13 @@ A resource flips to `active` after:
 
     cd v2/docs/wiki && ./build.sh
 
-## Forbidden v1 leftovers
+## Registry and verification
+
+The registry contains active v2 resources and their verification gates.
+`browser_target` is owned by `services/session` and its gate is
+`registry.resources.browser_target`.
+
+## Legacy v1 leftovers
 
 | v1 file | blocks resource |
 |---|---|
@@ -51,8 +60,8 @@ A resource flips to `active` after:
 | `src/container/subscription-registry.mjs` | subscription |
 | `src/container/runtime-core/operations/tab-pool.mjs` | tab_pool |
 
-These are exactly what the per-resource gates already detect; their
-output is the spec for what to remove in v1 to enable activation.
+These paths are legacy references used by the per-resource gates. They are not
+the v2 execution path.
 
 ## CI wiring (hard guard 22a: required)
 
@@ -63,4 +72,5 @@ Add to `.github/workflows/ci.yml`:
   run: node v2/gates/run-all.mjs
 ```
 
-Until that line exists in CI, the gates are not gates.
+The workflow must run this command; otherwise the registry gates are not CI
+gates.

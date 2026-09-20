@@ -75,6 +75,20 @@ test('negative: closeBrowser rejects empty profileId', async () => {
   );
 });
 
+test('negative: closeBrowser preserves context close failures', async () => {
+  const profile = 'close-failure';
+  __setBrowserForTest(profile, {
+    context: { close: async () => { throw new Error('context close failed'); } },
+  });
+  await assert.rejects(
+    () => import('../../../services/browser_service/internal/camoufox_bridge.mjs').then(({ closeBrowser }) => closeBrowser(profile)),
+    (err) => err.code === 'E_BROWSER_CLOSE_FAILED'
+      && err.details.profileId === profile
+      && /context close failed/.test(err.details.reason),
+  );
+  assert.deepEqual(listActive(), [profile], 'failed close must retain ownership truth');
+});
+
 test('positive: launch and relaunch keep network and navigator UA aligned', async () => {
   const profile = 'ua-bridge-success';
   const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)';

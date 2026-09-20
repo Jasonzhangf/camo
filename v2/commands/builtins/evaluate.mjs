@@ -1,4 +1,4 @@
-// camo v2 builtin: `camo evaluate --script <js> [--profile <id>]`
+// camo v2 builtin: `camo evaluate --script <js> [--target <t_id>] [--profile <id>]`
 //
 // Execute arbitrary JavaScript in the page context.
 
@@ -23,6 +23,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
     throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'transport' } });
   }
   const profile = safeProfile(parsed.profile);
+  const target = parsed.named?.target || null;
   const script = parsed.named?.script || '';
 
   if (typeof script !== 'string' || !script.trim()) {
@@ -31,11 +32,12 @@ export async function run(transport, parsed = {}, ctx = {}) {
 
   const reply = await sendCommand(transport, {
     cmd: 'evaluate',
-    args: { profile, script },
+    args: { profile, target, script },
   });
   return {
     cmd: 'evaluate',
     profile,
+    target: reply.payload?.target || target,
     result: reply.payload?.result ?? null,
     issuedAt: new Date().toISOString(),
     traceId: ctx.traceId || null,

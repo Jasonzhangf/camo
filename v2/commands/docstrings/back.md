@@ -1,11 +1,11 @@
 # `camo back`
 
-Navigate the active page back one history entry.
+Navigate a target's page back one history entry.
 
 ## Usage
 
 ```
-camo back [--profile <id>]
+camo back [--target <t_id>] [--profile <id>]
 ```
 
 ## Arguments
@@ -13,12 +13,13 @@ camo back [--profile <id>]
 | Flag | Type | Required | Description |
 |------|------|----------|-------------|
 | `--profile` | string | No | Profile id (default: $CAMO_PROFILE or 'default') |
+| `--target` | string | No | Stable target id returned by `start`; required when the profile has multiple active targets |
 
 ## Examples
 
 ```bash
 # Go back after a click navigated away
-camo back --profile my-profile
+camo back --target t_abc --profile my-profile
 ```
 
 ## Wiring
@@ -30,5 +31,7 @@ camo back --profile my-profile
 ## Hard Guards
 
 - Requires an active browser session with the profile already started.
+- A stale target or a target from another profile is rejected explicitly.
+- Concurrent actions for the same profile return `E_STATE_LOCKED`.
 - No fallback; first failure is reported.
 - `navigated` is `false` when there is no previous history entry.

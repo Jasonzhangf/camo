@@ -1,4 +1,4 @@
-// camo v2 builtin: `camo back [--profile <id>]`
+// camo v2 builtin: `camo back [--target <t_id>] [--profile <id>]`
 //
 // Navigate the active page back one history entry.
 
@@ -19,10 +19,12 @@ export async function run(transport, parsed = {}, ctx = {}) {
     throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'transport' } });
   }
   const profile = safeProfile(parsed.profile);
-  const reply = await sendCommand(transport, { cmd: 'back', args: { profile } });
+  const target = parsed.named?.target || null;
+  const reply = await sendCommand(transport, { cmd: 'back', args: { profile, target } });
   return {
     cmd: 'back',
     profile,
+    target: reply.payload?.target || target,
     navigated: reply.payload?.navigated === true,
     finalUrl: reply.payload?.finalUrl || null,
     issuedAt: new Date().toISOString(),

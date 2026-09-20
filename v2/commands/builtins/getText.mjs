@@ -1,4 +1,4 @@
-// camo v2 builtin: `camo get-text [--selector <css>] [--profile <id>]`
+// camo v2 builtin: `camo get-text [--selector <css>] [--target <t_id>] [--profile <id>]`
 import { CamoError } from '../../contracts/error_envelope/projector.mjs';
 import { sendCommand } from '../../transports/client/api.mjs';
 export const cmd = 'get-text';
@@ -11,7 +11,8 @@ function safeProfile(profileId) {
 export async function run(transport, parsed = {}, ctx = {}) {
   if (!transport || typeof transport.sendFrame !== 'function') throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'transport' } });
   const profile = safeProfile(parsed.profile);
+  const target = parsed.named?.target ?? null;
   const selector = parsed.named?.selector ?? null;
-  const reply = await sendCommand(transport, { cmd: 'get-text', args: { profile, selector } });
-  return { cmd: 'get-text', profile, text: reply.payload?.text ?? '', length: reply.payload?.length ?? 0, issuedAt: new Date().toISOString(), traceId: ctx.traceId || null };
+  const reply = await sendCommand(transport, { cmd: 'get-text', args: { profile, target, selector } });
+  return { cmd: 'get-text', profile, target: reply.payload?.target || target, text: reply.payload?.text ?? '', length: reply.payload?.length ?? 0, issuedAt: new Date().toISOString(), traceId: ctx.traceId || null };
 }

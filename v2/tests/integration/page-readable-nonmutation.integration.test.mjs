@@ -32,10 +32,13 @@ test('getReadable extracts from a clone without mutating the live document', () 
           return [{ remove() { state.liveRemovals += 1; } }];
         },
       };
-      __setBrowserForTest('readable_nonmutation', {
-        page: { evaluate: async (fn, arg) => fn(arg) },
+      const page = { evaluate: async (fn, arg) => fn(arg) };
+      __setBrowserForTest('readable_nonmutation', { page });
+      const output = await getReadable({
+        profileId: 'readable_nonmutation',
+        target: { targetId: 't_readable_nonmutation', page, status: 'active' },
+        maxLength: 13,
       });
-      const output = await getReadable({ profileId: 'readable_nonmutation', maxLength: 13 });
       process.stdout.write(JSON.stringify({ output, state }));
     `;
     const out = spawnSync(process.execPath, ['--input-type=module', '-e', script], {

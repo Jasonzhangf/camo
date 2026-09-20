@@ -56,7 +56,7 @@ test('smoke: browser_service bootstrap exposes session API', async () => {
   const bs = await import('../../services/browser_service/bootstrap.mjs');
   assert.ok(typeof bs.startSession === 'function');
   assert.ok(typeof bs.stopSession === 'function');
-  assert.ok(typeof bs.getCurrentPage === 'function');
+  assert.equal(bs.getCurrentPage, undefined, 'external current-page access must not exist');
   assert.ok(typeof bs.getSession === 'function');
   assert.ok(typeof bs.listSessions === 'function');
   assert.ok(typeof bs.shutdown === 'function');
