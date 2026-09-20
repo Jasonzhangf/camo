@@ -740,6 +740,13 @@ Stage 8: dynamic ports and daemon discovery are present in source but live CLI v
 - Boundary: no live daemon was stopped or started during this work. Only the approved restart path may be used for deployment; the existing production daemon remains untouched until the runtime verification step.
 - Live verification: single profile `camo start --profile A` works (9s browser launch). Concurrent second profile `camo start --profile B` causes Camoufox engine crash (second browser fails to launch, daemon exits silently, claim file left in `active` state with no process). `listRegistrations` then throws `E_CONFIG_INVALID` because the orphaned claim has a non-matching process identity, making `findActiveDaemon` fail and causing `WS timeout`. This is a pre-existing Camoufox engine limitation on parallel browser instances, not caused by the idle-reclaim code. Resolution is pending Camoufox engine fix or explicit approval to add per-profile browser-launch guards to the daemon.
 
+## 2026-09-19 Target / Status / Lifecycle 整改任务
+
+- 任务真源：[camo-target-status-remediation.md](docs/goals/camo-target-status-remediation.md)。
+- 目标：以 `target` 取代外部 `profileId` 页面操作主键，新增只读 `status`，收敛 default/temp 生命周期、自动准备、串行执行和回收状态。
+- 当前状态：`READY_FOR_GCM`；首轮 worker 从最新 `origin/main` 建立独立 worktree 执行 T0-T3 主线。
+- 约束：不改业务编排、不走 fallback、不修改当前 main/远程/生产运行位置；候选必须经过 review、merge、重建、安装和真实入口证据后才能宣告完成。
+
 ## 2026-08-20 multi-profile daemon single-slot repair
 
 - Root cause: `v2/shell/daemon/index.mjs` kept scalar `currentBrowserProfile` and `browserRefCount`; starting profile B stopped profile A before dispatch. The browser-service registry is already keyed by profile id and is the lifecycle truth.
