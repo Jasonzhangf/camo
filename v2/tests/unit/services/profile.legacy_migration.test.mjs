@@ -15,17 +15,20 @@ import {
 
 function withTempHome(fn) {
   const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-migrate-'));
-  const previousHome = process.env.HOME;
+  // The owner resolves home via USERPROFILE on Windows and HOME elsewhere;
+  // the test must isolate the same variable the implementation reads.
+  const HOME_VAR = process.platform === 'win32' ? 'USERPROFILE' : 'HOME';
+  const previousHome = process.env[HOME_VAR];
   const previousProfiles = process.env.CAMO_PATHS_PROFILES;
   const previousProfileRoot = process.env.CAMO_PROFILE_ROOT;
-  process.env.HOME = tmpHome;
+  process.env[HOME_VAR] = tmpHome;
   delete process.env.CAMO_PATHS_PROFILES;
   delete process.env.CAMO_PROFILE_ROOT;
   return (async () => {
     try { await fn(); }
     finally {
-      if (previousHome === undefined) delete process.env.HOME;
-      else process.env.HOME = previousHome;
+      if (previousHome === undefined) delete process.env[HOME_VAR];
+      else process.env[HOME_VAR] = previousHome;
       if (previousProfiles === undefined) delete process.env.CAMO_PATHS_PROFILES;
       else process.env.CAMO_PATHS_PROFILES = previousProfiles;
       if (previousProfileRoot === undefined) delete process.env.CAMO_PROFILE_ROOT;
@@ -35,10 +38,15 @@ function withTempHome(fn) {
   })();
 }
 
+// Reading home inside the tests must match resolveHomeDir().
+function testHome() {
+  return process.platform === 'win32' ? process.env.USERPROFILE : process.env.HOME;
+}
+
 test('positive: profile fingerprint moves from legacy root into profile dir and legacy file is removed', async () => {
   await withTempHome(async () => {
     const pid = 'migrate-fp';
-    const legacyDir = path.join(process.env.HOME, '.camo', 'fingerprints');
+    const legacyDir = path.join(testHome(), '.camo', 'fingerprints');
     fs.mkdirSync(legacyDir, { recursive: true });
     const legacyFile = path.join(legacyDir, `${pid}.json`);
     const legacyData = { profileId: pid, fingerprintSalt: 'legacy-salt', source: 'legacy' };
@@ -57,7 +65,7 @@ test('positive: profile fingerprint moves from legacy root into profile dir and 
 test('positive: profile cookies move from legacy per-profile dir to profile-owned backups', async () => {
   await withTempHome(async () => {
     const pid = 'migrate-cookies';
-    const legacyProfileDir = path.join(process.env.HOME, '.camo', 'cookies', pid);
+    const legacyProfileDir = path.join(testHome(), '.camo', 'cookies', pid);
     fs.mkdirSync(legacyProfileDir, { recursive: true });
     const legacyFile = path.join(legacyProfileDir, 'example.com.txt');
     fs.writeFileSync(legacyFile, '# Netscape HTTP Cookie File\n.example.com\tTRUE\t/\tFALSE\t1786026438\tlegacy\tyes\n', 'utf8');
@@ -82,7 +90,7 @@ test('positive: profile cookies move from legacy per-profile dir to profile-owne
 test('negative: target already populated fails fast with typed error and does not overwrite', async () => {
   await withTempHome(async () => {
     const pid = 'migrate-conflict';
-    const legacyDir = path.join(process.env.HOME, '.camo', 'fingerprints');
+    const legacyDir = path.join(testHome(), '.camo', 'fingerprints');
     fs.mkdirSync(legacyDir, { recursive: true });
     const legacyFile = path.join(legacyDir, `${pid}.json`);
     fs.writeFileSync(legacyFile, JSON.stringify({ profileId: pid, source: 'legacy' }), 'utf8');
@@ -119,7 +127,7 @@ test('negative: no legacy state is a no-op and never touches target files', asyn
 test('negative: cookie target conflict aborts before any legacy file moves', async () => {
   await withTempHome(async () => {
     const pid = 'migrate-cookie-conflict';
-    const legacyProfileDir = path.join(process.env.HOME, '.camo', 'cookies', pid);
+    const legacyProfileDir = path.join(testHome(), '.camo', 'cookies', pid);
     fs.mkdirSync(legacyProfileDir, { recursive: true });
     fs.writeFileSync(path.join(legacyProfileDir, 'a.example.txt'), 'legacy-a', 'utf8');
     fs.writeFileSync(path.join(legacyProfileDir, 'b.example.txt'), 'legacy-b', 'utf8');
@@ -142,9 +150,9 @@ test('negative: cookie target conflict aborts before any legacy file moves', asy
 test('positive: migration target honors the documented CAMO_PROFILE_ROOT', async () => {
   await withTempHome(async () => {
     const pid = 'migrate-custom-root';
-    const customRoot = path.join(process.env.HOME, 'custom-profiles');
+    const customRoot = path.join(testHome(), 'custom-profiles');
     process.env.CAMO_PROFILE_ROOT = customRoot;
-    const legacyDir = path.join(process.env.HOME, '.camo', 'fingerprints');
+    const legacyDir = path.join(testHome(), '.camo', 'fingerprints');
     fs.mkdirSync(legacyDir, { recursive: true });
     fs.writeFileSync(path.join(legacyDir, `${pid}.json`), '{"source":"legacy"}', 'utf8');
 
@@ -157,8 +165,8 @@ test('positive: migration target honors the documented CAMO_PROFILE_ROOT', async
 
 test('negative: conflicting profile-root variables fail closed', async () => {
   await withTempHome(async () => {
-    process.env.CAMO_PROFILE_ROOT = path.join(process.env.HOME, 'profiles-a');
-    process.env.CAMO_PATHS_PROFILES = path.join(process.env.HOME, 'profiles-b');
+    process.env.CAMO_PROFILE_ROOT = path.join(testHome(), 'profiles-a');
+    process.env.CAMO_PATHS_PROFILES = path.join(testHome(), 'profiles-b');
 
     assert.throws(
       () => resolveProfileDir('conflicting-roots'),

@@ -102,10 +102,12 @@ test('import: keeps same-name cookies with different path (domain+path+name key)
 });
 
 test('profile isolation: getCookieStore(profile) uses per-profile storage dir', () => {
-  // 用临时 HOME 隔离，验证不同 profile 目录不同
+  // 用临时 home 隔离，验证不同 profile 目录不同。home 变量按平台匹配
+  // storage_paths.mjs 的 resolveHomeDir()。
+  const HOME_VAR = process.platform === 'win32' ? 'USERPROFILE' : 'HOME';
   const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-cookie-home-'));
-  const prevHome = process.env.HOME;
-  process.env.HOME = fakeHome;
+  const prevHome = process.env[HOME_VAR];
+  process.env[HOME_VAR] = fakeHome;
   try {
     const a = getCookieStore('profile-a');
     const b = getCookieStore('profile-b');
@@ -118,7 +120,8 @@ test('profile isolation: getCookieStore(profile) uses per-profile storage dir', 
     assert.equal(b.loadCookies('example.com').length, 0, 'no cross-profile leakage');
     assert.equal(a.loadCookies('example.com').length, 1);
   } finally {
-    process.env.HOME = prevHome;
+    if (prevHome === undefined) delete process.env[HOME_VAR];
+    else process.env[HOME_VAR] = prevHome;
     fs.rmSync(fakeHome, { recursive: true, force: true });
   }
 });
