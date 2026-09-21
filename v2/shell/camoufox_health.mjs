@@ -181,11 +181,15 @@ async function checkCamoufoxHealth({
   const cacheDir = resolveCamoufoxCacheDir({ platform, homedir });
   const installPaths = camoufoxInstallPaths({ platform, cacheDir });
   const {
-    executablePath,
+    executablePath: installExecutablePath,
     macosPropertiesPath,
     propertiesPath,
     versionPath,
   } = installPaths;
+  // The explicit value is the contract: engine-manager passes it straight to
+  // the daemon as executable_path, so health must check that file itself and
+  // not a canonical name reconstructed from its directory.
+  const executablePath = explicitExecutable || installExecutablePath;
 
   if (!fs.existsSync(propertiesPath)) {
     return {

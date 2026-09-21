@@ -161,6 +161,44 @@ test('negative: an explicit CAMO_EXECUTABLE_PATH install is never auto-repaired'
   }
 });
 
+test('positive: an explicit executable with a non-canonical basename is accepted without repair', async () => {
+  // The daemon receives the explicit path as executable_path, so health must
+  // check that exact file rather than a canonical filename in its directory.
+  const platform = process.platform;
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-health-exe-custom-'));
+  const propsDir = platform === 'darwin'
+    ? path.join(tmpRoot, 'Camoufox.app', 'Contents', 'Resources')
+    : tmpRoot;
+  const exeDir = platform === 'darwin'
+    ? path.join(tmpRoot, 'Camoufox.app', 'Contents', 'MacOS')
+    : tmpRoot;
+  fs.mkdirSync(propsDir, { recursive: true });
+  fs.mkdirSync(exeDir, { recursive: true });
+  fs.writeFileSync(path.join(propsDir, 'properties.json'), '{"fake":true}', 'utf8');
+  fs.writeFileSync(path.join(tmpRoot, 'version.json'), JSON.stringify({
+    version: '152.0.4',
+    release: 'beta.29',
+  }), 'utf8');
+  const customExe = path.join(exeDir, platform === 'win32' ? 'browser.exe' : 'custom-browser');
+  fs.writeFileSync(customExe, platform === 'win32' ? '' : '#!/bin/sh\nexit 0\n', {
+    mode: platform === 'win32' ? undefined : 0o755,
+  });
+  const previousExe = process.env.CAMO_EXECUTABLE_PATH;
+  process.env.CAMO_EXECUTABLE_PATH = customExe;
+
+  try {
+    const mod = await loadFresh();
+    const out = await mod.checkCamoufoxHealth({ homedir: tmpRoot });
+    assert.equal(out.ok, true, 'explicit non-canonical executable must pass health');
+    assert.equal(out.launchVerified, false);
+    assert.equal(out.installPath, path.join(propsDir, 'properties.json'));
+  } finally {
+    if (previousExe === undefined) delete process.env.CAMO_EXECUTABLE_PATH;
+    else process.env.CAMO_EXECUTABLE_PATH = previousExe;
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
 test('negative: an incompatible explicit CAMO_EXECUTABLE_PATH install is not repaired either', async () => {
   // Version mismatch is repairable in Camo's own cache, but the same decision
   // must not leak into a caller-owned explicit installation: repair would
