@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +28,29 @@ test('v2 package boundary explicitly excludes its local node_modules', () => {
   const npmIgnore = readFileSync(resolve(REPO_ROOT, 'v2/.npmignore'), 'utf8');
 
   assert.match(npmIgnore, /^node_modules\/$/m);
+});
+
+test('npm package excludes local build output', () => {
+  // A CI checkout has no v2/dist, so only a stubbed tree can prove the
+  // boundary. v2/.npmignore replaces the repo .gitignore for that subtree,
+  // so without an explicit entry a local build publishes as package content.
+  const distDir = resolve(REPO_ROOT, 'v2/dist');
+  mkdirSync(distDir, { recursive: true });
+  const stub = resolve(distDir, 'pack-boundary-stub.js');
+  writeFileSync(stub, 'export const stub = true;\n', 'utf8');
+  try {
+    const output = execFileSync('npm', ['pack', '--dry-run', '--json'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      shell: process.platform === 'win32',
+    });
+    const [manifest] = JSON.parse(output);
+    const buildEntries = manifest.files.filter(({ path }) => path.startsWith('v2/dist/'));
+
+    assert.deepEqual(buildEntries, []);
+  } finally {
+    rmSync(distDir, { recursive: true, force: true });
+  }
 });
 
 test('published runtime pins the Camoufox protocol client version', () => {
