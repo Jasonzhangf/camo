@@ -4,8 +4,11 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(new URL('../../../', import.meta.url).pathname);
+// fileURLToPath, not URL.pathname: on Windows the latter yields "/C:/..."
+// and leaves percent-escapes undecoded, so cwd lookups miss the repo.
+const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const NPM = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 function run(cmd, args, opts = {}) {
   const out = spawnSync(cmd, args, {

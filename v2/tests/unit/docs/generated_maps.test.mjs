@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parse } from 'acorn';
 import {
   renderMainlineCallMapHtml,
@@ -28,7 +29,7 @@ const registryEdges = JSON.parse(fs.readFileSync(
   new URL('../../../resources/registry/edges.json', import.meta.url),
   'utf8',
 ));
-const V2_ROOT = path.resolve(new URL('../../../', import.meta.url).pathname);
+const V2_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 function sourceFiles(root) {
   const files = [];
