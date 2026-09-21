@@ -51,14 +51,35 @@ if (files.length === 0) {
   process.exit(1);
 }
 
-const result = spawnSync(process.execPath, ['--test', ...files], {
-  cwd: REPO_ROOT,
-  env: { ...process.env, CAMO_PKG_ROOT: REPO_ROOT },
-  stdio: 'inherit',
-});
-
-if (result.error) {
-  console.error(result.error.message);
-  process.exit(1);
+// Windows caps the whole command line near 32K characters, so a suite's worth
+// of absolute paths cannot go into one child process. Batch by estimated
+// length and fail the run if any batch fails.
+const MAX_BATCH_CHARS = 20_000;
+const batches = [];
+let current = [];
+let currentChars = '--test'.length;
+for (const file of files) {
+  if (current.length > 0 && currentChars + file.length + 1 > MAX_BATCH_CHARS) {
+    batches.push(current);
+    current = [];
+    currentChars = '--test'.length;
+  }
+  current.push(file);
+  currentChars += file.length + 1;
 }
-process.exit(result.status ?? 1);
+if (current.length > 0) batches.push(current);
+
+let failed = false;
+for (const batch of batches) {
+  const result = spawnSync(process.execPath, ['--test', ...batch], {
+    cwd: REPO_ROOT,
+    env: { ...process.env, CAMO_PKG_ROOT: REPO_ROOT },
+    stdio: 'inherit',
+  });
+  if (result.error) {
+    console.error(result.error.message);
+    process.exit(1);
+  }
+  if ((result.status ?? 1) !== 0) failed = true;
+}
+process.exit(failed ? 1 : 0);
