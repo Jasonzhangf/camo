@@ -21,6 +21,11 @@ function ensureDir(name) {
   return dir;
 }
 
+// Windows rejects names containing reserved characters, so the "illegal"
+// fixture must be creatable on every platform while still failing
+// PROFILE_ID_PATTERN.
+const ILLEGAL_NAME = 'another bad';
+
 test('positive: cleanupStale skips illegal profile directory names without throwing', () => {
   ensureDir('..weird name..');
   ensureDir('contains/slash');
@@ -33,7 +38,7 @@ test('positive: cleanupStale skips illegal profile directory names without throw
 });
 
 test('positive: listHeld skips illegal profile directory names without throwing', () => {
-  ensureDir('another*bad');
+  ensureDir(ILLEGAL_NAME);
   ensureDir('clean-id');
 
   lock.acquire('clean-id', { owner: 'browser-service', pid: process.pid });

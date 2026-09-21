@@ -98,6 +98,11 @@ test('positive: CAMO_EXECUTABLE_PATH resolves the installed binary under an isol
   fs.mkdirSync(propsDir, { recursive: true });
   fs.mkdirSync(exeDir, { recursive: true });
   fs.writeFileSync(path.join(propsDir, 'properties.json'), '{"fake":true}', 'utf8');
+  if (platform === 'darwin') {
+    // A launchable macOS Camoufox install also carries the launcher-visible
+    // properties.json beside the executable.
+    fs.symlinkSync(path.join(propsDir, 'properties.json'), path.join(exeDir, 'properties.json'));
+  }
   fs.writeFileSync(path.join(tmpRoot, 'version.json'), JSON.stringify({
     version: '152.0.4',
     release: 'beta.29',
@@ -158,6 +163,110 @@ test('negative: an explicit CAMO_EXECUTABLE_PATH install is never auto-repaired'
     if (previousExe === undefined) delete process.env.CAMO_EXECUTABLE_PATH;
     else process.env.CAMO_EXECUTABLE_PATH = previousExe;
     fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+test('positive: an explicit executable with a non-canonical basename is accepted without repair', async () => {
+  // The daemon receives the explicit path as executable_path, so health must
+  // check that exact file rather than a canonical filename in its directory.
+  const platform = process.platform;
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-health-exe-custom-'));
+  const propsDir = platform === 'darwin'
+    ? path.join(tmpRoot, 'Camoufox.app', 'Contents', 'Resources')
+    : tmpRoot;
+  const exeDir = platform === 'darwin'
+    ? path.join(tmpRoot, 'Camoufox.app', 'Contents', 'MacOS')
+    : tmpRoot;
+  fs.mkdirSync(propsDir, { recursive: true });
+  fs.mkdirSync(exeDir, { recursive: true });
+  fs.writeFileSync(path.join(propsDir, 'properties.json'), '{"fake":true}', 'utf8');
+  if (platform === 'darwin') {
+    fs.symlinkSync(path.join(propsDir, 'properties.json'), path.join(exeDir, 'properties.json'));
+  }
+  fs.writeFileSync(path.join(tmpRoot, 'version.json'), JSON.stringify({
+    version: '152.0.4',
+    release: 'beta.29',
+  }), 'utf8');
+  const customExe = path.join(exeDir, platform === 'win32' ? 'browser.exe' : 'custom-browser');
+  fs.writeFileSync(customExe, platform === 'win32' ? '' : '#!/bin/sh\nexit 0\n', {
+    mode: platform === 'win32' ? undefined : 0o755,
+  });
+  const previousExe = process.env.CAMO_EXECUTABLE_PATH;
+  process.env.CAMO_EXECUTABLE_PATH = customExe;
+
+  try {
+    const mod = await loadFresh();
+    const out = await mod.checkCamoufoxHealth({ homedir: tmpRoot });
+    assert.equal(out.ok, true, 'explicit non-canonical executable must pass health');
+    assert.equal(out.launchVerified, false);
+    assert.equal(out.installPath, path.join(propsDir, 'properties.json'));
+  } finally {
+    if (previousExe === undefined) delete process.env.CAMO_EXECUTABLE_PATH;
+    else process.env.CAMO_EXECUTABLE_PATH = previousExe;
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+test('positive: health reports the Camo-owned cache as the install owner', async () => {
+  const { teardown, tmpHome } = withFakeInstall(true);
+  try {
+    const mod = await loadFresh();
+    const out = await mod.checkCamoufoxHealth({ homedir: tmpHome });
+    assert.equal(out.ok, true);
+    assert.equal(out.installOwner, 'camoufox_cache', 'owned cache grants layout/permission writes');
+  } finally { teardown(); }
+});
+
+test('negative: health never writes a layout fix into an explicit install', async () => {
+  // macOS launches read properties.json next to the executable. For an
+  // operator-owned install the missing link is reported, not created.
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-health-exe-layout-'));
+  const propsDir = path.join(tmpRoot, 'Camoufox.app', 'Contents', 'Resources');
+  const macosDir = path.join(tmpRoot, 'Camoufox.app', 'Contents', 'MacOS');
+  fs.mkdirSync(propsDir, { recursive: true });
+  fs.mkdirSync(macosDir, { recursive: true });
+  fs.writeFileSync(path.join(propsDir, 'properties.json'), '{"fake":true}', 'utf8');
+  fs.writeFileSync(path.join(tmpRoot, 'version.json'), JSON.stringify({
+    version: '152.0.4',
+    release: 'beta.29',
+  }), 'utf8');
+  const executablePath = path.join(macosDir, 'camoufox');
+  fs.writeFileSync(executablePath, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  const previousExe = process.env.CAMO_EXECUTABLE_PATH;
+  process.env.CAMO_EXECUTABLE_PATH = executablePath;
+
+  try {
+    const mod = await loadFresh();
+    const out = await mod.checkCamoufoxHealth({ platform: 'darwin', homedir: tmpRoot });
+    assert.equal(out.ok, false);
+    assert.equal(out.errorCode, 'E_CAMOUFOX_INSTALL_LAYOUT_INVALID');
+    assert.equal(out.repairable, false);
+    assert.equal(
+      fs.existsSync(path.join(macosDir, 'properties.json')),
+      false,
+      'health must not write a symlink into a caller-owned install',
+    );
+  } finally {
+    if (previousExe === undefined) delete process.env.CAMO_EXECUTABLE_PATH;
+    else process.env.CAMO_EXECUTABLE_PATH = previousExe;
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+test('positive: the Camo-owned macOS cache still gets the launch layout fix', async () => {
+  const { teardown, tmpHome } = withFakeInstall(true);
+  const macOSDir = path.join(tmpHome, 'Library', 'Caches', 'camoufox', 'Camoufox.app', 'Contents', 'MacOS');
+  const deleteCAMO_EXECUTABLE_PATH = process.env.CAMO_EXECUTABLE_PATH;
+  delete process.env.CAMO_EXECUTABLE_PATH;
+  try {
+    fs.rmSync(path.join(macOSDir, 'properties.json'), { force: true });
+    const mod = await loadFresh();
+    const out = await mod.checkCamoufoxHealth({ platform: 'darwin', homedir: tmpHome });
+    assert.equal(out.ok, true, 'owned cache layout is repaired');
+    assert.equal(fs.lstatSync(path.join(macOSDir, 'properties.json')).isSymbolicLink(), true);
+  } finally {
+    if (deleteCAMO_EXECUTABLE_PATH !== undefined) process.env.CAMO_EXECUTABLE_PATH = deleteCAMO_EXECUTABLE_PATH;
+    teardown();
   }
 });
 
