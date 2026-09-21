@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -34,9 +34,12 @@ test('npm package excludes local build output', () => {
   // A CI checkout has no v2/dist, so only a stubbed tree can prove the
   // boundary. v2/.npmignore replaces the repo .gitignore for that subtree,
   // so without an explicit entry a local build publishes as package content.
+  // A local build may already own this directory, so create and remove only
+  // this test's own stub and never the tree around it.
   const distDir = resolve(REPO_ROOT, 'v2/dist');
+  const ownedDistDir = !existsSync(distDir);
   mkdirSync(distDir, { recursive: true });
-  const stub = resolve(distDir, 'pack-boundary-stub.js');
+  const stub = resolve(distDir, `pack-boundary-stub-${process.pid}.js`);
   writeFileSync(stub, 'export const stub = true;\n', 'utf8');
   try {
     const output = execFileSync('npm', ['pack', '--dry-run', '--json'], {
@@ -49,7 +52,8 @@ test('npm package excludes local build output', () => {
 
     assert.deepEqual(buildEntries, []);
   } finally {
-    rmSync(distDir, { recursive: true, force: true });
+    rmSync(stub, { force: true });
+    if (ownedDistDir && readdirSync(distDir).length === 0) rmdirSync(distDir);
   }
 });
 
