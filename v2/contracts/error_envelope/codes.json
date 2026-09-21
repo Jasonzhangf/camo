@@ -126,6 +126,11 @@
       "default_user_message": "Failed to type into the target."
     },
     {
+      "code": "E_BROWSER_KEYBOARD_FAILED",
+      "category": "io",
+      "default_user_message": "Failed to press the keyboard key."
+    },
+    {
       "code": "E_BROWSER_HOVER_FAILED",
       "category": "io",
       "default_user_message": "Failed to hover the target."

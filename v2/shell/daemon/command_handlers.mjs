@@ -3,14 +3,9 @@
 // Handles the switch-case dispatch for all 24 daemon commands.
 // Delegated from daemon/index.mjs:handleCommand().
 
-import { CamoError, project as projectError } from '../../contracts/error_envelope/projector.mjs';
-import { append as appendProgress } from '../../services/progress_event/log.mjs';
+import { CamoError } from '../../contracts/error_envelope/projector.mjs';
 import { browserCommandNames, isBrowserCommand } from './browser_commands.mjs';
 import { projectStatus } from './status_projection.mjs';
-
-function emit(profileId, type, payload) {
-  appendProgress({ event: type, source: 'daemon_handler', profileId, payload, ts: new Date().toISOString() });
-}
 
 async function importOp(opName) {
   const { [opName]: fn } = await import('../../services/page_runtime/input_pipeline.mjs');
@@ -242,6 +237,16 @@ export async function handleCommand(cmd, args, ctx) {
       return { ok: true, target: target.targetId, typed: true, typedChars: r.length };
     }
 
+    case 'keyboard': {
+      const keyboard = await importOp('keyboard');
+      const target = await resolveTarget(args, { ...ctx, profile });
+      const r = await keyboard(withTargetArgs(target, {
+        action: args.action,
+        key: args.key,
+        timeout: args.timeout,
+      }));
+      return { ok: true, target: target.targetId, pressed: true, action: r.action, key: r.key };
+    }
     case 'scroll': {
       const scroll = await importOp('scroll');
       const target = await resolveTarget(args, { ...ctx, profile });
@@ -340,7 +345,6 @@ export async function handleCommand(cmd, args, ctx) {
       const r = await getCookies(withTargetArgs(target));
       return { ok: true, target: target.targetId, count: r.count, cookies: r.cookies };
     }
-
     case 'get-page-info': {
       const getPageInfo = await importOp('getPageInfo');
       const target = await resolveTarget(args, { ...ctx, profile });
@@ -374,7 +378,6 @@ export async function handleCommand(cmd, args, ctx) {
       const r = await getText(withTargetArgs(target, { selector: args.selector }));
       return { ok: true, target: target.targetId, text: r.text };
     }
-
     case 'hover': {
       const hover = await importOp('hover');
       const target = await resolveTarget(args, { ...ctx, profile });

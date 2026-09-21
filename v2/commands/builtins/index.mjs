@@ -16,6 +16,7 @@ import * as forward from './forward.mjs';
 import * as reload from './reload.mjs';
 import * as click from './click.mjs';
 import * as type from './type.mjs';
+import * as keyboard from './keyboard.mjs';
 import * as snapshot from './snapshot.mjs';
 import * as scroll from './scroll.mjs';
 import * as screenshot from './screenshot.mjs';
@@ -44,7 +45,7 @@ import * as fetchPage from './fetchPage.mjs';
 import * as login from './login.mjs';
 import * as search from './search/index.mjs';
 
-const BUILTINS = { start, stop, status, goto, back, forward, reload, search, click, type, snapshot, scroll, screenshot, wait, evaluate, upload, select, daemon, hover, getText, getPageInfo, findElements, getReadable, newTab, closeTab, listTabs, switchTab, multiOpen, getCookies, setCookies, setUserAgent, setViewport, waitDomStable, scrollAndCollect, fetchPage, login };
+const BUILTINS = { start, stop, status, goto, back, forward, reload, search, click, type, keyboard, snapshot, scroll, screenshot, wait, evaluate, upload, select, daemon, hover, getText, getPageInfo, findElements, getReadable, newTab, closeTab, listTabs, switchTab, multiOpen, getCookies, setCookies, setUserAgent, setViewport, waitDomStable, scrollAndCollect, fetchPage, login };
 
 // Convert camelCase to kebab-case
 const toKebab = (s) => s.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();

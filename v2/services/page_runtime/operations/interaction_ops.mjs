@@ -20,16 +20,37 @@ async function awaitProtocol(operation, signal) {
   ]);
 }
 
+async function readLocatorBox(locator) {
+  return locator.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+    };
+  });
+}
+
+async function readViewportSize(page) {
+  const viewport = page.viewportSize();
+  if (viewport) return viewport;
+  return page.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  }));
+}
+
 async function chooseVisibleLocator(page, locator, profileId, selector, text, failureCode) {
   const count = await locator.count();
-  const viewport = page.viewportSize?.() || null;
+  const viewport = await readViewportSize(page);
   let selected = null;
   let visibleSelected = null;
   let selectedArea = Number.POSITIVE_INFINITY;
   let visibleArea = Number.POSITIVE_INFINITY;
   for (let index = 0; index < count; index += 1) {
     const candidate = locator.nth(index);
-    const box = await candidate.boundingBox();
+    const box = await readLocatorBox(candidate);
     if (!box || box.width <= 0 || box.height <= 0) continue;
     if (viewport && (
       box.x + box.width > 0
@@ -60,14 +81,14 @@ async function chooseVisibleLocator(page, locator, profileId, selector, text, fa
 }
 
 async function moveLocatorIntoViewport(page, locator, profileId, selector, text, failureCode, signal) {
-  const viewport = page.viewportSize() || { width: 800, height: 600 };
+  const viewport = await readViewportSize(page);
   const margin = 8;
   const verticalMargin = Math.min(64, Math.max(margin, Math.round(viewport.height * 0.1)));
   let pointerAnchored = false;
 
   for (let wheelAttempt = 0; wheelAttempt < 12; wheelAttempt += 1) {
     throwIfAborted(signal);
-    const box = await locator.boundingBox();
+    const box = await readLocatorBox(locator);
     if (!box) {
       throw new CamoError({
         code: failureCode,
@@ -86,6 +107,7 @@ async function moveLocatorIntoViewport(page, locator, profileId, selector, text,
       && box.y >= activeVerticalMargin
       && box.y + box.height <= viewport.height - activeVerticalMargin;
     if (inside) return { x: cx, y: cy };
+
 
     const wheelX = box.x < margin || box.x + box.width > viewport.width - margin
       ? (cx < viewport.width / 2
@@ -110,7 +132,7 @@ async function moveLocatorIntoViewport(page, locator, profileId, selector, text,
       // Playwright acknowledges wheel dispatch before scrolling finishes.
       // Require two stable geometry samples before clicking or redispatching.
       await page.waitForTimeout(32);
-      const currentBox = await locator.boundingBox();
+      const currentBox = await readLocatorBox(locator);
       if (!currentBox) {
         throw new CamoError({
           code: failureCode,
@@ -153,7 +175,7 @@ async function moveLocatorIntoViewport(page, locator, profileId, selector, text,
  * Click an element using protocol-level mouse simulation.
  *
  * Strategy:
- * 1. Get element center via locator.boundingBox()
+ * 1. Get element center via read-only getBoundingClientRect()
  * 2. Move it into view with protocol wheel events when necessary
  * 3. page.mouse.move() -> down() -> up() at element center
  *    This bypasses Playwright's actionability layer completely.
@@ -309,7 +331,67 @@ export async function type({ profileId, target, text, selector, delay }) {
     return result;
   } catch (cause) {
     emit(pid, 'type.error', { length: text.length, selector, error: cause?.message });
-    throw new CamoError({ code: 'E_BROWSER_TYPE_FAILED', details: { profileId: pid, selector, reason: cause?.message }, cause });
+    throw new CamoError({
+      code: 'E_BROWSER_TYPE_FAILED',
+      details: { profileId: pid, selector, reason: cause?.message },
+      cause,
+    });
+  }
+}
+
+/**
+ * Press a real keyboard key through the browser protocol.
+ *
+ * @param {Object} opts
+ * @param {string} opts.profileId
+ * @param {string} opts.action - only 'press' is supported
+ * @param {string} opts.key - allowlisted key name
+ * @returns {Object} keyboard result
+ */
+export async function keyboard({ profileId, target, action, key }, signal) {
+  const pid = safeId(profileId, 'profileId');
+  const page = getTargetPageOrThrow(target);
+  const allowedActions = new Set(['press']);
+  const allowedKeys = new Set([
+    'Enter',
+    'Escape',
+    'Tab',
+    'ArrowUp',
+    'ArrowDown',
+    'ArrowLeft',
+    'ArrowRight',
+  ]);
+  if (!allowedActions.has(action)) {
+    throw new CamoError({
+      code: 'E_INPUT_INVALID',
+      details: { field: 'action', value: action, allowed: [...allowedActions] },
+    });
+  }
+  if (!allowedKeys.has(key)) {
+    throw new CamoError({
+      code: 'E_INPUT_INVALID',
+      details: { field: 'key', value: key, allowed: [...allowedKeys] },
+    });
+  }
+  emit(pid, 'keyboard.start', { action, key });
+  try {
+    await awaitProtocol(page.keyboard.press(key), signal);
+    const result = {
+      profileId: pid,
+      targetId: target.targetId,
+      pressed: true,
+      action,
+      key,
+    };
+    emit(pid, 'keyboard.done', result);
+    return result;
+  } catch (cause) {
+    emit(pid, 'keyboard.error', { action, key, error: cause?.message });
+    throw new CamoError({
+      code: 'E_BROWSER_KEYBOARD_FAILED',
+      details: { profileId: pid, action, key, reason: cause?.details?.reason || cause?.message },
+      cause,
+    });
   }
 }
 
@@ -332,7 +414,7 @@ export async function scroll({ profileId, target, x = 0, y = 0, atX = null, atY 
     // Protocol-level scroll: dispatch a real wheel input event, not a JS
     // window.scrollTo hack. Move the pointer into the viewport first so the
     // wheel event targets the scrolling region.
-    const viewport = page.viewportSize() || { width: 800, height: 600 };
+    const viewport = await readViewportSize(page);
     const cx = Number.isFinite(atX) ? Math.max(0, Math.min(viewport.width - 1, Math.floor(atX))) : Math.floor(viewport.width / 2);
     const cy = Number.isFinite(atY) ? Math.max(0, Math.min(viewport.height - 1, Math.floor(atY))) : Math.floor(viewport.height / 2);
     await page.mouse.move(cx, cy);

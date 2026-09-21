@@ -436,6 +436,32 @@
       ]
     },
     {
+      "id": "cmd.keyboard.request",
+      "owner_resource": "command_log",
+      "required_commands": [
+        "npm test"
+      ],
+      "positive": [
+        "v2/tests/integration/daemon-wire-contract.integration.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/integration/daemon-wire-contract.integration.test.mjs"
+      ]
+    },
+    {
+      "id": "cmd.keyboard.execute",
+      "owner_resource": "input_pipeline",
+      "required_commands": [
+        "npm run test:all"
+      ],
+      "positive": [
+        "v2/tests/integration/page-protocol-interaction.integration.test.mjs"
+      ],
+      "negative": [
+        "v2/tests/integration/page-protocol-interaction.integration.test.mjs"
+      ]
+    },
+    {
       "id": "cmd.browser-wire.project",
       "owner_resource": "daemon.command_handlers",
       "required_commands": [

@@ -30,7 +30,7 @@ test('positive: click accepts a native prompt through protocol dialog handling',
     import { click } from './v2/services/page_runtime/operations/interaction_ops.mjs';
     __enableTestRoot(); enableBridge();
     const calls = []; const listeners = new Map();
-    const locator = { count: async () => 1, nth() { return this; }, async boundingBox() { return { x: 20, y: 30, width: 80, height: 20 }; } };
+    const locator = { count: async () => 1, nth() { return this; }, async evaluate() { return { x: 20, y: 30, width: 80, height: 20 }; } };
     const page = {
       viewportSize: () => ({ width: 800, height: 600 }), locator: () => locator,
       on(name, handler) { listeners.set(name, handler); },
@@ -61,7 +61,7 @@ test('negative: click rejects an unknown dialog action before input', () => {
     __enableTestRoot(); enableBridge(); const calls = [];
     const page = {
       viewportSize: () => ({ width: 800, height: 600 }),
-      locator: () => ({ count: async () => 1, nth() { return this; }, async boundingBox() { return { x: 20, y: 30, width: 80, height: 20 }; } }),
+      locator: () => ({ count: async () => 1, nth() { return this; }, async evaluate() { return { x: 20, y: 30, width: 80, height: 20 }; } }),
       mouse: { move: async () => calls.push('move'), down: async () => calls.push('down'), up: async () => calls.push('up') },
     };
     __setBrowserForTest('protocol_dialog_invalid', { page });

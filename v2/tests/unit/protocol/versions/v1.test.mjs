@@ -14,7 +14,7 @@ test('positive: WS_KINDS and HTTP_KINDS are frozen', () => {
 });
 
 test('positive: isCommandId recognises well-known ids', () => {
-  for (const id of ['start', 'stop', 'goto', 'click', 'type', 'snapshot']) {
+  for (const id of ['start', 'stop', 'goto', 'click', 'type', 'keyboard', 'snapshot']) {
     assert.equal(isCommandId(id), true, id);
   }
 });

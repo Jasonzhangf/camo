@@ -340,6 +340,47 @@
       "docstring": "commands/docstrings/type.md"
     },
     {
+      "cmd": "keyboard",
+      "module": "commands/builtins/keyboard.mjs",
+      "args_schema": {
+        "named": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "profile id"
+          },
+          "target": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "required": false,
+            "doc": "stable target id returned by start"
+          },
+          "timeout": {
+            "type": "integer",
+            "min": 1,
+            "required": false,
+            "doc": "hard operation timeout in ms (default 30000)"
+          }
+        },
+        "positional": [
+          {
+            "name": "action",
+            "type": "string",
+            "required": true,
+            "doc": "keyboard action; currently only press"
+          },
+          {
+            "name": "key",
+            "type": "string",
+            "required": true,
+            "doc": "key to press; Enter, Escape, Tab, ArrowUp, ArrowDown, ArrowLeft, ArrowRight"
+          }
+        ]
+      },
+      "docstring": "commands/docstrings/keyboard.md"
+    },
+    {
       "cmd": "snapshot",
       "module": "commands/builtins/snapshot.mjs",
       "args_schema": {

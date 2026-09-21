@@ -8,7 +8,7 @@ import path from 'node:path';
 const ROOT = path.resolve(new URL('../../../', import.meta.url).pathname);
 
 function runScript(source) {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-visible-edge-home-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-protocol-viewport-home-'));
   try {
     const out = spawnSync(process.execPath, ['--input-type=module', '-e', source], {
       cwd: ROOT,
@@ -23,7 +23,7 @@ function runScript(source) {
   }
 }
 
-test('positive: visible edge target clicks without protocol wheel input', () => {
+test('positive: DOM inner viewport is used when Playwright viewportSize is null', () => {
   const result = runScript(`
     import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';
     import { __setBrowserForTest, __enableTestRoot as enableBridge } from './v2/services/browser_service/internal/camoufox_bridge.mjs';
@@ -35,11 +35,15 @@ test('positive: visible edge target clicks without protocol wheel input', () => 
       count: async () => 1,
       nth() { return this; },
       first() { return this; },
-      async evaluate() { return { x: 5.5, y: 744, width: 44, height: 40 }; },
+      async evaluate(fn) {
+        if (typeof fn === 'function') return { x: 415.5, y: 357.8, width: 624, height: 48 };
+        return { width: 1536, height: 849 };
+      },
     };
     const page = {
-      viewportSize: () => ({ width: 390, height: 844 }),
+      viewportSize: () => null,
       locator: () => locator,
+      evaluate: async () => ({ width: 1536, height: 849 }),
       mouse: {
         move: async (...args) => calls.push(['move', ...args]),
         down: async (...args) => calls.push(['down', ...args]),
@@ -47,11 +51,11 @@ test('positive: visible edge target clicks without protocol wheel input', () => 
         wheel: async (...args) => calls.push(['wheel', ...args]),
       },
     };
-    __setBrowserForTest('protocol_visible_edge', { page });
-    const out = await click({ profileId: 'protocol_visible_edge', target: { targetId: 't_visible_edge', page, status: 'active' }, selector: '#teams' });
+    __setBrowserForTest('protocol_dom_viewport_fallback', { page });
+    const out = await click({ profileId: 'protocol_dom_viewport_fallback', target: { targetId: 't_protocol_dom_viewport_fallback', page, status: 'active' }, selector: 'input[node-type=text]' });
     process.stdout.write(JSON.stringify({ out, calls }));
   `);
   assert.equal(result.out.clicked, true);
-  assert.equal(result.calls.filter((entry) => entry[0] === 'wheel').length, 0);
+  assert.equal(result.calls.some((entry) => entry[0] === 'wheel'), false);
   assert.deepEqual(result.calls.map((entry) => entry[0]), ['move', 'down', 'up']);
 });

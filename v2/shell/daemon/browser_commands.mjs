@@ -5,6 +5,7 @@ const BROWSER_COMMANDS = new Set([
   'reload',
   'click',
   'type',
+  'keyboard',
   'scroll',
   'screenshot',
   'snapshot',

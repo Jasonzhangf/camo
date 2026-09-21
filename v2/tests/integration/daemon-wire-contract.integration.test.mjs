@@ -6,6 +6,7 @@ import { run as runForward } from '../../commands/builtins/forward.mjs';
 import { run as runReload } from '../../commands/builtins/reload.mjs';
 import { run as runScroll } from '../../commands/builtins/scroll.mjs';
 import { run as runType } from '../../commands/builtins/type.mjs';
+import { run as runKeyboard } from '../../commands/builtins/keyboard.mjs';
 import { run as runClick } from '../../commands/builtins/click.mjs';
 import { run as runUpload } from '../../commands/builtins/upload.mjs';
 import { run as runSelect } from '../../commands/builtins/select.mjs';
@@ -187,6 +188,59 @@ test('type projects typedChars from runtime and rejects missing response truth',
   );
 });
 
+test('keyboard preserves key through CLI, daemon, pipeline, and protocol', async () => {
+  enablePipeline();
+  enableBridge();
+  const profile = 'keyboard_wire_contract';
+  const pressed = [];
+  const page = {
+    keyboard: {
+      press: async (key) => pressed.push(key),
+    },
+  };
+  __setBrowserForTest(profile, { page });
+  const target = allocateTarget(profile, page);
+  const transport = wireTransport((args) => handleCommand('keyboard', args, daemonContext(profile)));
+  const output = await runKeyboard(transport, {
+    profile,
+    positional: ['press', 'Enter'],
+    named: { target: target.targetId },
+  });
+  assert.equal(output.pressed, true);
+  assert.equal(output.key, 'Enter');
+  assert.equal(output.target, target.targetId);
+  assert.deepEqual(pressed, ['Enter']);
+
+  const malformedTransport = wireTransport(async () => ({ ok: true, pressed: false }));
+  await assert.rejects(
+    () => runKeyboard(malformedTransport, { profile, positional: ['press', 'Enter'], named: {} }),
+    (cause) => cause?.code === 'E_PROTO_BAD_ENVELOPE',
+  );
+});
+
+test('keyboard preserves a registry-valid dotted profile through the wire', async () => {
+  enablePipeline();
+  enableBridge();
+  const profile = 'keyboard.profile.with.dot';
+  const pressed = [];
+  const page = {
+    keyboard: {
+      press: async (key) => pressed.push(key),
+    },
+  };
+  __setBrowserForTest(profile, { page });
+  const target = allocateTarget(profile, page);
+  const transport = wireTransport((args) => handleCommand('keyboard', args, daemonContext(profile)));
+  const output = await runKeyboard(transport, {
+    profile,
+    positional: ['press', 'Enter'],
+    named: { target: target.targetId },
+  });
+  assert.equal(output.profile, profile);
+  assert.equal(output.pressed, true);
+  assert.deepEqual(pressed, ['Enter']);
+});
+
 test('snapshot projects the full HTML payload through the daemon wire', async () => {
   enablePipeline();
   enableBridge();
@@ -220,7 +274,7 @@ test('negative: click timeout crosses the daemon wire and releases the profile l
         count: async () => 1,
         nth() { return this; },
         first() { return this; },
-        async boundingBox() { return { x: 200, y: 900, width: 80, height: 20 }; },
+        async evaluate() { return { x: 200, y: 900, width: 80, height: 20 }; },
       }),
       mouse: {
         move: async () => {},
@@ -242,6 +296,7 @@ test('negative: click timeout crosses the daemon wire and releases the profile l
 });
 test('hover belongs to the canonical ephemeral browser command set', () => {
   assert.equal(isBrowserCommand('hover'), true);
+  assert.equal(isBrowserCommand('keyboard'), true);
   assert.equal(isBrowserCommand('get-page-info'), true);
 });
 

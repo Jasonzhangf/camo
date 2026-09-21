@@ -26,7 +26,7 @@ test('positive: click, hover, and type use only protocol mouse/keyboard events',
   const result = runScript(`
     import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';
     import { __setBrowserForTest, __enableTestRoot as enableBridge } from './v2/services/browser_service/internal/camoufox_bridge.mjs';
-    import { click, hover, type as typeText } from './v2/services/page_runtime/operations/interaction_ops.mjs';
+    import { click, hover, keyboard, type as typeText } from './v2/services/page_runtime/operations/interaction_ops.mjs';
     __enableTestRoot();
     enableBridge();
     const calls = [];
@@ -34,7 +34,7 @@ test('positive: click, hover, and type use only protocol mouse/keyboard events',
       count: async () => 1,
       nth() { return this; },
       first() { return this; },
-      async boundingBox() { return { x: 20, y: 30, width: 80, height: 20 }; },
+      async evaluate() { return { x: 20, y: 30, width: 80, height: 20 }; },
     };
     const page = {
       viewportSize: () => ({ width: 800, height: 600 }),
@@ -56,17 +56,18 @@ test('positive: click, hover, and type use only protocol mouse/keyboard events',
     const clickOut = await click({ profileId: 'protocol_positive', target, selector: '#submit' });
     const hoverOut = await hover({ profileId: 'protocol_positive', target, selector: '#submit' });
     const typeOut = await typeText({ profileId: 'protocol_positive', target, selector: '#name', text: 'Jason' });
-    process.stdout.write(JSON.stringify({ clickOut, hoverOut, typeOut, calls }));
+    const keyboardOut = await keyboard({ profileId: 'protocol_positive', target, action: 'press', key: 'Enter' });
+    process.stdout.write(JSON.stringify({ clickOut, hoverOut, typeOut, keyboardOut, calls }));
   `);
   assert.equal(result.clickOut.clicked, true);
   assert.equal(result.hoverOut.hovered, true);
   assert.equal(result.typeOut.typed, true);
+  assert.equal(result.keyboardOut.pressed, true);
   assert.deepEqual(result.calls.map((entry) => entry[0]), [
-    'move', 'down', 'up', 'move', 'move', 'down', 'up', 'press', 'press', 'type',
+    'move', 'down', 'up', 'move', 'move', 'down', 'up', 'press', 'press', 'type', 'press',
   ]);
   assert.equal(result.calls.some((entry) => entry[0] === 'evaluate'), false);
 });
-
 test('positive: offscreen target enters viewport through protocol wheel input', () => {
   const result = runScript(`
     import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';
@@ -76,7 +77,7 @@ test('positive: offscreen target enters viewport through protocol wheel input', 
     enableBridge();
     const calls = [];
     let y = 900;
-    const locator = { count: async () => 1, nth() { return this; }, first() { return this; }, async boundingBox() { return { x: 200, y, width: 80, height: 20 }; } };
+    const locator = { count: async () => 1, nth() { return this; }, first() { return this; }, async evaluate() { return { x: 200, y, width: 80, height: 20 }; } };
     const page = {
       viewportSize: () => ({ width: 800, height: 600 }),
       locator: () => locator,
@@ -95,6 +96,27 @@ test('positive: offscreen target enters viewport through protocol wheel input', 
   assert.equal(result.out.clicked, true);
   assert.equal(result.calls.filter((entry) => entry[0] === 'wheel').length, 1);
 });
+test('positive: locator geometry uses read-only getBoundingClientRect()', () => {
+  const result = runScript(`
+    import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';
+    import { __setBrowserForTest, __enableTestRoot as enableBridge } from './v2/services/browser_service/internal/camoufox_bridge.mjs';
+    import { click } from './v2/services/page_runtime/operations/interaction_ops.mjs';
+    __enableTestRoot();
+    enableBridge();
+    const calls = [];
+    const locator = { count: async () => 1, nth() { return this; }, async evaluate() { return { x: 100, y: 200, width: 80, height: 20 }; } };
+    const page = { viewportSize: () => ({ width: 800, height: 600 }), locator: () => locator, mouse: { move: async (...args) => calls.push(['move', ...args]), down: async (...args) => calls.push(['down', ...args]), up: async (...args) => calls.push(['up', ...args]), wheel: async (...args) => calls.push(['wheel', ...args]) } };
+    __setBrowserForTest('protocol_geometry', { page });
+    const out = await click({ profileId: 'protocol_geometry', target: { targetId: 't_protocol_geometry', page, status: 'active' }, selector: '#target' });
+    process.stdout.write(JSON.stringify({ out, calls }));
+  `);
+  assert.equal(result.out.clicked, true);
+  assert.deepEqual(result.calls, [
+    ['move', 140, 210],
+    ['down', { button: 'left' }],
+    ['up', { button: 'left' }],
+  ]);
+});
 test('negative: hung protocol wheel times out and releases the profile pipeline', () => {
   const result = runScript(`
     import { __enableTestRoot as enablePipeline, click, getPageInfo } from './v2/services/page_runtime/input_pipeline.mjs';
@@ -105,7 +127,7 @@ test('negative: hung protocol wheel times out and releases the profile pipeline'
       count: async () => 1,
       nth() { return this; },
       first() { return this; },
-      async boundingBox() { return { x: 200, y: 900, width: 80, height: 20 }; },
+      async evaluate() { return { x: 200, y: 900, width: 80, height: 20 }; },
     };
     const page = {
       viewportSize: () => ({ width: 800, height: 600 }),
@@ -119,7 +141,6 @@ test('negative: hung protocol wheel times out and releases the profile pipeline'
       },
     };
     __setBrowserForTest('protocol_hung_wheel', { page });
-
     let code = null;
     try {
       await click({ profileId: 'protocol_hung_wheel', target: { targetId: 't_protocol_hung_wheel', page, status: 'active' }, selector: '#target', timeout: 20 });
@@ -143,7 +164,7 @@ test('positive: offscreen click waits for wheel-driven layout settlement', () =>
     let y = 900;
     let settled = false;
     let waitCalls = 0;
-    const locator = { count: async () => 1, nth() { return this; }, first() { return this; }, async boundingBox() { return { x: 200, y, width: 80, height: 20 }; } };
+    const locator = { count: async () => 1, nth() { return this; }, first() { return this; }, async evaluate() { return { x: 200, y, width: 80, height: 20 }; } };
     const page = {
       viewportSize: () => ({ width: 800, height: 600 }),
       locator: () => locator,
@@ -182,7 +203,7 @@ test('positive: multi-wheel click anchors once and settles before redispatch', (
       count: async () => 1,
       nth() { return this; },
       first() { return this; },
-      async boundingBox() {
+      async evaluate() {
         calls.push(['box', y]);
         return { x: 200, y, width: 80, height: 20 };
       },
@@ -239,7 +260,7 @@ test('negative: second protocol wheel failure does not re-anchor the pointer', (
       count: async () => 1,
       nth() { return this; },
       first() { return this; },
-      async boundingBox() { return { x: 200, y, width: 80, height: 20 }; },
+      async evaluate() { return { x: 200, y, width: 80, height: 20 }; },
     };
     const page = {
       viewportSize: () => ({ width: 800, height: 600 }),
@@ -271,7 +292,6 @@ test('negative: second protocol wheel failure does not re-anchor the pointer', (
   assert.equal(result.wheelCount, 2);
   assert.equal(result.calls.some((entry) => entry[0] === 'down' || entry[0] === 'up'), false);
 });
-
 test('positive: partially visible target clears the fixed bottom boundary with bounded wheel segments', () => {
   const result = runScript(`
     import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';
@@ -286,7 +306,7 @@ test('positive: partially visible target clears the fixed bottom boundary with b
       count: async () => 1,
       nth() { return this; },
       first() { return this; },
-      async boundingBox() { return { x: 16, y, width: 358, height: 48 }; },
+      async evaluate() { return { x: 16, y, width: 358, height: 48 }; },
     };
     const page = {
       viewportSize: () => ({ width: 390, height: 844 }),
@@ -321,7 +341,6 @@ test('positive: partially visible target clears the fixed bottom boundary with b
     .every((entry) => Math.abs(entry[1]) <= 120 && Math.abs(entry[2]) <= 120), true);
   assert.equal(result.calls.some((entry) => entry[0] === 'down'), true);
 });
-
 test('positive: top target clears fixed header through bounded center-directed wheel segments', () => {
   const result = runScript(`
     import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';
@@ -336,7 +355,7 @@ test('positive: top target clears fixed header through bounded center-directed w
       count: async () => 1,
       nth() { return this; },
       first() { return this; },
-      async boundingBox() { return { x: 16, y, width: 58, height: 40 }; },
+      async evaluate() { return { x: 16, y, width: 58, height: 40 }; },
     };
     const page = {
       viewportSize: () => ({ width: 390, height: 844 }),
@@ -387,7 +406,7 @@ test('negative: moving offscreen target never receives a false-success click', (
       count: async () => 1,
       nth() { return this; },
       first() { return this; },
-      async boundingBox() {
+      async evaluate() {
         if (!wheelIssued) return { x: 200, y: 900, width: 80, height: 20 };
         sample += 1;
         return { x: 200, y: sample % 2 ? 100 : 140, width: 80, height: 20 };
@@ -429,7 +448,7 @@ test('positive: visible duplicate wins over offscreen duplicate', () => {
     let selected = -1;
     const locator = {
       count: async () => boxes.length,
-      nth(index) { selected = index; return { boundingBox: async () => boxes[index] }; },
+      nth(index) { selected = index; return { evaluate: async () => boxes[index] }; },
     };
     const page = {
       viewportSize: () => ({ width: 800, height: 600 }),
@@ -454,10 +473,10 @@ test('negative: protocol interaction failures remain explicit', () => {
   const result = runScript(`
     import { __enableTestRoot } from './v2/services/page_runtime/input_pipeline.mjs';
     import { __setBrowserForTest, __enableTestRoot as enableBridge } from './v2/services/browser_service/internal/camoufox_bridge.mjs';
-    import { click, type as typeText } from './v2/services/page_runtime/operations/interaction_ops.mjs';
+    import { click, keyboard, type as typeText } from './v2/services/page_runtime/operations/interaction_ops.mjs';
     __enableTestRoot();
     enableBridge();
-    const missing = { count: async () => 1, nth() { return this; }, first() { return this; }, async boundingBox() { return null; } };
+    const missing = { count: async () => 1, nth() { return this; }, first() { return this; }, async evaluate() { return null; } };
     const page = {
       viewportSize: () => ({ width: 800, height: 600 }), locator: () => missing,
       mouse: { move: async () => {}, down: async () => {}, up: async () => {}, wheel: async () => {} },
@@ -470,10 +489,11 @@ test('negative: protocol interaction failures remain explicit', () => {
       () => click({ profileId: 'protocol_failure', target, selector: '#missing' }),
       () => typeText({ profileId: 'protocol_failure', target, selector: '#missing', text: 'x' }),
       () => typeText({ profileId: 'protocol_failure', target, selector: '#missing', text: '' }),
+      () => keyboard({ profileId: 'protocol_failure', target, action: 'press', key: 'F5' }),
     ]) {
       try { await action(); } catch (error) { codes.push(error.code); }
     }
     process.stdout.write(JSON.stringify({ codes }));
   `);
-  assert.deepEqual(result.codes, ['E_BROWSER_CLICK_FAILED', 'E_BROWSER_TYPE_FAILED', 'E_INPUT_MISSING_FIELD']);
+  assert.deepEqual(result.codes, ['E_BROWSER_CLICK_FAILED', 'E_BROWSER_TYPE_FAILED', 'E_INPUT_MISSING_FIELD', 'E_INPUT_INVALID']);
 });

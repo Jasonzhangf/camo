@@ -19,7 +19,7 @@ export function __resetForTest() {
   _state.clear();
 }
 
-export const ALLOWED_KINDS = new Set(['goto', 'back', 'forward', 'reload', 'click', 'type', 'scroll', 'screenshot', 'snapshot', 'wait', 'evaluate', 'upload', 'select', 'hover', 'getText', 'getPageInfo', 'findElements', 'getReadable', 'newTab', 'closeTab', 'listTabs', 'switchTab', 'multiOpen', 'getCookies', 'setCookies', 'setUserAgent', 'setuseragent', 'setViewport', 'waitForDomStable', 'scrollAndCollect', 'fetch']);
+export const ALLOWED_KINDS = new Set(['goto', 'back', 'forward', 'reload', 'click', 'type', 'keyboard', 'scroll', 'screenshot', 'snapshot', 'wait', 'evaluate', 'upload', 'select', 'hover', 'getText', 'getPageInfo', 'findElements', 'getReadable', 'newTab', 'closeTab', 'listTabs', 'switchTab', 'multiOpen', 'getCookies', 'setCookies', 'setUserAgent', 'setuseragent', 'setViewport', 'waitForDomStable', 'scrollAndCollect', 'fetch']);
 
 const _state = new Map();
 const DEFAULT_OPERATION_TIMEOUT_MS = 30_000;

@@ -993,6 +993,74 @@
       "semantic_io": "serialized target focus and text to protocol mouse and keyboard input"
     },
     {
+      "feature_id": "cmd.keyboard.request",
+      "from": "shell.cli",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/shell/cli/dispatch.mjs",
+        "symbol": "dispatch"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run",
+        "local_symbol": "runBuiltin"
+      },
+      "semantic_io": "validated keyboard action and key to builtin dispatch"
+    },
+    {
+      "feature_id": "cmd.keyboard.request",
+      "from": "commands.builtins",
+      "to": "commands.builtins",
+      "caller": {
+        "path": "v2/commands/builtins/index.mjs",
+        "symbol": "run"
+      },
+      "callee": {
+        "path": "v2/commands/builtins/keyboard.mjs",
+        "symbol": "run",
+        "local_symbol": "keyboard.run"
+      },
+      "invocation": {
+        "kind": "registry_dispatch",
+        "registry_object": "BUILTINS",
+        "command_id": "keyboard",
+        "builtin_namespace": "keyboard",
+        "dispatch_local_symbol": "mod",
+        "method": "run"
+      },
+      "semantic_io": "registry-selected keyboard command to concrete builtin owner"
+    },
+    {
+      "feature_id": "cmd.keyboard.execute",
+      "from": "shell.daemon",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/shell/daemon/index.mjs",
+        "symbol": "handleCommand"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "keyboard",
+        "local_symbol": "keyboard"
+      },
+      "semantic_io": "profile-scoped target and allowlisted key to serialized input"
+    },
+    {
+      "feature_id": "cmd.keyboard.execute",
+      "from": "services.page_runtime",
+      "to": "services.page_runtime",
+      "caller": {
+        "path": "v2/services/page_runtime/input_pipeline.mjs",
+        "symbol": "keyboard"
+      },
+      "callee": {
+        "path": "v2/services/page_runtime/operations/interaction_ops.mjs",
+        "symbol": "keyboard",
+        "local_symbol": "pageOps.keyboard"
+      },
+      "semantic_io": "serialized keyboard action to protocol key press"
+    },
+    {
       "feature_id": "cmd.wait.request",
       "from": "shell.cli",
       "to": "commands.builtins",

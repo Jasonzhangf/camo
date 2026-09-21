@@ -29,6 +29,7 @@ export {
   click,
   hover,
   type,
+  keyboard,
   scroll,
   upload,
   select,

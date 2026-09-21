@@ -478,6 +478,32 @@
       ]
     },
     {
+      "id": "cmd.keyboard.request",
+      "status": "active",
+      "owner_module": "commands.builtins",
+      "entry_symbols": [
+        {
+          "path": "v2/commands/builtins/keyboard.mjs",
+          "symbol": "run"
+        }
+      ]
+    },
+    {
+      "id": "cmd.keyboard.execute",
+      "status": "active",
+      "owner_module": "services.page_runtime",
+      "entry_symbols": [
+        {
+          "path": "v2/services/page_runtime/input_pipeline.mjs",
+          "symbol": "keyboard"
+        },
+        {
+          "path": "v2/services/page_runtime/operations/interaction_ops.mjs",
+          "symbol": "keyboard"
+        }
+      ]
+    },
+    {
       "id": "cmd.wait.request",
       "status": "active",
       "owner_module": "commands.builtins",

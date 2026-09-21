@@ -34,7 +34,7 @@ export const HTTP_KINDS = Object.freeze({
 // Common command ids for the L4 layer. The v2/commands/registry
 // owns the full table; this list is a closed set of well-known ids.
 export const COMMAND_IDS = Object.freeze([
-  'start', 'stop', 'goto', 'click', 'type', 'snapshot',
+  'start', 'stop', 'goto', 'click', 'type', 'keyboard', 'snapshot',
   'scroll', 'screenshot', 'wait', 'evaluate', 'upload', 'select',
 ]);
 
