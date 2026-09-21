@@ -2,25 +2,107 @@
  * Check Camoufox installation readiness.
  * Browser launch verification belongs to daemon.browser_service.
  */
+import AdmZip from 'adm-zip';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+
 const CAMOUFOX_RUNTIME_CONTRACT = Object.freeze({
   camoufoxVersion: '152.0.4',
   camoufoxRelease: 'beta.29',
   playwrightCoreVersion: '1.60.0',
 });
 
-function camoufoxArchiveUrl() {
-  const { camoufoxVersion, camoufoxRelease } = CAMOUFOX_RUNTIME_CONTRACT;
-  const platform = process.platform === 'win32'
+function camoufoxPlatform(platform = process.platform) {
+  return platform === 'win32'
     ? 'win'
-    : process.platform === 'darwin'
+    : platform === 'darwin'
       ? 'mac'
       : 'lin';
-  const arch = process.arch === 'arm64'
-    ? 'arm64'
-    : process.arch === 'x64'
-      ? 'x86_64'
-      : process.arch;
-  return `https://github.com/daijro/camoufox/releases/download/v${camoufoxVersion}-${camoufoxRelease}/camoufox-${camoufoxVersion}-${camoufoxRelease}-${platform}.${arch}.zip`;
+}
+
+function camoufoxArch(arch = process.arch) {
+  if (arch === 'x64') return 'x86_64';
+  if (arch === 'ia32') return 'i686';
+  if (arch === 'arm64' || arch === 'arm') return 'arm64';
+  return arch;
+}
+
+function camoufoxCacheDir({
+  platform = process.platform,
+  homedir = os.homedir(),
+} = {}) {
+  if (platform === 'win32') {
+    return path.join(homedir, 'AppData', 'Local', 'camoufox', 'camoufox', 'Cache');
+  }
+  return platform === 'darwin'
+    ? path.join(homedir, 'Library', 'Caches', 'camoufox')
+    : path.join(homedir, '.cache', 'camoufox');
+}
+
+function camoufoxInstallPaths({
+  platform = process.platform,
+  homedir = os.homedir(),
+  cacheDir = camoufoxCacheDir({ platform, homedir }),
+} = {}) {
+  const versionPath = path.join(cacheDir, 'version.json');
+  if (platform === 'darwin') {
+    return {
+      cacheDir,
+      executablePath: path.join(cacheDir, 'Camoufox.app', 'Contents', 'MacOS', 'camoufox'),
+      propertiesPath: path.join(cacheDir, 'Camoufox.app', 'Contents', 'Resources', 'properties.json'),
+      macosPropertiesPath: path.join(cacheDir, 'Camoufox.app', 'Contents', 'MacOS', 'properties.json'),
+      versionPath,
+    };
+  }
+  return {
+    cacheDir,
+    executablePath: path.join(
+      cacheDir,
+      platform === 'win32' ? 'camoufox.exe' : 'camoufox-bin',
+    ),
+    propertiesPath: path.join(cacheDir, 'properties.json'),
+    macosPropertiesPath: null,
+    versionPath,
+  };
+}
+
+function cacheDirFromExecutable(executablePath, platform = process.platform) {
+  const executableDir = path.dirname(executablePath);
+  return platform === 'darwin'
+    ? path.resolve(executableDir, '..', '..', '..')
+    : executableDir;
+}
+
+function camoufoxArchiveUrl({
+  platform = process.platform,
+  arch = process.arch,
+} = {}) {
+  const { camoufoxVersion, camoufoxRelease } = CAMOUFOX_RUNTIME_CONTRACT;
+  const platformName = camoufoxPlatform(platform);
+  const archName = camoufoxArch(arch);
+  return `https://github.com/daijro/camoufox/releases/download/v${camoufoxVersion}-${camoufoxRelease}/camoufox-${camoufoxVersion}-${camoufoxRelease}-${platformName}.${archName}.zip`;
+}
+
+function setCamoufoxPermissions(cacheDir, platform = process.platform) {
+  if (platform === 'win32') return;
+
+  function visit(target) {
+    const stat = fs.lstatSync(target);
+    if (stat.isSymbolicLink()) return;
+    if (stat.isDirectory()) {
+      fs.chmodSync(target, 0o755);
+      for (const entry of fs.readdirSync(target)) {
+        visit(path.join(target, entry));
+      }
+      return;
+    }
+    fs.chmodSync(target, 0o755);
+  }
+
+  visit(cacheDir);
 }
 
 function validateCamoufoxRuntimeVersions({
@@ -69,31 +151,28 @@ async function readResolvedPlaywrightCoreVersion() {
   return camoufoxRequire('playwright-core/package.json').version;
 }
 
-async function checkCamoufoxHealth() {
-  const os = await import('node:os');
-  const path = await import('node:path');
-  const fs = await import('node:fs');
-
-  const homedir = os.homedir();
-  const isWin = os.platform() === 'win32';
+async function checkCamoufoxHealth({
+  platform = process.platform,
+  homedir = os.homedir(),
+} = {}) {
   const executableEnv = String(process.env.CAMO_EXECUTABLE_PATH || '').trim();
-  // CAMO_EXECUTABLE_PATH points at <cache>/Camoufox.app/Contents/MacOS/camoufox;
-  // derive the cache root from it so isolated HOMEs still resolve the real
-  // installed binary instead of triggering a download.
   const cacheDir = executableEnv
-    ? path.resolve(path.dirname(executableEnv), '..', '..', '..')
-    : isWin
-      ? path.join(homedir, 'AppData', 'Local', 'camoufox')
-      : os.platform() === 'darwin'
-        ? path.join(homedir, 'Library', 'Caches', 'camoufox')
-        : path.join(homedir, '.cache', 'camoufox');
-  
-  const resourcesProps = path.join(cacheDir, 'Camoufox.app', 'Contents', 'Resources', 'properties.json');
-  const macosProps = path.join(cacheDir, 'Camoufox.app', 'Contents', 'MacOS', 'properties.json');
-  const versionPath = path.join(cacheDir, 'version.json');
+    ? cacheDirFromExecutable(executableEnv, platform)
+    : camoufoxCacheDir({ platform, homedir });
+  const installPaths = camoufoxInstallPaths({ platform, cacheDir });
+  const {
+    executablePath,
+    macosPropertiesPath,
+    propertiesPath,
+    versionPath,
+  } = installPaths;
 
-  // Check 1: properties.json exists in Resources (the real location)
-  if (!fs.existsSync(resourcesProps)) {
+  let resolvedPropertiesPath = propertiesPath;
+  if (platform === 'darwin' && !fs.existsSync(propertiesPath) && fs.existsSync(macosPropertiesPath)) {
+    resolvedPropertiesPath = macosPropertiesPath;
+  }
+
+  if (!fs.existsSync(resolvedPropertiesPath)) {
     return {
       ok: false,
       launchVerified: false,
@@ -101,6 +180,17 @@ async function checkCamoufoxHealth() {
       errorCode: 'E_CAMOUFOX_BINARY_MISSING',
       repairable: true,
       error: 'Camoufox binary not found. Run: npx camoufox fetch',
+    };
+  }
+
+  if (!fs.existsSync(executablePath)) {
+    return {
+      ok: false,
+      launchVerified: false,
+      launchOwner: 'daemon.browser_service',
+      errorCode: 'E_CAMOUFOX_BINARY_MISSING',
+      repairable: true,
+      error: `Camoufox executable not found: ${executablePath}`,
     };
   }
 
@@ -156,10 +246,15 @@ async function checkCamoufoxHealth() {
     };
   }
 
-  // Check 2: symlink exists (workaround for npm bug)
-  if (!fs.existsSync(macosProps)) {
+  // Camoufox's npm launcher reads properties.json next to the macOS
+  // executable even though the release stores it in Resources.
+  if (
+    platform === 'darwin'
+    && resolvedPropertiesPath === propertiesPath
+    && !fs.existsSync(macosPropertiesPath)
+  ) {
     try {
-      fs.symlinkSync(resourcesProps, macosProps);
+      fs.symlinkSync(propertiesPath, macosPropertiesPath);
     } catch (cause) {
       return {
         ok: false,
@@ -185,7 +280,7 @@ async function checkCamoufoxHealth() {
     ok: true,
     launchVerified: false,
     launchOwner: 'daemon.browser_service',
-    installPath: resourcesProps,
+    installPath: resolvedPropertiesPath,
     versionPath,
     camoufoxVersion: installedVersion.version,
     camoufoxRelease: installedVersion.release,
@@ -196,8 +291,12 @@ async function checkCamoufoxHealth() {
 /**
  * Ensure Camoufox installation is ready. Auto-fetches if missing.
  */
-async function ensureCamoufox({ spawnImpl } = {}) {
-  const health = await checkCamoufoxHealth();
+async function ensureCamoufox({
+  fetchImpl = globalThis.fetch,
+  platform = process.platform,
+  homedir = os.homedir(),
+} = {}) {
+  const health = await checkCamoufoxHealth({ platform, homedir });
   if (health.ok) return health;
 
   if (!health.repairable) {
@@ -205,16 +304,7 @@ async function ensureCamoufox({ spawnImpl } = {}) {
   }
 
   console.error('Camoufox runtime is missing or incompatible, fetching the admitted binary...');
-  const os = await import('node:os');
-  const path = await import('node:path');
-  const fs = await import('node:fs');
-  const { spawn } = await import('node:child_process');
-  const run = spawnImpl || spawn;
-  const cacheDir = process.platform === 'win32'
-    ? path.join(os.homedir(), 'AppData', 'Local', 'camoufox')
-    : process.platform === 'darwin'
-      ? path.join(os.homedir(), 'Library', 'Caches', 'camoufox')
-      : path.join(os.homedir(), '.cache', 'camoufox');
+  const cacheDir = camoufoxCacheDir({ platform, homedir });
   // Stage beside the cache root. The install replaces cacheDir below, so a
   // staging directory nested inside it would be deleted before extraction.
   const downloadDir = path.join(
@@ -225,23 +315,12 @@ async function ensureCamoufox({ spawnImpl } = {}) {
 
   fs.mkdirSync(downloadDir, { recursive: true });
   try {
-    const curl = run('curl', ['-fL', '--retry', '3', '--connect-timeout', '15', '-o', archivePath, camoufoxArchiveUrl()], { stdio: 'inherit' });
-    const curlExitCode = await new Promise((resolve, reject) => {
-      curl.once('error', reject);
-      curl.once('close', resolve);
-    });
-    if (curlExitCode !== 0) {
-      throw new Error(`Camoufox archive download failed with exit code ${curlExitCode}`);
+    const response = await fetchImpl(camoufoxArchiveUrl({ platform }));
+    if (!response?.ok || !response.body) {
+      throw new Error(`Camoufox archive download failed with status ${response?.status ?? 'unknown'}`);
     }
-
-    const unzip = run('unzip', ['-q', '-o', archivePath, '-d', downloadDir], { stdio: 'inherit' });
-    const unzipExitCode = await new Promise((resolve, reject) => {
-      unzip.once('error', reject);
-      unzip.once('close', resolve);
-    });
-    if (unzipExitCode !== 0) {
-      throw new Error(`Camoufox archive extraction failed with exit code ${unzipExitCode}`);
-    }
+    await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(archivePath));
+    new AdmZip(archivePath).extractAllTo(downloadDir, true);
 
     fs.rmSync(cacheDir, { recursive: true, force: true });
     fs.mkdirSync(cacheDir, { recursive: true });
@@ -257,11 +336,12 @@ async function ensureCamoufox({ spawnImpl } = {}) {
       }),
       'utf8',
     );
+    setCamoufoxPermissions(cacheDir, platform);
   } finally {
     fs.rmSync(downloadDir, { recursive: true, force: true });
   }
 
-  const retry = await checkCamoufoxHealth();
+  const retry = await checkCamoufoxHealth({ platform, homedir });
   if (!retry.ok) {
     throw new Error('Camoufox setup failed: ' + retry.error);
   }
@@ -270,7 +350,10 @@ async function ensureCamoufox({ spawnImpl } = {}) {
 
 export {
   CAMOUFOX_RUNTIME_CONTRACT,
+  camoufoxCacheDir,
+  camoufoxInstallPaths,
   checkCamoufoxHealth,
   ensureCamoufox,
+  setCamoufoxPermissions,
   validateCamoufoxRuntimeVersions,
 };

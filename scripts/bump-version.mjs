@@ -11,6 +11,7 @@ import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packageJsonPath = join(__dirname, '..', 'package.json');
+const packageLockPath = join(__dirname, '..', 'package-lock.json');
 
 function bumpVersion() {
   const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
@@ -26,6 +27,15 @@ function bumpVersion() {
   
   pkg.version = newVersion;
   writeFileSync(packageJsonPath, JSON.stringify(pkg, null, 2) + '\n');
+
+  try {
+    const lock = JSON.parse(readFileSync(packageLockPath, 'utf-8'));
+    lock.version = newVersion;
+    if (lock.packages?.['']) lock.packages[''].version = newVersion;
+    writeFileSync(packageLockPath, JSON.stringify(lock, null, 2) + '\n');
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
   
   console.log(`Version bumped: ${currentVersion} -> ${newVersion}`);
   return newVersion;

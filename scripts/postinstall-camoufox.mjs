@@ -2,12 +2,12 @@
 // Post-install hook: ensure Camoufox is installed and verified.
 // This runs after 'npm install' in the project directory.
 
-import { spawnSync } from 'node:child_process';
-import path from 'node:path';
-import os from 'node:os';
-import { checkCamoufoxHealth, ensureCamoufox } from '../v2/shell/camoufox_health.mjs';
-
-const isWin = os.platform() === 'win32';
+import {
+  camoufoxCacheDir,
+  checkCamoufoxHealth,
+  ensureCamoufox,
+  setCamoufoxPermissions,
+} from '../v2/shell/camoufox_health.mjs';
 
 async function main() {
   const silent = process.argv.includes('--silent');
@@ -16,12 +16,7 @@ async function main() {
     console.log('\n=== Camoufox Setup ===\n');
   }
   
-  const homedir = os.homedir();
-  const cacheDir = isWin 
-    ? path.join(homedir, 'AppData', 'Local', 'camoufox')
-    : os.platform() === 'darwin'
-      ? path.join(homedir, 'Library', 'Caches', 'camoufox')
-      : path.join(homedir, '.cache', 'camoufox');
+  const cacheDir = camoufoxCacheDir();
   
   // Step 1: Enforce the single admitted browser/protocol pair.
   if (!silent) console.log('[1/4] Checking Camoufox runtime contract...');
@@ -53,10 +48,8 @@ async function main() {
 
   // Step 3: Permissions
   if (!silent) console.log('\n[3/4] Setting permissions...');
-  try {
-    spawnSync('chmod', ['-R', '755', cacheDir], { stdio: 'ignore' });
-    if (!silent) console.log('  Done');
-  } catch {}
+  setCamoufoxPermissions(cacheDir);
+  if (!silent) console.log('  Done');
 
   // Step 4: Report installation readiness. Browser launch truth stays with
   // daemon.browser_service and is verified through the installed camo CLI.
