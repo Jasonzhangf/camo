@@ -19,3 +19,10 @@ test('negative: postinstall does not bypass the owner with presence-only or dire
   assert.doesNotMatch(source, /\bCamoufox\s*\(/);
   assert.doesNotMatch(source, /\['camoufox',\s*'fetch'\]/);
 });
+
+test('negative: postinstall does not chmod a caller-owned explicit install', () => {
+  // Permissions are normalized only for the cache Camo owns; a
+  // CAMO_EXECUTABLE_PATH install belongs to the operator.
+  assert.match(source, /installOwner === 'explicit_path'/);
+  assert.match(source, /setCamoufoxPermissions\(health\.cacheDir\)/);
+});

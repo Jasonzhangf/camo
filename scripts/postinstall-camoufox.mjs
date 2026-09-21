@@ -44,9 +44,15 @@ async function main() {
   if (!silent) console.log('  Installation layout OK');
 
   // Step 3: Permissions
-  if (!silent) console.log('\n[3/4] Setting permissions...');
-  setCamoufoxPermissions(health.cacheDir);
-  if (!silent) console.log('  Done');
+  if (health.installOwner === 'explicit_path') {
+    // A CAMO_EXECUTABLE_PATH install belongs to the caller; normalizing
+    // permissions would rewrite an operator-owned tree.
+    if (!silent) console.log('\n[3/4] Skipping permissions for the caller-owned CAMO_EXECUTABLE_PATH install');
+  } else {
+    if (!silent) console.log('\n[3/4] Setting permissions...');
+    setCamoufoxPermissions(health.cacheDir);
+    if (!silent) console.log('  Done');
+  }
 
   // Step 4: Report installation readiness. Browser launch truth stays with
   // daemon.browser_service and is verified through the installed camo CLI.

@@ -173,11 +173,12 @@ async function checkCamoufoxHealth({
   platform = process.platform,
   homedir = os.homedir(),
 } = {}) {
-  // Auto-repair is only defined for the cache root Camo installs into.
-  // An explicit executable path is caller-managed, so a missing or stale
-  // install there is reported, never overwritten.
+  // Auto-repair and layout/permission writes are only defined for the cache
+  // root Camo installs into. An explicit executable path is caller-managed, so
+  // a missing or stale install there is reported, never overwritten.
   const explicitExecutable = explicitCamoufoxExecutable();
-  const repairable = explicitExecutable === '';
+  const explicitInstall = explicitExecutable !== '';
+  const repairable = !explicitInstall;
   const cacheDir = resolveCamoufoxCacheDir({ platform, homedir });
   const installPaths = camoufoxInstallPaths({ platform, cacheDir });
   const {
@@ -271,9 +272,22 @@ async function checkCamoufoxHealth({
   }
 
   // Camoufox's npm launcher reads properties.json next to the macOS
-  // executable even though the release stores it in Resources.
+  // executable even though the release stores it in Resources. Only the cache
+  // Camo owns may be rearranged; a caller-owned explicit install is reported.
+  if (platform === 'darwin' && explicitInstall && !fs.existsSync(macosPropertiesPath)) {
+    return {
+      ok: false,
+      launchVerified: false,
+      launchOwner: 'daemon.browser_service',
+      errorCode: 'E_CAMOUFOX_INSTALL_LAYOUT_INVALID',
+      repairable: false,
+      error: `Camoufox installation at the explicit CAMO_EXECUTABLE_PATH is missing ${macosPropertiesPath}`,
+    };
+  }
+
   if (
     platform === 'darwin'
+    && !explicitInstall
     && !fs.existsSync(macosPropertiesPath)
   ) {
     try {
@@ -303,6 +317,10 @@ async function checkCamoufoxHealth({
     ok: true,
     launchVerified: false,
     launchOwner: 'daemon.browser_service',
+    // Ownership of the installation root. Only the Camo-owned cache may be
+    // modified (permissions, layout), so consumers must not act on an
+    // explicit caller-supplied install.
+    installOwner: explicitInstall ? 'explicit_path' : 'camoufox_cache',
     cacheDir,
     installPath: propertiesPath,
     versionPath,
