@@ -254,7 +254,9 @@ test('negative: health never writes a layout fix into an explicit install', asyn
 });
 
 test('positive: the Camo-owned macOS cache still gets the launch layout fix', async () => {
-  const { teardown, tmpHome } = withFakeInstall(true);
+  // The macOS layout fix is exercised on every platform, so the fixture has to
+  // be built from the simulated darwin cache root rather than the host one.
+  const { teardown, tmpHome } = withFakeInstall(true, undefined, 'darwin');
   const macOSDir = path.join(tmpHome, 'Library', 'Caches', 'camoufox', 'Camoufox.app', 'Contents', 'MacOS');
   const deleteCAMO_EXECUTABLE_PATH = process.env.CAMO_EXECUTABLE_PATH;
   delete process.env.CAMO_EXECUTABLE_PATH;
