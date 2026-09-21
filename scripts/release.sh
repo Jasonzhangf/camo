@@ -50,5 +50,11 @@ echo "Pushing to remote..."
 git push origin HEAD
 git push origin "v$NEW_VERSION"
 
+echo "Creating GitHub Release..."
+gh release create "v$NEW_VERSION" \
+  --verify-tag \
+  --title "v$NEW_VERSION" \
+  --notes "Release v$NEW_VERSION"
+
 echo "Release v$NEW_VERSION created successfully!"
 echo "GitHub Actions will automatically publish to npm."
