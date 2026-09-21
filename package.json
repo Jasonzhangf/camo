@@ -37,6 +37,10 @@
     "cli"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jasonzhangf/camo.git"
+  },
   "engines": {
     "node": ">=20.0.0"
   },

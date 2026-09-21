@@ -67,7 +67,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # npm trusted publishing (OIDC) requires npm >= 11.5.1, which
+          # ships with Node 24. Node 20's npm 10 cannot exchange the
+          # GitHub OIDC token for a publish credential.
+          node-version: 24
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
@@ -78,5 +81,5 @@ jobs:
 
       - name: Publish to npm
         run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # No NODE_AUTH_TOKEN: the auth token comes from the OIDC exchange, and
+        # an unset or stale token env makes npm fail with ENEEDAUTH instead.
