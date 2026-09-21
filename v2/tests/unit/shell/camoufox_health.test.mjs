@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { EventEmitter } from 'node:events';
 
 function loadFresh() {
   const url = new URL('../../../shell/camoufox_health.mjs', import.meta.url).href + `?t=${Date.now()}-${Math.random()}`;
@@ -156,4 +157,56 @@ test('negative: automatic repair downloads the exact admitted Camoufox release',
   );
   assert.match(source, /camoufox-\$\{camoufoxVersion\}-\$\{camoufoxRelease\}/);
   assert.doesNotMatch(source, /\['camoufox',\s*'fetch'\]/);
+});
+
+test('positive: automatic repair stages outside the cache root before replacing it', async () => {
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-health-repair-'));
+  const homeDir = path.join(tmpRoot, 'home');
+  fs.mkdirSync(homeDir, { recursive: true });
+  const commands = [];
+  const fakeSpawn = (command, args) => {
+    commands.push({ command, args });
+    const child = new EventEmitter();
+    setImmediate(() => {
+      if (command === 'curl') {
+        const out = args[args.indexOf('-o') + 1];
+        fs.writeFileSync(out, 'fake archive');
+      } else if (command === 'unzip') {
+        const dest = args[args.indexOf('-d') + 1];
+        const resources = path.join(dest, 'Camoufox.app', 'Contents', 'Resources');
+        fs.mkdirSync(resources, { recursive: true });
+        fs.mkdirSync(path.join(dest, 'Camoufox.app', 'Contents', 'MacOS'), { recursive: true });
+        fs.writeFileSync(path.join(resources, 'properties.json'), '{"fake":true}');
+      }
+      child.emit('close', 0);
+    });
+    return child;
+  };
+
+  const previousHome = process.env.HOME;
+  process.env.HOME = homeDir;
+  try {
+    const mod = await loadFresh();
+    const out = await mod.ensureCamoufox({ spawnImpl: fakeSpawn });
+    assert.equal(out.ok, true);
+    const cacheDir = process.platform === 'darwin'
+      ? path.join(homeDir, 'Library', 'Caches', 'camoufox')
+      : process.platform === 'win32'
+        ? path.join(homeDir, 'AppData', 'Local', 'camoufox')
+        : path.join(homeDir, '.cache', 'camoufox');
+    assert.equal(
+      out.installPath,
+      path.join(cacheDir, 'Camoufox.app', 'Contents', 'Resources', 'properties.json'),
+    );
+    assert.equal(fs.existsSync(path.join(cacheDir, 'version.json')), true);
+    assert.equal(
+      fs.readdirSync(path.dirname(cacheDir)).some((entry) => entry.startsWith('.camoufox-download-')),
+      false,
+    );
+    assert.deepEqual(commands.map((entry) => entry.command), ['curl', 'unzip']);
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
 });

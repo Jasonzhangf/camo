@@ -196,7 +196,7 @@ async function checkCamoufoxHealth() {
 /**
  * Ensure Camoufox installation is ready. Auto-fetches if missing.
  */
-async function ensureCamoufox() {
+async function ensureCamoufox({ spawnImpl } = {}) {
   const health = await checkCamoufoxHealth();
   if (health.ok) return health;
 
@@ -209,17 +209,23 @@ async function ensureCamoufox() {
   const path = await import('node:path');
   const fs = await import('node:fs');
   const { spawn } = await import('node:child_process');
+  const run = spawnImpl || spawn;
   const cacheDir = process.platform === 'win32'
     ? path.join(os.homedir(), 'AppData', 'Local', 'camoufox')
     : process.platform === 'darwin'
       ? path.join(os.homedir(), 'Library', 'Caches', 'camoufox')
       : path.join(os.homedir(), '.cache', 'camoufox');
-  const downloadDir = path.join(cacheDir, `.download-${process.pid}-${Date.now()}`);
+  // Stage beside the cache root. The install replaces cacheDir below, so a
+  // staging directory nested inside it would be deleted before extraction.
+  const downloadDir = path.join(
+    path.dirname(cacheDir),
+    `.camoufox-download-${process.pid}-${Date.now()}`,
+  );
   const archivePath = path.join(downloadDir, 'camoufox.zip');
 
   fs.mkdirSync(downloadDir, { recursive: true });
   try {
-    const curl = spawn('curl', ['-fL', '--retry', '3', '--connect-timeout', '15', '-o', archivePath, camoufoxArchiveUrl()], { stdio: 'inherit' });
+    const curl = run('curl', ['-fL', '--retry', '3', '--connect-timeout', '15', '-o', archivePath, camoufoxArchiveUrl()], { stdio: 'inherit' });
     const curlExitCode = await new Promise((resolve, reject) => {
       curl.once('error', reject);
       curl.once('close', resolve);
@@ -228,7 +234,7 @@ async function ensureCamoufox() {
       throw new Error(`Camoufox archive download failed with exit code ${curlExitCode}`);
     }
 
-    const unzip = spawn('unzip', ['-q', '-o', archivePath, '-d', downloadDir], { stdio: 'inherit' });
+    const unzip = run('unzip', ['-q', '-o', archivePath, '-d', downloadDir], { stdio: 'inherit' });
     const unzipExitCode = await new Promise((resolve, reject) => {
       unzip.once('error', reject);
       unzip.once('close', resolve);

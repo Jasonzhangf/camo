@@ -45,11 +45,11 @@ jobs:
         run: echo 'skip v1 coverage gate; see v2-registry-gates.yml'
 
       - name: Test global install (Unix)
-        run: npm install -g . --ignore-scripts
+        run: npm install -g .
         if: matrix.os != 'windows-latest'
 
       - name: Test global install (Windows)
-        run: npm install -g . --ignore-scripts
+        run: npm install -g .
         if: matrix.os == 'windows-latest'
         shell: pwsh
 
