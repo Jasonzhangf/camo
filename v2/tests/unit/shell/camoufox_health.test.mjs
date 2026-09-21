@@ -161,6 +161,60 @@ test('negative: an explicit CAMO_EXECUTABLE_PATH install is never auto-repaired'
   }
 });
 
+test('negative: an incompatible explicit CAMO_EXECUTABLE_PATH install is not repaired either', async () => {
+  // Version mismatch is repairable in Camo's own cache, but the same decision
+  // must not leak into a caller-owned explicit installation: repair would
+  // download a default-cache copy and then still fail against the explicit path.
+  const platform = process.platform;
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-health-exe-stale-'));
+  const propsDir = platform === 'darwin'
+    ? path.join(tmpRoot, 'Camoufox.app', 'Contents', 'Resources')
+    : tmpRoot;
+  const exeDir = platform === 'darwin'
+    ? path.join(tmpRoot, 'Camoufox.app', 'Contents', 'MacOS')
+    : tmpRoot;
+  fs.mkdirSync(propsDir, { recursive: true });
+  fs.mkdirSync(exeDir, { recursive: true });
+  fs.writeFileSync(path.join(propsDir, 'properties.json'), '{"fake":true}', 'utf8');
+  fs.writeFileSync(path.join(tmpRoot, 'version.json'), JSON.stringify({
+    version: '152.0.4',
+    release: 'beta.28',
+  }), 'utf8');
+  const executablePath = path.join(
+    exeDir,
+    platform === 'win32' ? 'camoufox.exe' : platform === 'darwin' ? 'camoufox' : 'camoufox-bin',
+  );
+  fs.writeFileSync(executablePath, platform === 'win32' ? '' : '#!/bin/sh\nexit 0\n', {
+    mode: platform === 'win32' ? undefined : 0o755,
+  });
+  const sentinel = path.join(propsDir, 'operator-owned.txt');
+  fs.writeFileSync(sentinel, 'keep me', 'utf8');
+  const previousExe = process.env.CAMO_EXECUTABLE_PATH;
+  process.env.CAMO_EXECUTABLE_PATH = executablePath;
+  let fetchCalled = false;
+
+  try {
+    const mod = await loadFresh();
+    const health = await mod.checkCamoufoxHealth({ homedir: tmpRoot });
+    assert.equal(health.ok, false);
+    assert.equal(health.errorCode, 'E_CAMOUFOX_BINARY_INCOMPATIBLE');
+    assert.equal(health.repairable, false, 'incompatible caller-owned installs must not be repairable');
+    await assert.rejects(
+      () => mod.ensureCamoufox({
+        fetchImpl: async () => { fetchCalled = true; return new Response('', { status: 200 }); },
+        homedir: tmpRoot,
+      }),
+      /Camoufox unhealthy/,
+    );
+    assert.equal(fetchCalled, false, 'no download may happen for a caller-owned install');
+    assert.equal(fs.readFileSync(sentinel, 'utf8'), 'keep me', 'repair must not touch a caller-owned tree');
+  } finally {
+    if (previousExe === undefined) delete process.env.CAMO_EXECUTABLE_PATH;
+    else process.env.CAMO_EXECUTABLE_PATH = previousExe;
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
 test('negative: Camoufox beta.28 is rejected because it can deadlock mouse acknowledgements', async () => {
   const { teardown, tmpHome } = withFakeInstall(true, {
     version: '152.0.4',

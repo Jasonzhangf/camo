@@ -258,6 +258,9 @@ async function checkCamoufoxHealth({
   if (!compatibility.ok) {
     return {
       ...compatibility,
+      // A caller-owned explicit install is never repaired, even when the
+      // mismatch itself would be repairable in the cache Camo owns.
+      repairable: repairable && compatibility.repairable,
       launchVerified: false,
       launchOwner: 'daemon.browser_service',
     };
