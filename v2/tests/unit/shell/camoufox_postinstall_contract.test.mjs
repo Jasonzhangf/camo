@@ -8,7 +8,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 const source = fs.readFileSync(path.join(repoRoot, 'scripts/postinstall-camoufox.mjs'), 'utf8');
 
 test('positive: postinstall consumes the canonical Camoufox health and repair owner', () => {
-  assert.match(source, /import \{ checkCamoufoxHealth, ensureCamoufox \}/);
+  assert.match(source, /import \{[^}]*checkCamoufoxHealth[^}]*ensureCamoufox[^}]*\}/s);
   assert.match(source, /await ensureCamoufox\(\)/);
   assert.match(source, /await checkCamoufoxHealth\(\)/);
 });

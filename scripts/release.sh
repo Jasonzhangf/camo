@@ -102,7 +102,7 @@ echo "Building..."
 npm run build
 
 # Commit version bump
-git add package.json
+git add package.json package-lock.json
 git commit -m "chore: release v$NEW_VERSION"
 
 # Create tag

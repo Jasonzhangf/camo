@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { EventEmitter } from 'node:events';
+import AdmZip from 'adm-zip';
 
 function loadFresh() {
   const url = new URL('../../../shell/camoufox_health.mjs', import.meta.url).href + `?t=${Date.now()}-${Math.random()}`;
@@ -18,41 +18,53 @@ function loadFresh() {
 function withFakeInstall(makeFake, versionManifest = {
   version: '152.0.4',
   release: 'beta.29',
-}) {
+}, platform = process.platform) {
   const tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-health-'));
-  const previousHome = process.env.HOME;
-  process.env.HOME = tmpHome;
-  const cacheDir = process.platform === 'darwin'
-    ? path.join(tmpHome, 'Library', 'Caches', 'camoufox')
-    : path.join(tmpHome, '.cache', 'camoufox');
-  let installed = false;
+  const cacheDir = platform === 'win32'
+    ? path.join(tmpHome, 'AppData', 'Local', 'camoufox', 'camoufox', 'Cache')
+    : platform === 'darwin'
+      ? path.join(tmpHome, 'Library', 'Caches', 'camoufox')
+      : path.join(tmpHome, '.cache', 'camoufox');
   const teardown = () => {
-    if (previousHome === undefined) delete process.env.HOME;
-    else process.env.HOME = previousHome;
     fs.rmSync(tmpHome, { recursive: true, force: true });
   };
   if (makeFake) {
-    const propsDir = path.join(cacheDir, 'Camoufox.app', 'Contents', 'Resources');
-    const macosDir = path.join(cacheDir, 'Camoufox.app', 'Contents', 'MacOS');
+    const propsDir = platform === 'darwin'
+      ? path.join(cacheDir, 'Camoufox.app', 'Contents', 'Resources')
+      : cacheDir;
+    const macosDir = platform === 'darwin'
+      ? path.join(cacheDir, 'Camoufox.app', 'Contents', 'MacOS')
+      : cacheDir;
     fs.mkdirSync(propsDir, { recursive: true });
     fs.mkdirSync(macosDir, { recursive: true });
     fs.writeFileSync(path.join(propsDir, 'properties.json'), '{"fake":true}', 'utf8');
+    fs.writeFileSync(
+      path.join(
+        macosDir,
+        platform === 'win32'
+          ? 'camoufox.exe'
+          : platform === 'darwin'
+            ? 'camoufox'
+            : 'camoufox-bin',
+      ),
+      '',
+      'utf8',
+    );
     if (versionManifest !== null) {
       const body = typeof versionManifest === 'string'
         ? versionManifest
         : JSON.stringify(versionManifest);
       fs.writeFileSync(path.join(cacheDir, 'version.json'), body, 'utf8');
     }
-    installed = true;
   }
-  return { teardown, installed };
+  return { teardown, tmpHome };
 }
 
 test('negative: missing Camoufox install surfaces an install-not-found result', async () => {
-  const { teardown } = withFakeInstall(false);
+  const { teardown, tmpHome } = withFakeInstall(false);
   try {
     const mod = await loadFresh();
-    const out = await mod.checkCamoufoxHealth();
+    const out = await mod.checkCamoufoxHealth({ homedir: tmpHome });
     assert.equal(out.ok, false);
     assert.match(out.error || '', /not found|Run: npx camoufox fetch/);
     assert.equal(out.launchVerified, false, 'missing install must not claim launch verification');
@@ -61,10 +73,10 @@ test('negative: missing Camoufox install surfaces an install-not-found result', 
 });
 
 test('positive: present Camoufox install reports installation readiness and never claims launch verification', async () => {
-  const { teardown } = withFakeInstall(true);
+  const { teardown, tmpHome } = withFakeInstall(true);
   try {
     const mod = await loadFresh();
-    const out = await mod.checkCamoufoxHealth();
+    const out = await mod.checkCamoufoxHealth({ homedir: tmpHome });
     assert.equal(out.ok, true);
     assert.equal(out.launchVerified, false, 'install presence check must never promise launch success');
     assert.equal(out.launchOwner, 'daemon.browser_service', 'launch verification must remain owned by daemon browser-service');
@@ -72,32 +84,41 @@ test('positive: present Camoufox install reports installation readiness and neve
 });
 
 test('positive: CAMO_EXECUTABLE_PATH resolves the installed binary under an isolated HOME', async () => {
+  // Explicit-path resolution is platform-shaped: the cache root is derived
+  // from the executable path using the layout of the platform in play, so the
+  // fixture must match the running platform rather than a fixed macOS layout.
+  const platform = process.platform;
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-health-exe-'));
-  const propsDir = path.join(tmpRoot, 'Camoufox.app', 'Contents', 'Resources');
-  const macosDir = path.join(tmpRoot, 'Camoufox.app', 'Contents', 'MacOS');
+  const propsDir = platform === 'darwin'
+    ? path.join(tmpRoot, 'Camoufox.app', 'Contents', 'Resources')
+    : tmpRoot;
+  const exeDir = platform === 'darwin'
+    ? path.join(tmpRoot, 'Camoufox.app', 'Contents', 'MacOS')
+    : tmpRoot;
   fs.mkdirSync(propsDir, { recursive: true });
-  fs.mkdirSync(macosDir, { recursive: true });
+  fs.mkdirSync(exeDir, { recursive: true });
   fs.writeFileSync(path.join(propsDir, 'properties.json'), '{"fake":true}', 'utf8');
   fs.writeFileSync(path.join(tmpRoot, 'version.json'), JSON.stringify({
     version: '152.0.4',
     release: 'beta.29',
   }), 'utf8');
-  const exePath = path.join(macosDir, 'camoufox');
-  fs.writeFileSync(exePath, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  const exePath = path.join(
+    exeDir,
+    platform === 'win32' ? 'camoufox.exe' : platform === 'darwin' ? 'camoufox' : 'camoufox-bin',
+  );
+  fs.writeFileSync(exePath, platform === 'win32' ? '' : '#!/bin/sh\nexit 0\n', {
+    mode: platform === 'win32' ? undefined : 0o755,
+  });
 
-  const previousHome = process.env.HOME;
   const previousExe = process.env.CAMO_EXECUTABLE_PATH;
   const isolatedHome = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-health-empty-home-'));
-  process.env.HOME = isolatedHome;
   process.env.CAMO_EXECUTABLE_PATH = exePath;
   try {
     const mod = await loadFresh();
-    const out = await mod.checkCamoufoxHealth();
+    const out = await mod.checkCamoufoxHealth({ homedir: isolatedHome });
     assert.equal(out.ok, true);
     assert.equal(out.installPath, path.join(propsDir, 'properties.json'));
   } finally {
-    if (previousHome === undefined) delete process.env.HOME;
-    else process.env.HOME = previousHome;
     if (previousExe === undefined) delete process.env.CAMO_EXECUTABLE_PATH;
     else process.env.CAMO_EXECUTABLE_PATH = previousExe;
     fs.rmSync(tmpRoot, { recursive: true, force: true });
@@ -105,14 +126,103 @@ test('positive: CAMO_EXECUTABLE_PATH resolves the installed binary under an isol
   }
 });
 
+test('negative: an explicit CAMO_EXECUTABLE_PATH install is never auto-repaired', async () => {
+  // Repair replaces the installation root. With a caller-supplied executable
+  // path that root is not Camo's, so the owner must report instead of writing:
+  // a derived root like /usr/local/bin or an app bundle must survive intact.
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-health-exe-no-repair-'));
+  const cacheDir = path.join(tmpRoot, 'custom-cache');
+  fs.mkdirSync(cacheDir, { recursive: true });
+  const sentinel = path.join(cacheDir, 'operator-owned.txt');
+  fs.writeFileSync(sentinel, 'keep me', 'utf8');
+  const executablePath = path.join(cacheDir, 'camoufox-bin');
+  const previousExe = process.env.CAMO_EXECUTABLE_PATH;
+  process.env.CAMO_EXECUTABLE_PATH = executablePath;
+  let fetchCalled = false;
+
+  try {
+    const mod = await loadFresh();
+    const health = await mod.checkCamoufoxHealth({ homedir: tmpRoot });
+    assert.equal(health.ok, false);
+    assert.equal(health.repairable, false, 'caller-owned installs must not be marked repairable');
+    await assert.rejects(
+      () => mod.ensureCamoufox({
+        fetchImpl: async () => { fetchCalled = true; return new Response('', { status: 200 }); },
+        homedir: tmpRoot,
+      }),
+      /explicit CAMO_EXECUTABLE_PATH|Camoufox unhealthy/,
+    );
+    assert.equal(fetchCalled, false, 'repair must not download when the explicit install is unhealthy');
+    assert.equal(fs.readFileSync(sentinel, 'utf8'), 'keep me', 'repair must not touch a caller-owned root');
+  } finally {
+    if (previousExe === undefined) delete process.env.CAMO_EXECUTABLE_PATH;
+    else process.env.CAMO_EXECUTABLE_PATH = previousExe;
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+test('negative: an incompatible explicit CAMO_EXECUTABLE_PATH install is not repaired either', async () => {
+  // Version mismatch is repairable in Camo's own cache, but the same decision
+  // must not leak into a caller-owned explicit installation: repair would
+  // download a default-cache copy and then still fail against the explicit path.
+  const platform = process.platform;
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-health-exe-stale-'));
+  const propsDir = platform === 'darwin'
+    ? path.join(tmpRoot, 'Camoufox.app', 'Contents', 'Resources')
+    : tmpRoot;
+  const exeDir = platform === 'darwin'
+    ? path.join(tmpRoot, 'Camoufox.app', 'Contents', 'MacOS')
+    : tmpRoot;
+  fs.mkdirSync(propsDir, { recursive: true });
+  fs.mkdirSync(exeDir, { recursive: true });
+  fs.writeFileSync(path.join(propsDir, 'properties.json'), '{"fake":true}', 'utf8');
+  fs.writeFileSync(path.join(tmpRoot, 'version.json'), JSON.stringify({
+    version: '152.0.4',
+    release: 'beta.28',
+  }), 'utf8');
+  const executablePath = path.join(
+    exeDir,
+    platform === 'win32' ? 'camoufox.exe' : platform === 'darwin' ? 'camoufox' : 'camoufox-bin',
+  );
+  fs.writeFileSync(executablePath, platform === 'win32' ? '' : '#!/bin/sh\nexit 0\n', {
+    mode: platform === 'win32' ? undefined : 0o755,
+  });
+  const sentinel = path.join(propsDir, 'operator-owned.txt');
+  fs.writeFileSync(sentinel, 'keep me', 'utf8');
+  const previousExe = process.env.CAMO_EXECUTABLE_PATH;
+  process.env.CAMO_EXECUTABLE_PATH = executablePath;
+  let fetchCalled = false;
+
+  try {
+    const mod = await loadFresh();
+    const health = await mod.checkCamoufoxHealth({ homedir: tmpRoot });
+    assert.equal(health.ok, false);
+    assert.equal(health.errorCode, 'E_CAMOUFOX_BINARY_INCOMPATIBLE');
+    assert.equal(health.repairable, false, 'incompatible caller-owned installs must not be repairable');
+    await assert.rejects(
+      () => mod.ensureCamoufox({
+        fetchImpl: async () => { fetchCalled = true; return new Response('', { status: 200 }); },
+        homedir: tmpRoot,
+      }),
+      /Camoufox unhealthy/,
+    );
+    assert.equal(fetchCalled, false, 'no download may happen for a caller-owned install');
+    assert.equal(fs.readFileSync(sentinel, 'utf8'), 'keep me', 'repair must not touch a caller-owned tree');
+  } finally {
+    if (previousExe === undefined) delete process.env.CAMO_EXECUTABLE_PATH;
+    else process.env.CAMO_EXECUTABLE_PATH = previousExe;
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
 test('negative: Camoufox beta.28 is rejected because it can deadlock mouse acknowledgements', async () => {
-  const { teardown } = withFakeInstall(true, {
+  const { teardown, tmpHome } = withFakeInstall(true, {
     version: '152.0.4',
     release: 'beta.28',
   });
   try {
     const mod = await loadFresh();
-    const out = await mod.checkCamoufoxHealth();
+    const out = await mod.checkCamoufoxHealth({ homedir: tmpHome });
     assert.equal(out.ok, false);
     assert.equal(out.errorCode, 'E_CAMOUFOX_BINARY_INCOMPATIBLE');
     assert.match(out.error || '', /beta\.28|beta\.29/);
@@ -120,20 +230,20 @@ test('negative: Camoufox beta.28 is rejected because it can deadlock mouse ackno
 });
 
 test('negative: missing Camoufox version manifest is rejected explicitly', async () => {
-  const { teardown } = withFakeInstall(true, null);
+  const { teardown, tmpHome } = withFakeInstall(true, null);
   try {
     const mod = await loadFresh();
-    const out = await mod.checkCamoufoxHealth();
+    const out = await mod.checkCamoufoxHealth({ homedir: tmpHome });
     assert.equal(out.ok, false);
     assert.equal(out.errorCode, 'E_CAMOUFOX_VERSION_MISSING');
   } finally { teardown(); }
 });
 
 test('negative: malformed Camoufox version manifest is rejected explicitly', async () => {
-  const { teardown } = withFakeInstall(true, '{not-json');
+  const { teardown, tmpHome } = withFakeInstall(true, '{not-json');
   try {
     const mod = await loadFresh();
-    const out = await mod.checkCamoufoxHealth();
+    const out = await mod.checkCamoufoxHealth({ homedir: tmpHome });
     assert.equal(out.ok, false);
     assert.equal(out.errorCode, 'E_CAMOUFOX_VERSION_INVALID');
   } finally { teardown(); }
@@ -163,50 +273,50 @@ test('positive: automatic repair stages outside the cache root before replacing 
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-health-repair-'));
   const homeDir = path.join(tmpRoot, 'home');
   fs.mkdirSync(homeDir, { recursive: true });
-  const commands = [];
-  const fakeSpawn = (command, args) => {
-    commands.push({ command, args });
-    const child = new EventEmitter();
-    setImmediate(() => {
-      if (command === 'curl') {
-        const out = args[args.indexOf('-o') + 1];
-        fs.writeFileSync(out, 'fake archive');
-      } else if (command === 'unzip') {
-        const dest = args[args.indexOf('-d') + 1];
-        const resources = path.join(dest, 'Camoufox.app', 'Contents', 'Resources');
-        fs.mkdirSync(resources, { recursive: true });
-        fs.mkdirSync(path.join(dest, 'Camoufox.app', 'Contents', 'MacOS'), { recursive: true });
-        fs.writeFileSync(path.join(resources, 'properties.json'), '{"fake":true}');
-      }
-      child.emit('close', 0);
-    });
-    return child;
+  const archive = new AdmZip();
+  archive.addFile('properties.json', Buffer.from('{"fake":true}'));
+  archive.addFile('camoufox-bin', Buffer.from(''));
+  const archiveBody = archive.toBuffer();
+  const fetchCalls = [];
+  const fetchImpl = async (url) => {
+    fetchCalls.push(url);
+    return new Response(archiveBody, { status: 200 });
   };
 
-  const previousHome = process.env.HOME;
-  process.env.HOME = homeDir;
   try {
     const mod = await loadFresh();
-    const out = await mod.ensureCamoufox({ spawnImpl: fakeSpawn });
+    const out = await mod.ensureCamoufox({
+      fetchImpl,
+      platform: 'linux',
+      homedir: homeDir,
+    });
     assert.equal(out.ok, true);
-    const cacheDir = process.platform === 'darwin'
-      ? path.join(homeDir, 'Library', 'Caches', 'camoufox')
-      : process.platform === 'win32'
-        ? path.join(homeDir, 'AppData', 'Local', 'camoufox')
-        : path.join(homeDir, '.cache', 'camoufox');
+    const cacheDir = path.join(homeDir, '.cache', 'camoufox');
     assert.equal(
       out.installPath,
-      path.join(cacheDir, 'Camoufox.app', 'Contents', 'Resources', 'properties.json'),
+      path.join(cacheDir, 'properties.json'),
     );
     assert.equal(fs.existsSync(path.join(cacheDir, 'version.json')), true);
     assert.equal(
       fs.readdirSync(path.dirname(cacheDir)).some((entry) => entry.startsWith('.camoufox-download-')),
       false,
     );
-    assert.deepEqual(commands.map((entry) => entry.command), ['curl', 'unzip']);
+    assert.equal(fetchCalls.length, 1);
+    assert.match(fetchCalls[0], /camoufox-152\.0\.4-beta\.29-lin\./);
   } finally {
-    if (previousHome === undefined) delete process.env.HOME;
-    else process.env.HOME = previousHome;
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   }
+});
+
+test('positive: Windows uses the upstream nested cache layout', async () => {
+  const mod = await loadFresh();
+  const homedir = path.join(path.sep, 'Users', 'runner');
+  const paths = mod.camoufoxInstallPaths({ platform: 'win32', homedir });
+
+  assert.equal(
+    paths.cacheDir,
+    path.join(homedir, 'AppData', 'Local', 'camoufox', 'camoufox', 'Cache'),
+  );
+  assert.equal(paths.executablePath, path.join(paths.cacheDir, 'camoufox.exe'));
+  assert.equal(paths.propertiesPath, path.join(paths.cacheDir, 'properties.json'));
 });

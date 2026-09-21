@@ -4,8 +4,9 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(new URL('../../../', import.meta.url).pathname);
+const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 test('negative: failed launch releases lock and only removes metadata created by that start', () => {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-launch-fail-home-'));

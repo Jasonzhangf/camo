@@ -13,6 +13,8 @@ test('npm package excludes nested dependency trees', () => {
   const output = execFileSync('npm', ['pack', '--dry-run', '--json'], {
     cwd: REPO_ROOT,
     encoding: 'utf8',
+    // Windows ships npm as npm.cmd, which execFile cannot spawn directly.
+    shell: process.platform === 'win32',
   });
   const [manifest] = JSON.parse(output);
   const dependencyEntries = manifest.files.filter(({ path }) => (

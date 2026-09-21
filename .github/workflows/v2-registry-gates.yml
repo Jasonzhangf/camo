@@ -40,23 +40,19 @@ jobs:
         run: node gates/run-all.mjs --strict
 
       - name: v2 unit tests
-        working-directory: v2
         # 117+ tests across L2 services + L1 error_envelope.
         # Any failure exits non-zero and red-flags this job.
-        run: node --test 'tests/unit/**/*.test.mjs'
+        run: npm run test:v2
 
       - name: v2 smoke tests
-        working-directory: v2
-        run: node --test 'tests/smoke/**/*.test.mjs'
+        run: npm run test:smoke
 
       - name: v2 integration tests
-        working-directory: v2
-        run: node --test 'tests/integration/**/*.test.mjs'
+        run: npm run test:integration
 
       - name: v2 e2e lifecycle tests
-        working-directory: v2
         # Spawns real daemon subprocesses; verifies lifecycle / multi-profile / cleanup.
-        run: node --test 'tests/e2e/**/*.test.mjs'
+        run: npm run test:e2e
 
       - name: v1 src/ untouched by this workflow
         # Stage 6 deletes v1 src/ entirely. This step is informational:
