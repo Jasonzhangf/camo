@@ -3,7 +3,6 @@
 // This runs after 'npm install' in the project directory.
 
 import {
-  camoufoxCacheDir,
   checkCamoufoxHealth,
   ensureCamoufox,
   setCamoufoxPermissions,
@@ -15,8 +14,6 @@ async function main() {
   if (!silent) {
     console.log('\n=== Camoufox Setup ===\n');
   }
-  
-  const cacheDir = camoufoxCacheDir();
   
   // Step 1: Enforce the single admitted browser/protocol pair.
   if (!silent) console.log('[1/4] Checking Camoufox runtime contract...');
@@ -48,7 +45,7 @@ async function main() {
 
   // Step 3: Permissions
   if (!silent) console.log('\n[3/4] Setting permissions...');
-  setCamoufoxPermissions(cacheDir);
+  setCamoufoxPermissions(health.cacheDir);
   if (!silent) console.log('  Done');
 
   // Step 4: Report installation readiness. Browser launch truth stays with

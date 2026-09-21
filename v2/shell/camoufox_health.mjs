@@ -76,6 +76,24 @@ function cacheDirFromExecutable(executablePath, platform = process.platform) {
     : executableDir;
 }
 
+// Explicit CAMO_EXECUTABLE_PATH points at an installation Camo does not own.
+// It may be checked, but never auto-repaired: the repair path replaces the
+// installation root, and an arbitrary explicit path would make Camo
+// recursive-delete a directory outside its own cache.
+function explicitCamoufoxExecutable(explicit = process.env.CAMO_EXECUTABLE_PATH) {
+  return String(explicit || '').trim();
+}
+
+function resolveCamoufoxCacheDir({
+  platform = process.platform,
+  homedir = os.homedir(),
+  explicitExecutable = explicitCamoufoxExecutable(),
+} = {}) {
+  return explicitExecutable
+    ? cacheDirFromExecutable(explicitExecutable, platform)
+    : camoufoxCacheDir({ platform, homedir });
+}
+
 function camoufoxArchiveUrl({
   platform = process.platform,
   arch = process.arch,
@@ -155,10 +173,12 @@ async function checkCamoufoxHealth({
   platform = process.platform,
   homedir = os.homedir(),
 } = {}) {
-  const executableEnv = String(process.env.CAMO_EXECUTABLE_PATH || '').trim();
-  const cacheDir = executableEnv
-    ? cacheDirFromExecutable(executableEnv, platform)
-    : camoufoxCacheDir({ platform, homedir });
+  // Auto-repair is only defined for the cache root Camo installs into.
+  // An explicit executable path is caller-managed, so a missing or stale
+  // install there is reported, never overwritten.
+  const explicitExecutable = explicitCamoufoxExecutable();
+  const repairable = explicitExecutable === '';
+  const cacheDir = resolveCamoufoxCacheDir({ platform, homedir });
   const installPaths = camoufoxInstallPaths({ platform, cacheDir });
   const {
     executablePath,
@@ -167,19 +187,16 @@ async function checkCamoufoxHealth({
     versionPath,
   } = installPaths;
 
-  let resolvedPropertiesPath = propertiesPath;
-  if (platform === 'darwin' && !fs.existsSync(propertiesPath) && fs.existsSync(macosPropertiesPath)) {
-    resolvedPropertiesPath = macosPropertiesPath;
-  }
-
-  if (!fs.existsSync(resolvedPropertiesPath)) {
+  if (!fs.existsSync(propertiesPath)) {
     return {
       ok: false,
       launchVerified: false,
       launchOwner: 'daemon.browser_service',
       errorCode: 'E_CAMOUFOX_BINARY_MISSING',
-      repairable: true,
-      error: 'Camoufox binary not found. Run: npx camoufox fetch',
+      repairable,
+      error: repairable
+        ? 'Camoufox binary not found. Run: npx camoufox fetch'
+        : `Camoufox binary not found at the explicit CAMO_EXECUTABLE_PATH installation: ${cacheDir}`,
     };
   }
 
@@ -189,7 +206,7 @@ async function checkCamoufoxHealth({
       launchVerified: false,
       launchOwner: 'daemon.browser_service',
       errorCode: 'E_CAMOUFOX_BINARY_MISSING',
-      repairable: true,
+      repairable,
       error: `Camoufox executable not found: ${executablePath}`,
     };
   }
@@ -200,7 +217,7 @@ async function checkCamoufoxHealth({
       launchVerified: false,
       launchOwner: 'daemon.browser_service',
       errorCode: 'E_CAMOUFOX_VERSION_MISSING',
-      repairable: true,
+      repairable,
       error: `Camoufox version manifest not found: ${versionPath}`,
     };
   }
@@ -250,7 +267,6 @@ async function checkCamoufoxHealth({
   // executable even though the release stores it in Resources.
   if (
     platform === 'darwin'
-    && resolvedPropertiesPath === propertiesPath
     && !fs.existsSync(macosPropertiesPath)
   ) {
     try {
@@ -280,7 +296,8 @@ async function checkCamoufoxHealth({
     ok: true,
     launchVerified: false,
     launchOwner: 'daemon.browser_service',
-    installPath: resolvedPropertiesPath,
+    cacheDir,
+    installPath: propertiesPath,
     versionPath,
     camoufoxVersion: installedVersion.version,
     camoufoxRelease: installedVersion.release,
