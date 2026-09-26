@@ -30,6 +30,7 @@ const BROWSER_COMMANDS = new Set([
   'set-user-agent',
   'set-viewport',
   'wait-dom-stable',
+  'autoscript',
 ]);
 
 export function isBrowserCommand(cmd) {

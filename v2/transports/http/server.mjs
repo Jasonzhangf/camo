@@ -64,7 +64,7 @@ export async function handleRequest({ text, contentType } = {}) {
       id: 'srv-err',
       kind: 'error',
       status: 400,
-      body: { code: projected.code, message: projected.message, details: projected.details },
+      body: projected,
     });
   }
   const inner = ROUTES.get(env.path);
@@ -79,7 +79,7 @@ export async function handleRequest({ text, contentType } = {}) {
       id: env.id,
       kind: 'error',
       status: 404,
-      body: { code: projected.code, message: projected.message, details: projected.details },
+      body: projected,
     });
   }
   try {
@@ -94,7 +94,7 @@ export async function handleRequest({ text, contentType } = {}) {
       id: env.id,
       kind: 'error',
       status: projected.code === 'E_INPUT_INVALID' ? 400 : 500,
-      body: { code: projected.code, message: projected.message, details: projected.details },
+      body: projected,
     });
   }
 }

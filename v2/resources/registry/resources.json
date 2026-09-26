@@ -465,12 +465,10 @@
       "truth_owner": "v2/services/autoscript",
       "truth_store": "memory_per_run",
       "read_paths": [
-        "v2/services/autoscript/runner.mjs::read",
-        "v2/services/autoscript/runner.mjs::status"
+        "v2/services/autoscript/compiled_runner.mjs::validateGraph"
       ],
       "write_paths": [
-        "v2/services/autoscript/runner.mjs::start",
-        "v2/services/autoscript/runner.mjs::stop"
+        "v2/services/autoscript/compiled_runner.mjs::runGraph"
       ],
       "indirect_paths": [
         "v2/services/progress_event/log.mjs::append"
@@ -490,7 +488,6 @@
       "truth_store": "code_registry",
       "truth_path": "v2/services/autoscript/actions/<actionId>.mjs",
       "read_paths": [
-        "v2/services/autoscript/runner.mjs::execute",
         "v2/contracts/operations/registry.json::validate"
       ],
       "write_paths": [

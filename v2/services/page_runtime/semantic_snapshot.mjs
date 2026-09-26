@@ -19,6 +19,14 @@ import { register as registerSnapshot } from './snapshot_registry.mjs';
 import { getTargetPageOrThrow, emit } from './operations/_page_helpers.mjs';
 
 const EXTRACTION = function extractSemanticSnapshot() {
+  // Probe the actual semantic surface, not merely the presence of evaluate().
+  // This adapter uses DOM+ARIA inference, not a native accessibility tree.
+  if (typeof document === 'undefined' || typeof window === 'undefined'
+    || typeof getComputedStyle !== 'function'
+    || typeof document.getElementById !== 'function'
+    || typeof document.documentElement?.querySelectorAll !== 'function'
+    || typeof document.documentElement?.getAttribute !== 'function'
+    || typeof document.documentElement?.getBoundingClientRect !== 'function') return null;
   const doc = document;
   const root = doc.documentElement;
   const viewport = {
@@ -129,8 +137,10 @@ const EXTRACTION = function extractSemanticSnapshot() {
   const stableLocator = (el, tag, role, name) => {
     if (el.id) return `#${cssEscape(el.id)}`;
     if (el.getAttribute && el.getAttribute('data-testid')) return `${tag}[data-testid="${cssEscape(el.getAttribute('data-testid'))}"]`;
-    if (name) return `${tag}[aria-label="${cssEscape(name)}"]`;
-    if (role && role !== 'generic') return `[role="${cssEscape(role)}"]`;
+    if (el.getAttribute && el.getAttribute('aria-label')) return `${tag}[aria-label="${cssEscape(el.getAttribute('aria-label'))}"]`;
+    // A bare role selector is not a stable, unique locator. Returning it would
+    // make a later action target the wrong node or fail as ambiguous; callers
+    // should resolve by snapshot ref or by the node's accessible text instead.
     return null;
   };
 
@@ -169,6 +179,7 @@ const EXTRACTION = function extractSemanticSnapshot() {
     });
   }
   return {
+    capabilities: { semantic: 'dom-aria', nativeAccessibility: false },
     title: doc.title || '',
     url: window.location.href || '',
     viewport,
@@ -218,10 +229,10 @@ export async function captureSemanticSnapshot({ profileId, target, rawDom = fals
       });
     }
 
-    if (!semantic || typeof semantic !== 'object' || !Array.isArray(semantic.nodes)) {
+    if (semantic?.capabilities?.semantic !== 'dom-aria' || !Array.isArray(semantic.nodes)) {
       throw new CamoError({
         code: 'E_SNAPSHOT_CAPABILITY_MISSING',
-        details: { profileId: pid, targetId: target.targetId, reason: 'semantic extraction returned no node tree' },
+        details: { profileId: pid, targetId: target.targetId, reason: 'page binding has no stable DOM+ARIA semantic surface' },
       });
     }
 
@@ -240,6 +251,7 @@ export async function captureSemanticSnapshot({ profileId, target, rawDom = fals
       title: semantic.title || '',
       viewport: semantic.viewport || { width: 0, height: 0 },
       window: semantic.window || {},
+      capabilities: semantic.capabilities,
       tree: { nodes },
     };
     registerSnapshot({ snapshot, ttlMs });
@@ -254,6 +266,7 @@ export async function captureSemanticSnapshot({ profileId, target, rawDom = fals
       title: snapshot.title,
       viewport: snapshot.viewport,
       window: snapshot.window,
+      capabilities: snapshot.capabilities,
       tree: snapshot.tree,
     };
     emit(pid, 'snapshot.done', { format: SNAPSHOT_FORMAT, snapshotId, nodes: nodes.length });

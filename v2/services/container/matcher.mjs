@@ -76,7 +76,7 @@ function normalizeSnapshot(snapshot) {
     const visible = c.visible !== false;
     const vp = c.viewport && typeof c.viewport === 'object' ? c.viewport : null;
     const bounds = c.bounds && typeof c.bounds === 'object' ? c.bounds : {};
-    let inViewport = true;
+    let inViewport = c.inViewport !== false;
     if (vp && Number.isFinite(vp.width) && Number.isFinite(vp.height)) {
       const x = Number(c.x ?? bounds.x ?? 0);
       const y = Number(c.y ?? bounds.y ?? 0);

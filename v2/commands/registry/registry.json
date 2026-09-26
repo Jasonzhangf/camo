@@ -1193,6 +1193,23 @@
         "positional": []
       },
       "docstring": "commands/docstrings/multi-open.md"
+    },
+    {
+      "cmd": "autoscript",
+      "module": "commands/builtins/autoscript.mjs",
+      "args_schema": {
+        "named": {
+          "graph": { "type": "string", "required": true, "doc": "validated DAGpipe graph JSON path" },
+          "runId": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "required": true, "doc": "execution run identifier" },
+          "profile": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "required": true, "doc": "browser profile identifier" },
+          "target": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+$", "required": true, "doc": "active browser target identifier" },
+          "actionJson": { "type": "string", "required": true, "doc": "action object encoded as JSON" }
+        },
+        "positional": [
+          { "name": "subcommand", "type": "string", "required": true, "doc": "autoscript operation (run)" }
+        ]
+      },
+      "docstring": "commands/docstrings/autoscript.md"
     }
   ]
 }

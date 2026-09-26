@@ -43,6 +43,7 @@ function makePage(label) {
         viewport: { width: 1280, height: 720 },
         window: { innerWidth: 1280, innerHeight: 720 },
         nodes: [],
+        capabilities: { semantic: 'dom-aria', nativeAccessibility: false },
       };
     },
   };

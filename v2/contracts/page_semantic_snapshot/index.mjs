@@ -67,7 +67,7 @@ export function normalizeSnapshot(snapshot) {
     throw new CamoError({ code: 'E_INPUT_INVALID', details: { field: 'snapshot.tree.nodes', reason: 'must be array' } });
   }
   for (const node of snapshot.tree.nodes) {
-    for (const key of ['ref', 'role', 'visible', 'inViewport', 'bounds', 'state', 'actions', 'stableLocator']) {
+    for (const key of ['ref', 'role', 'visible', 'inViewport', 'bounds', 'state', 'actions']) {
       if (node[key] === undefined || node[key] === null || node[key] === '') {
         throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: `snapshot.tree.nodes.ref=${node.ref}.${key}` } });
       }
@@ -88,7 +88,11 @@ export function stableLocatorFor(runtimeNode) {
   const label = runtimeNode.nameText && typeof runtimeNode.nameText === 'string'
     ? runtimeNode.nameText.slice(0, 80)
     : '';
-  if (label) return `${el.tagName.toLowerCase()}[aria-label="${cssEscape(label)}"]`;
+  const ariaLabel = el.getAttribute && el.getAttribute('aria-label');
+  if (ariaLabel) return `${el.tagName.toLowerCase()}[aria-label="${cssEscape(ariaLabel)}"]`;
+  if (label && el.getAttribute && el.getAttribute('aria-labelledby')) {
+    return `${el.tagName.toLowerCase()}[aria-labelledby="${cssEscape(el.getAttribute('aria-labelledby'))}"]`;
+  }
   return null;
 }
 

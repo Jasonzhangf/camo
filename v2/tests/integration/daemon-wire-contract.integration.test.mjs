@@ -250,6 +250,7 @@ test('snapshot projects the semantic JSON payload through the daemon wire by def
     url: 'https://example.com/',
     viewport: { width: 800, height: 600 },
     window: { innerWidth: 800, innerHeight: 600 },
+    capabilities: { semantic: 'dom-aria', nativeAccessibility: false },
     nodes: [
       {
         role: 'heading',
@@ -505,6 +506,7 @@ test('negative: multiple active targets require an explicit --target', async () 
       url: 'https://example.com/1',
       viewport: { width: 800, height: 600 },
       window: { innerWidth: 800, innerHeight: 600 },
+      capabilities: { semantic: 'dom-aria', nativeAccessibility: false },
       nodes: [{ role: 'heading', nameText: 'First', visible: true, inViewport: true, bounds: { x: 0, y: 0, width: 10, height: 20 }, state: {}, actions: [], stableLocator: 'h1' }],
     }),
   };
@@ -516,6 +518,7 @@ test('negative: multiple active targets require an explicit --target', async () 
       url: 'https://example.com/2',
       viewport: { width: 800, height: 600 },
       window: { innerWidth: 800, innerHeight: 600 },
+      capabilities: { semantic: 'dom-aria', nativeAccessibility: false },
       nodes: [{ role: 'heading', nameText: 'Second', visible: true, inViewport: true, bounds: { x: 0, y: 0, width: 10, height: 20 }, state: {}, actions: [], stableLocator: 'h2' }],
     }),
   };

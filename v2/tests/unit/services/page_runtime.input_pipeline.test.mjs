@@ -106,6 +106,7 @@ test('negative: async timeout aborts the pipeline and emits an abort event', asy
 
   await assert.rejects(pending, (error) => {
     assert.equal(error.code, 'E_IO_TIMEOUT');
+    assert.equal(error.terminal, 'operation_timeout');
     assert.equal(error.details.profileId, profile);
     return true;
   });

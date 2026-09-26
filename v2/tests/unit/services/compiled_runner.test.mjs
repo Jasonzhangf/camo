@@ -5,7 +5,28 @@ import os from 'node:os';
 import path from 'node:path';
 import { runGraph, __resetForTest } from '../../../services/autoscript/compiled_runner.mjs';
 import * as inboundPipeline from '../../../services/page_runtime/input_pipeline.mjs';
+import * as snapshotRegistry from '../../../services/page_runtime/snapshot_registry.mjs';
 import * as progressLog from '../../../services/progress_event/log.mjs';
+import { CamoError, toWire } from '../../../contracts/error_envelope/projector.mjs';
+
+test('risk checkpoint rejection stops execution with a typed terminal', async () => {
+  const graphPath = writeGraph(makeGraph({ nodes: [makeNode({
+    id: 'risk', operator: 'test.risk', inputs: ['request'],
+    output: { id: 'out', schema: 'Object' }, config: baseConfig({ riskCheckpoint: true }),
+  })] }));
+  let called = false;
+  try {
+    for (const riskCheckpoint of [async () => false, async () => { throw new Error('blocked'); }]) {
+      await assert.rejects(runGraph({ graphPath, profileId: 'risk',
+        options: { riskCheckpoint }, handlers: { 'test.risk': async () => { called = true; } },
+      }), error => error instanceof CamoError && toWire(error).terminal === 'risk_blocked');
+    }
+    await assert.rejects(runGraph({ graphPath, profileId: 'risk',
+      options: { riskCheckpoint: async () => { throw new CamoError({ code: 'E_LOGIN_INVALID' }); } },
+    }), error => toWire(error).terminal === 'login_invalid');
+    assert.equal(called, false);
+  } finally { fs.rmSync(path.dirname(graphPath), { recursive: true }); }
+});
 
 function writeGraph(graph) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'camo-compiled-runner-'));
@@ -107,10 +128,12 @@ test('negative: invalid graph returns E_GRAPH_INVALID before any handler runs', 
   });
   const graphPath = writeGraph(graph);
   let handlerCalled = false;
+  let beforeExecutionCalled = false;
   await assert.rejects(
     runGraph({
       graphPath,
       profileId: 'invalid-cycle',
+      options: { beforeExecution: async () => { beforeExecutionCalled = true; } },
       handlers: {
         'must.not.run': async () => { handlerCalled = true; return {}; },
       },
@@ -121,6 +144,7 @@ test('negative: invalid graph returns E_GRAPH_INVALID before any handler runs', 
     },
   );
   assert.equal(handlerCalled, false);
+  assert.equal(beforeExecutionCalled, false);
 });
 
 test('positive: valid graph executes nodes in declared edge order', async () => {
@@ -294,6 +318,48 @@ test('negative: execute_input_pipeline rejects a validated node with no mappable
       return true;
     },
   );
+});
+
+test('negative: autoscript rejects hidden or offscreen targets for refs and semantic queries', async () => {
+  const profileId = 'autoscript-visibility';
+  const target = { ...fakePageTarget(), profileId };
+  const snapshot = {
+    profileId,
+    targetId: target.targetId,
+    documentId: 'doc-autoscript-visibility',
+    url: 'https://example.test/',
+    tree: { nodes: [{
+      ref: 'ref:snap-autoscript-visibility:n1',
+      role: 'button',
+      nameText: 'Hidden action',
+      visible: true,
+      inViewport: false,
+      stableLocator: '#hidden-action',
+    }] },
+  };
+  snapshotRegistry.register({ snapshot: { ...snapshot, snapshotId: 'snap-autoscript-visibility' } });
+  const graphPath = writeGraph(makeGraph({
+    nodes: [
+      makeNode({ id: 'context', operator: 'test.page_context', inputs: ['request'], output: { id: 'page_context', schema: 'Object' } }),
+      makeNode({ id: 'snapshot', operator: 'test.semantic_snapshot', inputs: ['page_context'], output: { id: 'semantic_snapshot', schema: 'Object' } }),
+      makeNode({ id: 'validate', operator: 'camo.container.validate', inputs: ['semantic_snapshot', 'page_context'], output: { id: 'validated_target', schema: 'Object' } }),
+    ],
+    edges: [
+      { from: 'context', to: 'snapshot', arc_id: 'page_context' },
+      { from: 'context', to: 'validate', arc_id: 'page_context' },
+      { from: 'snapshot', to: 'validate', arc_id: 'semantic_snapshot' },
+    ],
+    outputs: ['validated_target'],
+  }));
+  const handlers = {
+    'test.page_context': async () => target,
+    'test.semantic_snapshot': async () => snapshot,
+  };
+  const run = (action) => runGraph({ graphPath, profileId, request: { action }, handlers });
+
+  await assert.rejects(run({ kind: 'click', ref: 'ref:snap-autoscript-visibility:n1' }), (error) => error.code === 'E_STATE_INVALID');
+  await assert.rejects(run({ kind: 'click', role: 'button' }), (error) => error.code === 'E_STATE_NOT_FOUND');
+  snapshotRegistry.__resetForTest();
 });
 
 test('negative: graph node policy hook missing throws E_NODE_POLICY_MISSING before handler', async () => {

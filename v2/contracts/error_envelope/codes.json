@@ -52,6 +52,7 @@
     },
     {
       "code": "E_IO_TIMEOUT",
+      "terminal": "operation_timeout",
       "category": "io",
       "default_user_message": "Operation timed out."
     },
@@ -317,8 +318,21 @@
     },
     {
       "code": "E_GRAPH_INVALID",
+      "terminal": "graph_invalid",
       "category": "input",
       "default_user_message": "Graph validation failed."
+    },
+    {
+      "code": "E_RISK_BLOCKED",
+      "terminal": "risk_blocked",
+      "category": "state",
+      "default_user_message": "Risk checkpoint blocked execution."
+    },
+    {
+      "code": "E_LOGIN_INVALID",
+      "terminal": "login_invalid",
+      "category": "state",
+      "default_user_message": "Login is invalid."
     },
     {
       "code": "E_NODE_POLICY_MISSING",

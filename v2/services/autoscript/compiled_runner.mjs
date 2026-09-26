@@ -134,7 +134,20 @@ async function applyNodePolicy(hook, { node, options, input, request, profileId,
       },
     });
   }
-  await fn({ node, input, request, profileId, output });
+  try {
+    const result = await fn({ node, input, request, profileId, output });
+    if (hook === 'riskCheckpoint' && result === false) {
+      throw new CamoError({ code: 'E_RISK_BLOCKED', details: { node: node.id, hook } });
+    }
+  } catch (cause) {
+    // Preserve already classified failures (including caller-owned login checks).
+    if (hook !== 'riskCheckpoint' || cause instanceof CamoError && cause.terminal) throw cause;
+    throw new CamoError({
+      code: 'E_RISK_BLOCKED',
+      details: { node: node.id, hook, reason: cause?.message || String(cause) },
+      cause,
+    });
+  }
 }
 
 async function defaultStartSession({ request, profileId }) {
@@ -155,17 +168,33 @@ async function defaultResolvePageContext({ input }) {
 async function defaultCaptureSnapshot({ profileId, input }) {
   const snapshot = await import('../page_runtime/input_pipeline.mjs');
   const pageContext = input.page_context;
-  return snapshot.snapshot({ profileId, target: pageContext, rawDom: false });
+  const result = await snapshot.snapshot({ profileId, target: pageContext, rawDom: false });
+  // The node's single output ARC must carry everything later nodes need.
+  // `semantic_snapshot` therefore keeps the resolved target handle alongside
+  // the semantic tree so `validate_visibility_role` can stay single-input.
+  return { ...result, target: pageContext };
 }
 
 async function defaultValidateVisibilityRole({ input, request, node }) {
   const semantic = input.semantic_snapshot;
-  const target = input.page_context;
+  const target = semantic?.target || input.page_context;
+  if (!target?.page) {
+    throw new CamoError({
+      code: 'E_GRAPH_INVALID',
+      details: { graphNode: node?.id, reason: 'semantic_snapshot ARC must carry the resolved browser target' },
+    });
+  }
   const action = request?.action || {};
   const nodeCfg = node.config || {};
   const ref = action.ref || nodeCfg.ref;
   if (ref) {
     const hit = lookupNodeRef(ref, { profileId: semantic.profileId, documentId: semantic.documentId });
+    if (hit.node.visible !== true || hit.node.inViewport !== true) {
+      throw new CamoError({
+        code: 'E_STATE_INVALID',
+        details: { resource: 'semantic_node', ref, reason: 'target must be visible and in the viewport' },
+      });
+    }
     return { ...semantic, target, validated: hit.node };
   }
   const query = {
@@ -177,7 +206,8 @@ async function defaultValidateVisibilityRole({ input, request, node }) {
     throw new CamoError({ code: 'E_SNAPSHOT_REF_INVALID', details: { reason: 'validate_visibility_role requires ref or role/text/id query' } });
   }
   const matcher = await import('../container/matcher.mjs');
-  const match = matcher.match(query, semantic.tree.nodes);
+  const visibleNodes = semantic.tree.nodes.filter((candidate) => candidate.visible === true && candidate.inViewport === true);
+  const match = matcher.match(query, visibleNodes);
   const primary = match?.primary;
   if (!primary) {
     throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'semantic_node', query: match?.query } });
@@ -285,6 +315,7 @@ export async function runGraph({ graphPath, profileId, request = {}, handlers = 
   const { graph, plan } = compileGraph(graphPath);
   const activeHandlers = { ...defaultHandlers, ...handlers };
   return runSerial(pid, async () => {
+    await options.beforeExecution?.({ graph, plan, profileId: pid, request });
     const arcs = new Map();
     for (const input of graph.inputs || []) arcs.set(input.id, request);
     for (const nodeId of plan) {

@@ -113,6 +113,18 @@ async function releaseProfileBrowser(profile, forceClose) {
 // --- Command dispatch ---
 const ephemeralAllocations = new Map();   // requested alias -> allocated profile id
 const inFlightProfiles = new Map();
+const profileCommandQueues = new Map();
+
+function enqueueProfileCommand(profile, operation) {
+  const previous = profileCommandQueues.get(profile) || Promise.resolve();
+  const next = previous.then(
+    () => operation(),
+    () => operation(),
+  );
+  profileCommandQueues.set(profile, next.catch(() => {}));
+  return next;
+}
+
 async function handleCommand(env) {
   const { cmd, args = {} } = env.payload || {};
   const profile = args.profile || opts.profile;
@@ -145,52 +157,59 @@ async function handleCommand(env) {
   emit('command.start', { cmd, args, profile, ephemeral: isEphemeral });
   const releaseBrowser = (forceClose) => releaseProfileBrowser(profile, forceClose);
 
-  try {
+  const runCommand = () => {
     let result = null;
     let commandError = null;
-    try {
-      const commandResult = await dispatchCommand(cmd, args, {
-        profile,
-        opts,
-        ensureBrowser,
-        ephemeralAllocations,
-      });
-
-      result = { kind: 'result', payload: { cmd, ...commandResult } };
-    } catch (cause) {
-      commandError = cause;
-    }
-
-    if (isEphemeral && isBrowserCommand(cmd)) {
+    return (async () => {
       try {
-        await releaseBrowser(true);
+        const commandResult = await dispatchCommand(cmd, args, {
+          profile,
+          opts,
+          ensureBrowser,
+          ephemeralAllocations,
+        });
+        result = { kind: 'result', payload: { cmd, ...commandResult } };
       } catch (cause) {
-        commandError ||= cause;
-        result = null;
+        commandError = cause;
       }
-    }
 
-    if (commandError) {
-      const proj = commandError instanceof CamoError ? commandError : new CamoError({
-        code: 'E_INTERNAL_UNEXPECTED',
-        message: commandError?.message || String(commandError),
-        cause: commandError,
-      });
-      const projected = projectError(proj);
-      emit('command.error', { cmd, profile, error: projected });
-      return { kind: 'error', payload: projected };
-    }
-
-    if (profile && cmd !== 'daemon') {
-      try {
-        await touchSession(profile);
-      } catch (cause) {
-        emit('command.activity_touch_error', { cmd, profile, error: cause?.message || String(cause) });
+      if (isEphemeral && isBrowserCommand(cmd)) {
+        try {
+          await releaseBrowser(true);
+        } catch (cause) {
+          commandError ||= cause;
+          result = null;
+        }
       }
-    }
 
-    emit('command.done', { cmd, profile, durationMs: Date.now() - startedAt });
-    return result;
+      if (commandError) {
+        const proj = commandError instanceof CamoError ? commandError : new CamoError({
+          code: 'E_INTERNAL_UNEXPECTED',
+          message: commandError?.message || String(commandError),
+          cause: commandError,
+        });
+        const projected = projectError(proj);
+        emit('command.error', { cmd, profile, error: projected });
+        return { kind: 'error', payload: projected };
+      }
+
+      if (profile && cmd !== 'daemon') {
+        try {
+          await touchSession(profile);
+        } catch (cause) {
+          emit('command.activity_touch_error', { cmd, profile, error: cause?.message || String(cause) });
+        }
+      }
+
+      emit('command.done', { cmd, profile, durationMs: Date.now() - startedAt });
+      return result;
+    })();
+  };
+
+  const queued = profile ? enqueueProfileCommand(profile, runCommand) : runCommand();
+
+  try {
+    return await queued;
   } finally {
     if (profile) {
       const remaining = (inFlightProfiles.get(profile) || 1) - 1;

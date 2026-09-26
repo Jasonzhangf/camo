@@ -1,17 +1,30 @@
-# services-autoscript (design)
+# Autoscript runtime
 
-Module owner placeholder. Real implementation will live in this directory.
-See `v2/resources/registry/modules.json` for the canonical id.
+`runner.mjs` exports the graph-consuming API owned by `compiled_runner.mjs`.
+`runGraph` validates the SESE graph with `dagpipe graph validate` before any
+page-layer operation. It owns execution order and per-profile serialization;
+there is no separate legacy state machine or action-provider registry.
 
-The production execution path is `compiled_runner.mjs`: it validates a SESE
-camo graph with `dagpipe graph validate` before any page-layer work. Invalid
-graphs return `E_GRAPH_INVALID` and never reach handlers. `runner.mjs` keeps
-legacy unit surface for the existing transition tests, while `runGraph` is the
-graph-consuming entry point used by current consumers.
+Failure terminals are expressed by the runtime error envelope (`code`,
+`terminal`, `message`, optional `details`), never by graph nodes or output ARCs.
+The graph retains exactly one output ARC for successful results.
 
-Layer: see modules.json.
+| Error code | Runtime terminal | Trigger |
+| --- | --- | --- |
+| `E_GRAPH_INVALID` | `graph_invalid` | Graph validation/compilation fails before execution |
+| `E_RISK_BLOCKED` | `risk_blocked` | Risk checkpoint returns `false` or throws an unclassified failure |
+| `E_IO_TIMEOUT` | `operation_timeout` | Input pipeline operation times out |
+| `E_LOGIN_INVALID` | `login_invalid` | Caller-owned login validation throws this typed error |
 
-Skeletons to land here before this module becomes active:
-- `manager.mjs` (or equivalent) with single owner of the resource(s) listed in resources.json.
-- One thin `index.mjs` re-exporting public surface.
-- Tests under `v2/tests/unit/<path>/`.
+Policy hooks are required when enabled in node config. A missing hook returns
+`E_NODE_POLICY_MISSING`. Risk hooks may return normally to allow execution;
+already typed terminal errors are preserved, including `E_LOGIN_INVALID`.
+Login/platform detection belongs to the caller, not camo business logic.
+Errors reject `runGraph`; no subsequent node executes and no success result is
+produced. `CamoError` and its wire projection retain the same terminal.
+
+Semantic snapshots probe DOM+ARIA APIs inside the page binding and report
+`capabilities: { semantic: 'dom-aria', nativeAccessibility: false }`.
+This is inferred semantics, not Ego Lite's native accessibility snapshot.
+An absent/unstable semantic surface returns `E_SNAPSHOT_CAPABILITY_MISSING`;
+raw HTML is available only through explicit `rawDom`, with no screenshot fallback.

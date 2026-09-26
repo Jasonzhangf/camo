@@ -76,7 +76,7 @@ export async function handleFrame({ text, send } = {}) {
     const err = buildEnvelope({
       id: 'srv-err',
       kind: 'error',
-      payload: { code: projected.code, message: projected.message, details: projected.details },
+      payload: projected,
     });
     send(err);
     return { ok: false, sent: [err] };
@@ -89,7 +89,7 @@ export async function handleFrame({ text, send } = {}) {
     const err = buildEnvelope({
       id: env.id,
       kind: 'error',
-      payload: { code: projected.code, message: projected.message, details: projected.details },
+      payload: projected,
     });
     send(err);
     return { ok: false, sent: [err] };
@@ -108,7 +108,7 @@ export async function handleFrame({ text, send } = {}) {
     const err = buildEnvelope({
       id: env.id,
       kind: 'error',
-      payload: { code: projected.code, message: projected.message, details: projected.details },
+      payload: projected,
     });
     send(err);
     return { ok: false, sent: [err] };
