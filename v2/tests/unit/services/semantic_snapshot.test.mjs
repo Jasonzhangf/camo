@@ -97,6 +97,27 @@ test('stableLocator escapes CSS metacharacters in DOM ids', async () => {
   assert.equal(result.tree.nodes[0].stableLocator, '#\\31 \\.a\\:b\\[c\\]\\ d');
 });
 
+test('stableLocator escapes a leading hyphen before a digit', async () => {
+  const element = {
+    tagName: 'DIV',
+    id: '-1',
+    textContent: 'Negative',
+    getAttribute: () => null,
+    getBoundingClientRect: () => ({ x: 5, y: 6, width: 20, height: 10, left: 5, top: 6, right: 25, bottom: 16 }),
+  };
+  const page = pageFor({
+    document: {
+      title: 'Negative id',
+      getElementById: () => null,
+      documentElement: { ...element, querySelectorAll: () => [element] },
+    },
+    window: { innerWidth: 100, innerHeight: 100, location: { href: 'about:blank' } },
+    getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
+  });
+  const result = await capture(page);
+  assert.equal(result.tree.nodes[0].stableLocator, '#\\2d \\31 ');
+});
+
 test('stableLocator escapes data-testid and aria-label attribute values', async () => {
   const byTestId = {
     tagName: 'BUTTON',

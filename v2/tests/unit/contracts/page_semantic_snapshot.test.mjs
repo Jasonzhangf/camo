@@ -13,6 +13,10 @@ test('stableLocatorFor escapes CSS metacharacters in DOM ids', () => {
   assert.equal(stableLocatorFor(runtimeNode), '#\\31 \\.a\\:b\\[c\\]\\ d');
 });
 
+test('stableLocatorFor escapes a leading hyphen before a digit', () => {
+  assert.equal(stableLocatorFor({ el: { tagName: 'DIV', id: '-1', getAttribute: () => null } }), '#\\2d \\31 ');
+});
+
 test('stableLocatorFor escapes data-testid and aria-label attribute values', () => {
   assert.equal(stableLocatorFor({
     el: {

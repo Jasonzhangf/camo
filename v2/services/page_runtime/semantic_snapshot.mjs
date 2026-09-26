@@ -145,12 +145,12 @@ const EXTRACTION = function extractSemanticSnapshot() {
       if ((codeUnit >= 0x0001 && codeUnit <= 0x001F)
         || (codeUnit >= 0x007F && codeUnit <= 0x009F)
         || (index === 0 && codeUnit >= 0x0030 && codeUnit <= 0x0039)
-        || (index === 1 && codeUnit >= 0x0030 && codeUnit <= 0x0039 && firstCodeUnit >= 0x0030 && firstCodeUnit <= 0x0039)) {
+        || (index === 1 && codeUnit >= 0x0030 && codeUnit <= 0x0039 && firstCodeUnit === 0x002D)) {
         result += `\\${codeUnit.toString(16)} `;
         continue;
       }
-      if (index === 0 && codeUnit === 0x002D && string.length === 1) {
-        result += '\\-';
+      if (index === 0 && codeUnit === 0x002D && (string.length === 1 || (string.charCodeAt(1) >= 0x0030 && string.charCodeAt(1) <= 0x0039))) {
+        result += `\\${codeUnit.toString(16)} `;
         continue;
       }
       if (codeUnit >= 0x0080 || codeUnit === 0x002D || codeUnit === 0x005F
