@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runGraph, __resetForTest } from '../../../services/autoscript/compiled_runner.mjs';
+import { runGraph, compileGraph, __resetForTest } from '../../../services/autoscript/compiled_runner.mjs';
 import * as inboundPipeline from '../../../services/page_runtime/input_pipeline.mjs';
 import * as snapshotRegistry from '../../../services/page_runtime/snapshot_registry.mjs';
 import * as progressLog from '../../../services/progress_event/log.mjs';
@@ -145,6 +145,22 @@ test('negative: invalid graph returns E_GRAPH_INVALID before any handler runs', 
   );
   assert.equal(handlerCalled, false);
   assert.equal(beforeExecutionCalled, false);
+});
+
+test('negative: node without output.id is rejected as E_GRAPH_INVALID', async () => {
+  __resetForTest();
+  const graphPath = writeGraph(makeGraph({
+    nodes: [
+      makeNode({ id: 'no-output', operator: 'must.not.run', inputs: ['request'], output: {} }),
+    ],
+  }));
+  assert.throws(
+    () => compileGraph(graphPath),
+    (err) => err?.code === 'E_GRAPH_INVALID'
+      && err?.details?.node === 'no-output'
+      && err?.details?.reason?.includes('node.output.id'),
+  );
+  fs.rmSync(path.dirname(graphPath), { recursive: true });
 });
 
 test('positive: valid graph executes nodes in declared edge order', async () => {

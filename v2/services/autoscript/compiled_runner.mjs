@@ -55,13 +55,16 @@ export function validateGraph(graphPath) {
   }
 }
 
-function compileGraph(graphPath) {
+export function compileGraph(graphPath) {
   const graph = readGraphFile(graphPath);
   const ids = new Set();
   const outputOwners = new Map();
   for (const node of graph.nodes || []) {
     if (!node.id || !node.operator || !node.operator_version) {
       throw new CamoError({ code: 'E_GRAPH_INVALID', details: { graphPath, node: node?.id, reason: 'node missing id/operator/operator_version' } });
+    }
+    if (!node.output || typeof node.output.id !== 'string' || node.output.id.length === 0) {
+      throw new CamoError({ code: 'E_GRAPH_INVALID', details: { graphPath, node: node.id, reason: 'node.output.id must be a non-empty string' } });
     }
     if (ids.has(node.id)) {
       throw new CamoError({ code: 'E_GRAPH_INVALID', details: { graphPath, node: node.id, reason: 'duplicate node id' } });

@@ -76,6 +76,61 @@ test('aria-labelledby resolves each whitespace-separated label id', async () => 
   assert.equal(result.tree.nodes[0].stableLocator, '#labelled-button');
 });
 
+test('stableLocator escapes CSS metacharacters in DOM ids', async () => {
+  const element = {
+    tagName: 'BUTTON',
+    id: '1.a:b[c] d',
+    textContent: 'Go',
+    getAttribute: () => null,
+    getBoundingClientRect: () => ({ x: 5, y: 6, width: 20, height: 10, left: 5, top: 6, right: 25, bottom: 16 }),
+  };
+  const page = pageFor({
+    document: {
+      title: 'Escaped ids',
+      getElementById: () => null,
+      documentElement: { ...element, querySelectorAll: () => [element] },
+    },
+    window: { innerWidth: 100, innerHeight: 100, location: { href: 'about:blank' } },
+    getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
+  });
+  const result = await capture(page);
+  assert.equal(result.tree.nodes[0].stableLocator, '#\\31 \\.a\\:b\\[c\\]\\ d');
+});
+
+test('stableLocator escapes data-testid and aria-label attribute values', async () => {
+  const byTestId = {
+    tagName: 'BUTTON',
+    textContent: 'By test id',
+    getAttribute: (name) => (name === 'data-testid' ? 'a"b\\c' : null),
+    getBoundingClientRect: () => ({ x: 7, y: 8, width: 20, height: 10, left: 7, top: 8, right: 27, bottom: 18 }),
+  };
+  const byAriaLabel = {
+    tagName: 'BUTTON',
+    textContent: 'By aria label',
+    getAttribute: (name) => (name === 'aria-label' ? 'say "hi" \\' : null),
+    getBoundingClientRect: () => ({ x: 9, y: 10, width: 20, height: 10, left: 9, top: 10, right: 29, bottom: 20 }),
+  };
+  const base = {
+    document: {
+      title: 'Escaped attributes',
+      getElementById: () => null,
+      documentElement: { querySelectorAll: () => [] },
+    },
+    window: { innerWidth: 100, innerHeight: 100, location: { href: 'about:blank' } },
+    getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
+  };
+  const testIdResult = await capture(pageFor({
+    ...base,
+    document: { ...base.document, documentElement: { ...base.document.documentElement, ...byTestId, querySelectorAll: () => [byTestId] } },
+  }));
+  assert.equal(testIdResult.tree.nodes[0].stableLocator, 'button[data-testid="a\\"b\\\\c"]');
+  const ariaLabelResult = await capture(pageFor({
+    ...base,
+    document: { ...base.document, documentElement: { ...base.document.documentElement, ...byAriaLabel, querySelectorAll: () => [byAriaLabel] } },
+  }));
+  assert.equal(ariaLabelResult.tree.nodes[0].stableLocator, 'button[aria-label="say\\ \\"hi\\"\\ \\\\"]');
+});
+
 test('explicit raw DOM capture does not require semantic APIs', async () => {
   const result = await capture({ url: () => 'about:blank', content: async () => '<html></html>' }, true);
   assert.equal(result.rawDom, true);
