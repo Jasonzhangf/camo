@@ -189,6 +189,7 @@ async function defaultValidateVisibilityRole({ input, request, node }) {
   const ref = action.ref || nodeCfg.ref;
   if (ref) {
     const hit = lookupNodeRef(ref, { profileId: semantic.profileId, documentId: semantic.documentId });
+    assertUniqueStableLocator(hit.node, semantic.tree?.nodes);
     if (hit.node.visible !== true || hit.node.inViewport !== true) {
       throw new CamoError({
         code: 'E_STATE_INVALID',
@@ -212,13 +213,34 @@ async function defaultValidateVisibilityRole({ input, request, node }) {
   if (!primary) {
     throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'semantic_node', query: match?.query } });
   }
+  assertUniqueStableLocator(primary, semantic.tree?.nodes);
   return { ...semantic, target, validated: primary };
 }
 
-function validatedLocator(validated) {
+function assertUniqueStableLocator(validated, nodes) {
+  if (!validated || typeof validated !== 'object') return;
+  if (typeof validated.stableLocator !== 'string' || validated.stableLocator.length === 0) return;
+  if (!Array.isArray(nodes) || nodes.length === 0) return;
+  const sameLocatorCount = nodes.filter((candidate) => typeof candidate?.stableLocator === 'string'
+    && candidate.stableLocator === validated.stableLocator).length;
+  if (sameLocatorCount > 1) {
+    throw new CamoError({
+      code: 'E_SNAPSHOT_AMBIGUOUS',
+      details: {
+        resource: 'semantic_node',
+        ref: validated.ref || null,
+        stableLocator: validated.stableLocator,
+        reason: 'stableLocator matches multiple snapshot nodes; cannot turn it into a unique action target',
+      },
+    });
+  }
+}
+
+function validatedLocator(validated, semanticNodes) {
   if (!validated || typeof validated !== 'object') {
     throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'validated_target.validated', reason: 'execute_input_pipeline requires a validated target node' } });
   }
+  assertUniqueStableLocator(validated, semanticNodes);
   if (typeof validated.stableLocator === 'string' && validated.stableLocator.length > 0) {
     return { selector: validated.stableLocator };
   }
@@ -254,18 +276,19 @@ async function defaultExecuteInputPipeline({ profileId, input, request }) {
   }
   const action = { ...request?.action };
   const target = input.validated_target?.target || input.page_context;
+  const semanticNodes = input.validated_target?.tree?.nodes;
   if (!action || typeof action.kind !== 'string') {
     throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'action.kind' } });
   }
   const pipeline = await import('../page_runtime/input_pipeline.mjs');
   const kind = action.kind.toLowerCase();
   if (kind === 'click') {
-    const locator = validatedLocator(validated);
+    const locator = validatedLocator(validated, semanticNodes);
     const out = await pipeline.click({ target, profileId, ...locatorParams(action.params, locator) });
     return { ok: true, kind, result: out };
   }
   if (kind === 'type') {
-    const locator = validatedLocator(validated);
+    const locator = validatedLocator(validated, semanticNodes);
     const params = { ...(action.params || {}) };
     const text = String(params.text || '');
     if (!text) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'text' } });

@@ -274,6 +274,96 @@ test('positive: execute_input_pipeline derives action locator from validated_tar
   assert.deepEqual(target.calls, [{ selector: '#validated' }]);
 });
 
+test('negative: duplicate stableLocator from semantic query is rejected as ambiguous', async () => {
+  __resetForTest();
+  inboundPipeline.__resetForTest();
+  const profileId = 'autoscript-ambiguous-query';
+  const target = { ...fakePageTarget(), profileId };
+  const snapshot = {
+    profileId,
+    targetId: target.targetId,
+    documentId: 'doc-ambiguous-query',
+    url: 'https://example.test/',
+    tree: { nodes: [
+      { ref: 'ref:snap-ambiguous-query:n1', role: 'button', nameText: 'First', visible: true, inViewport: true, stableLocator: 'button[aria-label="Same"]' },
+      { ref: 'ref:snap-ambiguous-query:n2', role: 'button', nameText: 'Second', visible: true, inViewport: true, stableLocator: 'button[aria-label="Same"]' },
+    ] },
+  };
+  const graphPath = writeGraph(makeGraph({
+    nodes: [
+      makeNode({ id: 'context', operator: 'test.page_context', inputs: ['request'], output: { id: 'page_context', schema: 'Object' } }),
+      makeNode({ id: 'snapshot', operator: 'test.semantic_snapshot', inputs: ['page_context'], output: { id: 'semantic_snapshot', schema: 'Object' } }),
+      makeNode({ id: 'validate', operator: 'camo.container.validate', inputs: ['semantic_snapshot', 'page_context'], output: { id: 'validated_target', schema: 'Object' } }),
+    ],
+    edges: [
+      { from: 'context', to: 'snapshot', arc_id: 'page_context' },
+      { from: 'context', to: 'validate', arc_id: 'page_context' },
+      { from: 'snapshot', to: 'validate', arc_id: 'semantic_snapshot' },
+    ],
+    outputs: ['validated_target'],
+  }));
+  const handlers = {
+    'test.page_context': async () => target,
+    'test.semantic_snapshot': async () => snapshot,
+  };
+  await assert.rejects(
+    runGraph({ graphPath, profileId, request: { action: { kind: 'click', role: 'button' } }, handlers }),
+    (error) => error.code === 'E_SNAPSHOT_AMBIGUOUS'
+      && error.details?.stableLocator === 'button[aria-label="Same"]'
+      && error.details?.reason?.includes('matches multiple snapshot nodes'),
+  );
+});
+
+test('negative: execute_input_pipeline rejects duplicate stableLocator before protocol input', async () => {
+  __resetForTest();
+  inboundPipeline.__resetForTest();
+  const graph = makeGraph({
+    nodes: [
+      makeNode({
+        id: 'validate',
+        operator: 'test.validate',
+        inputs: ['request'],
+        output: { id: 'validated_target', schema: 'Object' },
+      }),
+      makeNode({
+        id: 'action',
+        operator: 'camo.input.action',
+        version: '1',
+        inputs: ['validated_target'],
+        output: { id: 'action_result', schema: 'Object' },
+      }),
+    ],
+    edges: [
+      { from: 'validate', to: 'action', arc_id: 'validated_target' },
+    ],
+    outputs: ['action_result'],
+  });
+  const graphPath = writeGraph(graph);
+  const target = fakePageTarget();
+  const duplicateNodes = [
+    { ref: 'ref:snap-dup-action:n1', role: 'button', nameText: 'First', stableLocator: 'button[aria-label="Same"]', visible: true, inViewport: true },
+    { ref: 'ref:snap-dup-action:n2', role: 'button', nameText: 'Second', stableLocator: 'button[aria-label="Same"]', visible: true, inViewport: true },
+  ];
+  await assert.rejects(
+    runGraph({
+      graphPath,
+      profileId: 'validated-ambiguous',
+      request: { action: { kind: 'click' } },
+      handlers: {
+        'test.validate': async () => ({
+          target,
+          tree: { nodes: duplicateNodes },
+          validated: { ref: 'ref:snap-dup-action:n1', role: 'button', nameText: 'First', stableLocator: 'button[aria-label="Same"]' },
+        }),
+      },
+    }),
+    (error) => error.code === 'E_SNAPSHOT_AMBIGUOUS'
+      && error.details?.ref === 'ref:snap-dup-action:n1'
+      && error.details?.stableLocator === 'button[aria-label="Same"]',
+  );
+  assert.deepEqual(target.calls, []);
+});
+
 test('negative: execute_input_pipeline rejects a validated node with no mappable locator', async () => {
   __resetForTest();
   inboundPipeline.__resetForTest();

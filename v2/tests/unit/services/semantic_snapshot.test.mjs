@@ -51,6 +51,31 @@ test('available DOM+ARIA semantics are explicitly distinguished from native a11y
   assert.equal(result.tree.nodes[0].inViewport, true);
 });
 
+test('aria-labelledby resolves each whitespace-separated label id', async () => {
+  const labelA = { textContent: 'First label' };
+  const labelB = { textContent: 'Second label' };
+  const element = {
+    tagName: 'BUTTON',
+    id: 'labelled-button',
+    textContent: '',
+    getAttribute: name => name === 'aria-labelledby' ? 'label-a label-b' : null,
+    getBoundingClientRect: () => ({ x: 3, y: 4, width: 30, height: 12, left: 3, top: 4, right: 33, bottom: 16 }),
+  };
+  const page = pageFor({
+    document: {
+      title: 'Labels',
+      getElementById: (id) => (id === 'label-a' ? labelA : id === 'label-b' ? labelB : null),
+      documentElement: { ...element, querySelectorAll: () => [element] },
+    },
+    window: { innerWidth: 100, innerHeight: 100, location: { href: 'about:blank' } },
+    getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
+  });
+  const result = await capture(page);
+  assert.equal(result.tree.nodes[0].name, 'First label Second label');
+  assert.equal(result.tree.nodes[0].id, 'labelled-button');
+  assert.equal(result.tree.nodes[0].stableLocator, '#labelled-button');
+});
+
 test('explicit raw DOM capture does not require semantic APIs', async () => {
   const result = await capture({ url: () => 'about:blank', content: async () => '<html></html>' }, true);
   assert.equal(result.rawDom, true);

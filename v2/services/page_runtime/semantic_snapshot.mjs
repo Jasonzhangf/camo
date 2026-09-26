@@ -92,7 +92,7 @@ const EXTRACTION = function extractSemanticSnapshot() {
     const label = el.getAttribute && el.getAttribute('aria-label');
     if (label && String(label).trim()) return String(label).trim().slice(0, 160);
     if (el.getAttribute && el.getAttribute('aria-labelledby')) {
-      const ids = el.getAttribute('aria-labelledby').split(/\\s+/);
+      const ids = el.getAttribute('aria-labelledby').split(/\s+/);
       const parts = [];
       for (const id of ids) {
         const node = doc.getElementById(id);
@@ -162,6 +162,7 @@ const EXTRACTION = function extractSemanticSnapshot() {
     if (seen.has(key)) continue;
     seen.add(key);
     nodes.push({
+      id: el.id || null,
       ref: null,
       role,
       nameText,

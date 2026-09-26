@@ -84,13 +84,18 @@ function normalizeSnapshot(snapshot) {
       const h = Number(c.height ?? bounds.height ?? 0);
       inViewport = x + w > 0 && y + h > 0 && x < vp.width && y < vp.height;
     }
+    const domId = c.id == null ? null : String(c.id);
     return {
-      id: c.id == null ? (c.ref == null ? null : String(c.ref)) : String(c.id),
+      id: domId,
+      ref: c.ref == null ? null : String(c.ref),
+      stableLocator: c.stableLocator == null ? null : String(c.stableLocator),
+      // `id` and `matchId` are DOM ids when the snapshot node exposes one.
+      // Snapshot refs stay a distinct control identity and are not silently
+      // reinterpreted as a DOM id for callers that omit the element id.
+      matchId: domId,
       role: c.role == null ? null : String(c.role).toLowerCase(),
       text: c.text == null ? (c.nameText == null ? (c.name == null ? '' : String(c.name)) : String(c.nameText)) : String(c.text),
-      ref: c.ref == null ? null : String(c.ref),
       nameText: c.nameText == null ? (c.name == null ? '' : String(c.name)) : String(c.nameText),
-      stableLocator: c.stableLocator == null ? null : String(c.stableLocator),
       bounds: c.bounds && typeof c.bounds === 'object' ? c.bounds : null,
       visible,
       inViewport,
@@ -99,12 +104,12 @@ function normalizeSnapshot(snapshot) {
 }
 
 function scoreMatch(container, q) {
-  if (q.id != null && container.id !== q.id) return 0;
+  if (q.id != null && container.matchId !== q.id) return 0;
   if (q.role != null && container.role !== q.role) return 0;
   if (q.text != null) {
     if (!container.text || !container.text.includes(q.text)) return 0;
   }
-  if (q.within != null && container.id !== q.within) return 0;
+  if (q.within != null && container.matchId !== q.within) return 0;
   if (!container.visible) return 0;
   if (!container.inViewport) return 0;
   if (q.text != null && container.text === q.text) return 2;
