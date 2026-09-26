@@ -364,6 +364,104 @@ test('negative: execute_input_pipeline rejects duplicate stableLocator before pr
   assert.deepEqual(target.calls, []);
 });
 
+test('negative: execute_input_pipeline rejects duplicate text locators before protocol input', async () => {
+  __resetForTest();
+  inboundPipeline.__resetForTest();
+  const graph = makeGraph({
+    nodes: [
+      makeNode({
+        id: 'validate',
+        operator: 'test.validate',
+        inputs: ['request'],
+        output: { id: 'validated_target', schema: 'Object' },
+      }),
+      makeNode({
+        id: 'action',
+        operator: 'camo.input.action',
+        version: '1',
+        inputs: ['validated_target'],
+        output: { id: 'action_result', schema: 'Object' },
+      }),
+    ],
+    edges: [
+      { from: 'validate', to: 'action', arc_id: 'validated_target' },
+    ],
+    outputs: ['action_result'],
+  });
+  const graphPath = writeGraph(graph);
+  const duplicateTextNodes = [
+    { ref: 'ref:snap-dup-text:n1', role: 'button', nameText: 'Confirm', visible: true, inViewport: true, stableLocator: null },
+    { ref: 'ref:snap-dup-text:n2', role: 'button', nameText: 'Confirm', visible: true, inViewport: true, stableLocator: null },
+  ];
+  for (const kind of ['click', 'type']) {
+    const target = fakePageTarget();
+    await assert.rejects(
+      runGraph({
+        graphPath,
+        profileId: `validated-text-ambiguous-${kind}`,
+        request: { action: { kind, params: kind === 'type' ? { text: 'new value' } : {} } },
+        handlers: {
+          'test.validate': async () => ({
+            target,
+            tree: { nodes: duplicateTextNodes },
+            validated: { ref: 'ref:snap-dup-text:n1', role: 'button', nameText: 'Confirm' },
+          }),
+        },
+      }),
+      (error) => error.code === 'E_SNAPSHOT_AMBIGUOUS'
+        && error.details?.ref === 'ref:snap-dup-text:n1'
+        && error.details?.text === 'Confirm',
+    );
+    assert.deepEqual(target.calls, []);
+  }
+});
+
+test('positive: execute_input_pipeline maps a single text-only node to getByText', async () => {
+  __resetForTest();
+  inboundPipeline.__resetForTest();
+  const graph = makeGraph({
+    nodes: [
+      makeNode({
+        id: 'validate',
+        operator: 'test.validate',
+        inputs: ['request'],
+        output: { id: 'validated_target', schema: 'Object' },
+      }),
+      makeNode({
+        id: 'action',
+        operator: 'camo.input.action',
+        version: '1',
+        inputs: ['validated_target'],
+        output: { id: 'action_result', schema: 'Object' },
+      }),
+    ],
+    edges: [
+      { from: 'validate', to: 'action', arc_id: 'validated_target' },
+    ],
+    outputs: ['action_result'],
+  });
+  const graphPath = writeGraph(graph);
+  const target = fakePageTarget();
+  const out = await runGraph({
+    graphPath,
+    profileId: 'validated-text-locator',
+    request: { action: { kind: 'click' } },
+    handlers: {
+      'test.validate': async () => ({
+        target,
+        tree: { nodes: [
+          { ref: 'ref:snap-text:n1', role: 'button', nameText: 'Confirm', visible: true, inViewport: true, stableLocator: null },
+        ] },
+        validated: { ref: 'ref:snap-text:n1', role: 'button', nameText: 'Confirm' },
+      }),
+    },
+  });
+  assert.equal(out.ok, true);
+  assert.equal(out.result.kind, 'click');
+  assert.equal(out.result.result.clicked, true);
+  assert.deepEqual(target.calls, [{ text: 'Confirm' }]);
+});
+
 test('negative: execute_input_pipeline rejects a validated node with no mappable locator', async () => {
   __resetForTest();
   inboundPipeline.__resetForTest();

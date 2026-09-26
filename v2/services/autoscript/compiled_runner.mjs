@@ -236,6 +236,29 @@ function assertUniqueStableLocator(validated, nodes) {
   }
 }
 
+function nodeText(node) {
+  if (!node || typeof node !== 'object') return null;
+  if (typeof node.nameText === 'string' && node.nameText.length > 0) return node.nameText;
+  if (typeof node.name === 'string' && node.name.length > 0) return node.name;
+  return null;
+}
+
+function assertUniqueText(validated, nodes, text) {
+  if (!text || !Array.isArray(nodes) || nodes.length === 0) return;
+  const sameTextCount = nodes.filter((candidate) => nodeText(candidate) === text).length;
+  if (sameTextCount > 1) {
+    throw new CamoError({
+      code: 'E_SNAPSHOT_AMBIGUOUS',
+      details: {
+        resource: 'semantic_node',
+        ref: validated.ref || null,
+        text,
+        reason: 'text matches multiple snapshot nodes; cannot turn it into a unique action target',
+      },
+    });
+  }
+}
+
 function validatedLocator(validated, semanticNodes) {
   if (!validated || typeof validated !== 'object') {
     throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'validated_target.validated', reason: 'execute_input_pipeline requires a validated target node' } });
@@ -244,9 +267,8 @@ function validatedLocator(validated, semanticNodes) {
   if (typeof validated.stableLocator === 'string' && validated.stableLocator.length > 0) {
     return { selector: validated.stableLocator };
   }
-  const text = typeof validated.nameText === 'string' && validated.nameText.length > 0
-    ? validated.nameText
-    : (typeof validated.name === 'string' && validated.name.length > 0 ? validated.name : null);
+  const text = nodeText(validated);
+  assertUniqueText(validated, semanticNodes, text);
   if (text) return { text };
   if (validated.ref) {
     throw new CamoError({
