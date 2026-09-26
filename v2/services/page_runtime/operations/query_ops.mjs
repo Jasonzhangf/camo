@@ -4,6 +4,7 @@
 
 import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
 import { safeId, getTargetPageOrThrow, emit } from './_page_helpers.mjs';
+import { captureSemanticSnapshot } from '../semantic_snapshot.mjs';
 
 /**
  * Take a screenshot.
@@ -42,31 +43,15 @@ export async function screenshot({ profileId, target, fullPage = false, path: de
 
 
 /**
- * Get DOM snapshot (full HTML).
+ * Get a page snapshot. Default is machine-readable semantic JSON; raw HTML is
+ * only returned when `rawDom` is explicitly true.
  * @param {Object} opts
  * @param {string} opts.profileId
- * @returns {Object} snapshot result with HTML
+ * @param {boolean} [opts.rawDom] - Explicitly request raw HTML
+ * @returns {Object} snapshot result
  */
-export async function snapshot({ profileId, target }) {
-  const pid = safeId(profileId, 'profileId');
-  const page = getTargetPageOrThrow(target);
-  emit(pid, 'snapshot.start', {});
-  try {
-    const content = await page.content();
-    const result = {
-      profileId: pid,
-      targetId: target.targetId,
-      snapshot: true,
-      url: page.url(),
-      htmlLength: content.length,
-      html: content,
-    };
-    emit(pid, 'snapshot.done', { htmlLength: content.length });
-    return result;
-  } catch (cause) {
-    emit(pid, 'snapshot.error', { error: cause?.message });
-    throw new CamoError({ code: 'E_BROWSER_SNAPSHOT_FAILED', details: { profileId: pid, reason: cause?.message }, cause });
-  }
+export async function snapshot({ profileId, target, rawDom = false }) {
+  return captureSemanticSnapshot({ profileId, target, rawDom });
 }
 
 /**

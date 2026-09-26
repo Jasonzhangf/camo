@@ -25,6 +25,7 @@ export async function run(transport, parsed = {}, ctx = {}) {
   const profile = safeProfile(parsed.profile);
   const format = parsed.named?.format || 'json';
   const target = parsed.named?.target || null;
+  const rawDom = parsed.named?.rawDom === true || parsed.named?.rawDom === 'true';
   
   if (!['json', 'yaml'].includes(format)) {
     throw new CamoError({
@@ -35,18 +36,38 @@ export async function run(transport, parsed = {}, ctx = {}) {
 
   const reply = await sendCommand(transport, {
     cmd: 'snapshot',
-    args: { profile, target, format },
+    args: { profile, target, format, rawDom },
   });
+  const payload = reply.payload || {};
+  let data;
+  if (payload.rawDom === true) {
+    data = {
+      format: 'raw-dom',
+      rawDom: true,
+      url: payload.url ?? null,
+      documentId: payload.documentId ?? null,
+      htmlLength: payload.htmlLength ?? 0,
+      html: payload.html ?? '',
+    };
+  } else {
+    data = {
+      format: payload.format || 'semantic-json',
+      snapshotId: payload.snapshotId ?? null,
+      documentId: payload.documentId ?? null,
+      url: payload.url ?? null,
+      title: payload.title ?? '',
+      viewport: payload.viewport ?? null,
+      window: payload.window ?? null,
+      tree: payload.tree ?? { nodes: [] },
+    };
+  }
   return {
     cmd: 'snapshot',
     profile,
-    target: reply.payload?.target || target,
+    target: payload?.target || target,
     format,
-    data: {
-      url: reply.payload?.url ?? null,
-      htmlLength: reply.payload?.htmlLength ?? 0,
-      html: reply.payload?.html ?? '',
-    },
+    rawDom,
+    data,
     issuedAt: new Date().toISOString(),
     traceId: ctx.traceId || null,
   };

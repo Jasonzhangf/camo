@@ -1,5 +1,10 @@
 # services-page_runtime
 
+Runtime capabilities include semantic snapshot capture. `camo snapshot` writes
+semantic JSON by default; `--raw-dom` is the only path that returns HTML.
+Snapshots are bound to profile+document and invalidated on navigation, tab
+close, session stop, TTL expiry, and capacity eviction.
+
 Executes serialized page operations against internal page handles.
 
 The daemon resolves the external `target` through `services/session` and passes

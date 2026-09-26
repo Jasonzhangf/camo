@@ -314,6 +314,31 @@
       "code": "E_DAEMON_START_FAILED",
       "category": "io",
       "default_user_message": "Failed to start daemon."
+    },
+    {
+      "code": "E_GRAPH_INVALID",
+      "category": "input",
+      "default_user_message": "Graph validation failed."
+    },
+    {
+      "code": "E_SNAPSHOT_STALE",
+      "category": "state",
+      "default_user_message": "Snapshot reference is stale."
+    },
+    {
+      "code": "E_SNAPSHOT_AMBIGUOUS",
+      "category": "state",
+      "default_user_message": "Snapshot reference is ambiguous."
+    },
+    {
+      "code": "E_SNAPSHOT_REF_INVALID",
+      "category": "input",
+      "default_user_message": "Snapshot reference is invalid."
+    },
+    {
+      "code": "E_SNAPSHOT_CAPABILITY_MISSING",
+      "category": "internal",
+      "default_user_message": "Semantic snapshot capability is unavailable."
     }
   ]
 }

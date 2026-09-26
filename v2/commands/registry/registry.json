@@ -405,6 +405,11 @@
             ],
             "required": false,
             "doc": "output format"
+          },
+          "rawDom": {
+            "type": "boolean",
+            "required": false,
+            "doc": "explicitly request raw HTML instead of the default semantic JSON"
           }
         },
         "positional": []

@@ -12,6 +12,7 @@
 //   - No v1 fallback to commands/autoscript.mjs.
 
 import { CamoError } from '../../contracts/error_envelope/projector.mjs';
+import { validateGraph, runGraph as runCompiledGraph } from './compiled_runner.mjs';
 
 const ALLOWED_STATUS = new Set(['pending', 'running', 'paused', 'finished', 'failed', 'cancelled']);
 const TERMINAL = new Set(['finished', 'failed', 'cancelled']);
@@ -168,6 +169,14 @@ export function execute(runId, actionId, params, ctx) {
   cur.stepCount = (cur.stepCount || 0) + 1;
   _lifecycle.push({ kind: 'execute', runId: rid, actionId: aid, at: nowIso(), stepCount: cur.stepCount });
   return result;
+}
+
+// Production path: a graph consumed by runner.mjs must already be validated by
+// dagpipe before any page-layer operation is attempted.
+export { validateGraph, runCompiledGraph };
+
+export async function runGraph(opts) {
+  return runCompiledGraph(opts);
 }
 
 const _actionModules = new Map();

@@ -4,6 +4,7 @@
 
 import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
 import { safeId, getTargetPageOrThrow, emit, normalizeUrl } from './_page_helpers.mjs';
+import { invalidateForProfile, invalidateForDocument } from '../snapshot_registry.mjs';
 
 let _bridge = null;
 async function getBridge() {
@@ -37,6 +38,7 @@ export async function goto({ profileId, target, url, waitUntil = 'load' }) {
       navigated: true,
       finalUrl: page.url(),
     };
+    invalidateForProfile(pid, 'navigation_goto');
     emit(pid, 'goto.done', result);
     return result;
   } catch (cause) {
@@ -58,6 +60,7 @@ export async function back({ profileId, target }) {
   try {
     const response = await page.goBack({ waitUntil: 'domcontentloaded', timeout: 30000 });
     const result = { profileId: pid, targetId: target.targetId, navigated: response !== null, finalUrl: page.url() };
+    invalidateForProfile(pid, 'navigation_back');
     emit(pid, 'back.done', result);
     return result;
   } catch (cause) {
@@ -79,6 +82,7 @@ export async function forward({ profileId, target }) {
   try {
     const response = await page.goForward({ waitUntil: 'domcontentloaded', timeout: 30000 });
     const result = { profileId: pid, targetId: target.targetId, navigated: response !== null, finalUrl: page.url() };
+    invalidateForProfile(pid, 'navigation_forward');
     emit(pid, 'forward.done', result);
     return result;
   } catch (cause) {
@@ -110,6 +114,7 @@ export async function reload({ profileId, target, waitUntil = 'load' }) {
       ok: response?.ok() ?? false,
       finalUrl: page.url(),
     };
+    invalidateForProfile(pid, 'navigation_reload');
     emit(pid, 'reload.done', result);
     return result;
   } catch (cause) {
@@ -176,6 +181,11 @@ export async function closeTab({ profileId, target }) {
   try {
     await page.close({ runBeforeUnload: false });
     const result = { profileId: pid, targetId: target.targetId, closed: true };
+    if (target.pageId || target.documentId) {
+      invalidateForDocument(pid, target.pageId || target.documentId, 'tab_closed');
+    } else {
+      invalidateForProfile(pid, 'tab_closed');
+    }
     emit(pid, 'closeTab.done', { targetId: target.targetId });
     return result;
   } catch (cause) {

@@ -12,6 +12,10 @@ async function importOp(opName) {
   return fn;
 }
 
+async function snapshotRegistry() {
+  return import('../../services/page_runtime/snapshot_registry.mjs');
+}
+
 async function resolveTarget(args, ctx) {
   const { resolveTarget: resolveOwnedTarget } = await import('../../services/browser_service/bootstrap.mjs');
   const target = await resolveOwnedTarget({
@@ -168,6 +172,8 @@ export async function handleCommand(cmd, args, ctx) {
           throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'ephemeral_allocations', alias: 'temp' } });
       }
       const result = await stopSession(resolvedProfile);
+      const snapshots = await snapshotRegistry();
+      snapshots.invalidateForProfile(resolvedProfile, 'session_stopped');
       if (result.ephemeral === true) {
         const cleanup = await deleteTempProfile(resolvedProfile);
         if (cleanup.cleaned !== true) {
@@ -264,8 +270,20 @@ export async function handleCommand(cmd, args, ctx) {
     case 'snapshot': {
       const snapshot = await importOp('snapshot');
       const target = await resolveTarget(args, { ...ctx, profile });
-      const r = await snapshot(withTargetArgs(target));
-      return { ok: true, target: target.targetId, snapshot: true, url: r.url, htmlLength: r.htmlLength, html: r.html };
+      const r = await snapshot(withTargetArgs(target, { rawDom: args.rawDom === true }));
+      const common = { ok: true, target: target.targetId, snapshot: true, url: r.url, documentId: r.documentId };
+      if (r.rawDom === true) {
+        return { ...common, rawDom: true, htmlLength: r.htmlLength, html: r.html };
+      }
+      return {
+        ...common,
+        format: r.format,
+        snapshotId: r.snapshotId,
+        title: r.title,
+        viewport: r.viewport,
+        window: r.window,
+        tree: r.tree,
+      };
     }
 
     case 'wait': {
@@ -301,6 +319,12 @@ export async function handleCommand(cmd, args, ctx) {
       const { invalidateTarget } = await import('../../services/browser_service/bootstrap.mjs');
       const target = await resolveTarget(args, { ...ctx, profile });
       const r = await closeTab(withTargetArgs(target));
+      const snapshots = await snapshotRegistry();
+      if (target.pageId || target.documentId) {
+        snapshots.invalidateForDocument(profile, target.pageId || target.documentId, 'tab_closed');
+      } else {
+        snapshots.invalidateForProfile(profile, 'tab_closed');
+      }
       await invalidateTarget(target.targetId);
       return { ok: true, target: target.targetId, page: target.pageId, closed: r.closed === true };
     }
@@ -449,6 +473,8 @@ export async function handleCommand(cmd, args, ctx) {
         { kind: 'setuseragent', params: { userAgent: args.userAgent, targetId: target.targetId } },
         () => setSessionUserAgent({ profileId: profile, userAgent: args.userAgent }),
       );
+      const snapshots = await snapshotRegistry();
+      snapshots.invalidateForProfile(profile, 'session_generation_changed');
       return { ok: true, target: r.target, previousTarget: target.targetId, set: r.set === true, userAgent: r.userAgent };
     }
 

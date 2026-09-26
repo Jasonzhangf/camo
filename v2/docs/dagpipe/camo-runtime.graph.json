@@ -1,0 +1,101 @@
+{
+  "id": "camo-runtime",
+  "version": "1",
+  "inputs": [
+    { "id": "session_request", "schema": "Object" }
+  ],
+  "nodes": [
+    {
+      "id": "start_session",
+      "operator": "camo.start_session",
+      "operator_version": "1",
+      "inputs": ["session_request"],
+      "output": { "id": "session_context", "schema": "Object" },
+      "input_selector": { "include": [], "exclude": [], "predicate": null },
+      "output_selector": { "include": [], "exclude": [], "predicate": null },
+      "iterator": "Whole",
+      "config": {
+        "pacingMs": 0,
+        "jitterMs": 0,
+        "preValidation": false,
+        "postValidation": false,
+        "riskCheckpoint": false
+      }
+    },
+    {
+      "id": "resolve_page_context",
+      "operator": "camo.resolve_page_context",
+      "operator_version": "1",
+      "inputs": ["session_context"],
+      "output": { "id": "page_context", "schema": "Object" },
+      "input_selector": { "include": [], "exclude": [], "predicate": null },
+      "output_selector": { "include": [], "exclude": [], "predicate": null },
+      "iterator": "Whole",
+      "config": {
+        "pacingMs": 0,
+        "jitterMs": 0,
+        "preValidation": false,
+        "postValidation": false,
+        "riskCheckpoint": false
+      }
+    },
+    {
+      "id": "capture_semantic_snapshot",
+      "operator": "camo.snapshot",
+      "operator_version": "1",
+      "inputs": ["page_context"],
+      "output": { "id": "semantic_snapshot", "schema": "Object" },
+      "input_selector": { "include": [], "exclude": [], "predicate": null },
+      "output_selector": { "include": [], "exclude": [], "predicate": null },
+      "iterator": "Whole",
+      "config": {
+        "pacingMs": 0,
+        "jitterMs": 0,
+        "preValidation": false,
+        "postValidation": false,
+        "riskCheckpoint": false
+      }
+    },
+    {
+      "id": "validate_visibility_role",
+      "operator": "camo.container.validate",
+      "operator_version": "1",
+      "inputs": ["semantic_snapshot"],
+      "output": { "id": "validated_target", "schema": "Object" },
+      "input_selector": { "include": [], "exclude": [], "predicate": null },
+      "output_selector": { "include": [], "exclude": [], "predicate": null },
+      "iterator": "Whole",
+      "config": {
+        "pacingMs": 0,
+        "jitterMs": 0,
+        "preValidation": false,
+        "postValidation": false,
+        "riskCheckpoint": true
+      }
+    },
+    {
+      "id": "execute_input_pipeline",
+      "operator": "camo.input.action",
+      "operator_version": "1",
+      "inputs": ["validated_target"],
+      "output": { "id": "action_result", "schema": "Object" },
+      "input_selector": { "include": [], "exclude": [], "predicate": null },
+      "output_selector": { "include": [], "exclude": [], "predicate": null },
+      "iterator": "Whole",
+      "config": {
+        "pacingMs": 250,
+        "jitterMs": 80,
+        "preValidation": true,
+        "postValidation": true,
+        "riskCheckpoint": true
+      }
+    }
+  ],
+  "edges": [
+    { "from": "start_session", "to": "resolve_page_context", "arc_id": "session_context" },
+    { "from": "resolve_page_context", "to": "capture_semantic_snapshot", "arc_id": "page_context" },
+    { "from": "capture_semantic_snapshot", "to": "validate_visibility_role", "arc_id": "semantic_snapshot" },
+    { "from": "validate_visibility_role", "to": "execute_input_pipeline", "arc_id": "validated_target" }
+  ],
+  "outputs": ["action_result"]
+}

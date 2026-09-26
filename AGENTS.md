@@ -23,5 +23,12 @@
    - 除非用户明确要求，不做兜底。
    - 团队硬约束原文：`兜底死全家`。
 
+7. **camo runtime DAG（强制）**：
+   - camo 底层能力以 `v2/docs/dagpipe/camo-runtime.graph.json` 为 SESE DAG 真源，执行 `dagpipe graph validate v2/docs/dagpipe/camo-runtime.graph.json` 必须 PASS。
+   - camo 内不引入 webauto 业务 DAG/XHS/Weibo 业务逻辑；业务编排由调用方负责。
+   - autoscript runner 必须先通过 `dagpipe graph validate` 再进入页面层；校验失败返回 `E_GRAPH_INVALID`，禁止绕过。
+8. **snapshot（强制）**：
+   - `camo snapshot` 默认返回机器可读语义 JSON（`snapshotId`/`documentId`/`url`/`title`/`viewport`/`window`/`tree.nodes`）。
+   - raw HTML 仅在显式 `camo snapshot --raw-dom` 时返回；stale/ambiguous ref 报 typed error，禁止静默回退到 HTML/截图。
 
 我们遇到 camo 的问题不要走回退或则加 patch，要找原因，解决问题

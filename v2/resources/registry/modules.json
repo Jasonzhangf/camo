@@ -76,6 +76,14 @@
       "status": "active"
     },
     {
+      "id": "contracts.page_semantic_snapshot",
+      "layer": "L1_contract",
+      "owned_paths": [
+        "v2/contracts/page_semantic_snapshot/**"
+      ],
+      "status": "active"
+    },
+    {
       "id": "services.profile",
       "layer": "L2_service",
       "owned_paths": [
@@ -143,7 +151,8 @@
       "id": "services.autoscript",
       "layer": "L2_service",
       "owned_paths": [
-        "v2/services/autoscript/runner.mjs"
+        "v2/services/autoscript/runner.mjs",
+        "v2/services/autoscript/compiled_runner.mjs"
       ],
       "status": "active"
     },
