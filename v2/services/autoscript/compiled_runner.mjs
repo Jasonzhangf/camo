@@ -120,6 +120,23 @@ async function applyNodeConfig(node) {
   await sleep(pacing + jitter);
 }
 
+async function applyNodePolicy(hook, { node, options, input, request, profileId, output }) {
+  const cfg = node.config || {};
+  if (!cfg[hook]) return;
+  const fn = options?.[hook];
+  if (typeof fn !== 'function') {
+    throw new CamoError({
+      code: 'E_NODE_POLICY_MISSING',
+      details: {
+        node: node.id,
+        hook,
+        reason: `node config requires ${hook} but no options.${hook} hook was provided`,
+      },
+    });
+  }
+  await fn({ node, input, request, profileId, output });
+}
+
 async function defaultStartSession({ request, profileId }) {
   if (request?.target) {
     return { profileId, target: request.target };
@@ -168,8 +185,44 @@ async function defaultValidateVisibilityRole({ input, request, node }) {
   return { ...semantic, target, validated: primary };
 }
 
+function validatedLocator(validated) {
+  if (!validated || typeof validated !== 'object') {
+    throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'validated_target.validated', reason: 'execute_input_pipeline requires a validated target node' } });
+  }
+  if (typeof validated.stableLocator === 'string' && validated.stableLocator.length > 0) {
+    return { selector: validated.stableLocator };
+  }
+  const text = typeof validated.nameText === 'string' && validated.nameText.length > 0
+    ? validated.nameText
+    : (typeof validated.name === 'string' && validated.name.length > 0 ? validated.name : null);
+  if (text) return { text };
+  if (validated.ref) {
+    throw new CamoError({
+      code: 'E_SNAPSHOT_REF_INVALID',
+      details: { ref: validated.ref, reason: 'validated node has no stableLocator or nameText to map into an action locator' },
+    });
+  }
+  throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'validated_target.validated.stableLocator/nameText', reason: 'validated node has no locator fields' } });
+}
+
+function locatorParams(params, locator) {
+  const merged = { ...(params || {}) };
+  if (locator.selector != null) {
+    merged.selector = locator.selector;
+    delete merged.text;
+  } else if (locator.text != null) {
+    merged.text = locator.text;
+    delete merged.selector;
+  }
+  return merged;
+}
+
 async function defaultExecuteInputPipeline({ profileId, input, request }) {
-  const action = input.validated_target?.validated ? { ...request?.action } : request?.action;
+  const validated = input.validated_target?.validated;
+  if (!validated || typeof validated !== 'object') {
+    throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'validated_target.validated', reason: 'cannot execute action against an unvalidated target' } });
+  }
+  const action = { ...request?.action };
   const target = input.validated_target?.target || input.page_context;
   if (!action || typeof action.kind !== 'string') {
     throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'action.kind' } });
@@ -177,15 +230,32 @@ async function defaultExecuteInputPipeline({ profileId, input, request }) {
   const pipeline = await import('../page_runtime/input_pipeline.mjs');
   const kind = action.kind.toLowerCase();
   if (kind === 'click') {
-    const out = await pipeline.click({ ...target, profileId, ...(action.params || {}) });
+    const locator = validatedLocator(validated);
+    const out = await pipeline.click({ target, profileId, ...locatorParams(action.params, locator) });
     return { ok: true, kind, result: out };
   }
   if (kind === 'type') {
-    const out = await pipeline.type({ ...target, profileId, ...(action.params || {}) });
+    const locator = validatedLocator(validated);
+    const params = { ...(action.params || {}) };
+    const text = String(params.text || '');
+    if (!text) throw new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'text' } });
+    if (locator.selector != null) {
+      const out = await pipeline.type({ target, profileId, text, selector: locator.selector, delay: params.delay });
+      return { ok: true, kind, result: out };
+    }
+    await pipeline.click({ target, profileId, text: locator.text });
+    const out = await pipeline.type({ target, profileId, text, delay: params.delay });
     return { ok: true, kind, result: out };
   }
   if (kind === 'scroll') {
-    const out = await pipeline.scroll({ ...target, profileId, ...(action.params || {}) });
+    const bounds = validated.bounds && typeof validated.bounds === 'object' ? validated.bounds : null;
+    const scrollParams = { target, profileId, ...(action.params || {}) };
+    if (bounds && Number.isFinite(bounds.x) && Number.isFinite(bounds.y)
+      && Number.isFinite(bounds.width) && Number.isFinite(bounds.height)) {
+      scrollParams.atX = Math.round(bounds.x + bounds.width / 2);
+      scrollParams.atY = Math.round(bounds.y + bounds.height / 2);
+    }
+    const out = await pipeline.scroll(scrollParams);
     return { ok: true, kind, result: out };
   }
   throw new CamoError({ code: 'E_PROTO_NO_HANDLER', details: { actionKind: kind } });
@@ -227,12 +297,16 @@ export async function runGraph({ graphPath, profileId, request = {}, handlers = 
         input[arcId] = arcs.get(arcId);
       }
       await applyNodeConfig(node);
+      const policyContext = { node, options, input, request, profileId: pid };
+      await applyNodePolicy('preValidation', policyContext);
+      await applyNodePolicy('riskCheckpoint', policyContext);
       const handlerKey = `${node.operator}@${node.operator_version}`;
       const handler = activeHandlers[handlerKey] || activeHandlers[node.operator];
       if (typeof handler !== 'function') {
         throw new CamoError({ code: 'E_PROTO_NO_HANDLER', details: { node: nodeId, operator: node.operator, operatorVersion: node.operator_version } });
       }
       const output = await handler({ node, input, request, profileId: pid });
+      await applyNodePolicy('postValidation', { ...policyContext, output });
       arcs.set(node.output.id, output);
     }
     const result = arcs.get(graph.outputs[0]);

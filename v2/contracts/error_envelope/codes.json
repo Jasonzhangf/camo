@@ -321,6 +321,11 @@
       "default_user_message": "Graph validation failed."
     },
     {
+      "code": "E_NODE_POLICY_MISSING",
+      "category": "internal",
+      "default_user_message": "Required graph node policy hook is missing."
+    },
+    {
       "code": "E_SNAPSHOT_STALE",
       "category": "state",
       "default_user_message": "Snapshot reference is stale."

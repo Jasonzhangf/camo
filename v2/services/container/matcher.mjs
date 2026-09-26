@@ -11,7 +11,28 @@
 
 import { CamoError } from '../../contracts/error_envelope/projector.mjs';
 
-const ALLOWED_ROLES = new Set(['button', 'link', 'textbox', 'tab', 'item', 'generic']);
+const ALLOWED_ROLES = new Set([
+  'button',
+  'link',
+  'textbox',
+  'tab',
+  'checkbox',
+  'radio',
+  'combobox',
+  'listbox',
+  'item',
+  'generic',
+  'navigation',
+  'main',
+  'article',
+  'banner',
+  'contentinfo',
+  'form',
+  'list',
+  'listitem',
+  'heading',
+  'img',
+]);
 
 function normalizeRole(role) {
   const r = String(role || '').trim().toLowerCase();
@@ -54,18 +75,23 @@ function normalizeSnapshot(snapshot) {
     }
     const visible = c.visible !== false;
     const vp = c.viewport && typeof c.viewport === 'object' ? c.viewport : null;
+    const bounds = c.bounds && typeof c.bounds === 'object' ? c.bounds : {};
     let inViewport = true;
     if (vp && Number.isFinite(vp.width) && Number.isFinite(vp.height)) {
-      const x = Number(c.x ?? 0);
-      const y = Number(c.y ?? 0);
-      const w = Number(c.width ?? 0);
-      const h = Number(c.height ?? 0);
+      const x = Number(c.x ?? bounds.x ?? 0);
+      const y = Number(c.y ?? bounds.y ?? 0);
+      const w = Number(c.width ?? bounds.width ?? 0);
+      const h = Number(c.height ?? bounds.height ?? 0);
       inViewport = x + w > 0 && y + h > 0 && x < vp.width && y < vp.height;
     }
     return {
-      id: c.id == null ? null : String(c.id),
+      id: c.id == null ? (c.ref == null ? null : String(c.ref)) : String(c.id),
       role: c.role == null ? null : String(c.role).toLowerCase(),
-      text: c.text == null ? '' : String(c.text),
+      text: c.text == null ? (c.nameText == null ? (c.name == null ? '' : String(c.name)) : String(c.nameText)) : String(c.text),
+      ref: c.ref == null ? null : String(c.ref),
+      nameText: c.nameText == null ? (c.name == null ? '' : String(c.name)) : String(c.nameText),
+      stableLocator: c.stableLocator == null ? null : String(c.stableLocator),
+      bounds: c.bounds && typeof c.bounds === 'object' ? c.bounds : null,
       visible,
       inViewport,
     };
