@@ -183,8 +183,8 @@ section { border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px; }</st
       <h2><code>autoscript_run</code></h2>
       <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>v2/services/autoscript</code> - <strong>Store:</strong> memory_per_run</p>
 
-      <h3>Reads</h3><ul><li><code>v2/services/autoscript/runner.mjs::read</code></li><li><code>v2/services/autoscript/runner.mjs::status</code></li></ul>
-      <h3>Writes</h3><ul><li><code>v2/services/autoscript/runner.mjs::start</code></li><li><code>v2/services/autoscript/runner.mjs::stop</code></li></ul>
+      <h3>Reads</h3><ul><li><code>v2/services/autoscript/compiled_runner.mjs::validateGraph</code></li></ul>
+      <h3>Writes</h3><ul><li><code>v2/services/autoscript/compiled_runner.mjs::runGraph</code></li></ul>
       <h3>Indirect</h3><ul><li><code>v2/services/progress_event/log.mjs::append</code></li></ul>
       <h3>Forbidden</h3><ul><li><code>v2/commands/autoscript.mjs::state_write</code></li></ul>
 
@@ -195,7 +195,7 @@ section { border-top: 1px solid #ddd; padding-top: 16px; margin-top: 16px; }</st
       <h2><code>autoscript_action</code></h2>
       <p><strong>Layer:</strong> L2_service - <strong>Truth owner:</strong> <code>v2/services/autoscript/actions</code> - <strong>Store:</strong> code_registry</p>
       <p><strong>Truth path:</strong> <code>v2/services/autoscript/actions/<actionId>.mjs</code></p>
-      <h3>Reads</h3><ul><li><code>v2/services/autoscript/runner.mjs::execute</code></li><li><code>v2/contracts/operations/registry.json::validate</code></li></ul>
+      <h3>Reads</h3><ul><li><code>v2/contracts/operations/registry.json::validate</code></li></ul>
       <h3>Writes</h3><ul><li><code>v2/services/autoscript/actions/<actionId>.mjs::run</code></li></ul>
 
       <h3>Forbidden</h3><ul><li><code>v2/autoscript/action_providers/index.mjs::stub</code></li></ul>

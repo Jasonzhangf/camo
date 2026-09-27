@@ -24,7 +24,7 @@ test('positive: boot returns plan with expected steps and dryRun', () => {
   assert.ok(stepIds.includes('session.create'));
   assert.ok(stepIds.includes('tab_pool.ensure'));
   assert.ok(stepIds.includes('display.read'));
-  assert.ok(stepIds.includes('autoscript.start'));
+  assert.equal(stepIds.includes('autoscript.start'), false);
 });
 
 test('positive: boot defaults mode to background when omitted', () => {

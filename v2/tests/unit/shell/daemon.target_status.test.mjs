@@ -36,6 +36,16 @@ function makePage(label) {
     url() { return this.navigations.at(-1) || 'about:blank'; },
     async goto(url) { this.navigations.push(url); return { status: () => 200, ok: () => true }; },
     async content() { return `<html>${this.label}</html>`; },
+    async evaluate() {
+      return {
+        title: this.label,
+        url: this.url(),
+        viewport: { width: 1280, height: 720 },
+        window: { innerWidth: 1280, innerHeight: 720 },
+        nodes: [],
+        capabilities: { semantic: 'dom-aria', nativeAccessibility: false },
+      };
+    },
   };
 }
 
@@ -176,7 +186,7 @@ test('positive: status distinguishes unknown execution from failed execution', a
   assert.equal(idle.execution[0].outcome, 'unknown');
 
   const target = await bootstrap.resolveTarget({ profileId: 'status-execution' });
-  target.page.content = async () => { throw new Error('snapshot failed'); };
+  target.page.evaluate = async () => { throw new Error('snapshot failed'); };
   await assert.rejects(() => handleCommand('snapshot', {}, ctx));
 
   const failed = await handleCommand('status', {}, ctx);
@@ -197,11 +207,11 @@ test('negative: same-profile concurrent action is rejected by the pipeline lock'
   const ctx = context('serialized-target');
   await handleCommand('start', {}, ctx);
   const target = await bootstrap.resolveTarget({ profileId: 'serialized-target' });
-  const originalContent = target.page.content;
+  const originalEvaluate = target.page.evaluate;
   let release;
-  target.page.content = async function () {
+  target.page.evaluate = async function () {
     await new Promise((resolve) => { release = resolve; });
-    return originalContent.call(this);
+    return originalEvaluate.call(this);
   };
 
   const first = handleCommand('snapshot', {}, ctx);

@@ -6,14 +6,14 @@ import { look as registryLook, list as registryList } from '../../../commands/re
 
 // Use kebab-case to match registry convention
 const EXPECTED_BUILTINS = [
-  'back', 'click', 'close-tab', 'daemon', 'evaluate', 'fetch-page', 'find-elements',
+  'autoscript', 'back', 'click', 'close-tab', 'daemon', 'evaluate', 'fetch-page', 'find-elements',
   'forward', 'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'goto', 'hover',
   'keyboard', 'list-tabs', 'login', 'multi-open', 'new-tab', 'reload', 'screenshot', 'scroll', 'scroll-and-collect', 'search', 'select',
   'set-cookies', 'set-user-agent', 'set-viewport', 'snapshot', 'start', 'status', 'stop',
   'switch-tab', 'type', 'upload', 'wait', 'wait-dom-stable',
 ];
 
-test('positive: list returns all 37 builtins sorted (kebab-case)', () => {
+test('positive: list returns all 38 builtins sorted (kebab-case)', () => {
   assert.deepEqual(list(), EXPECTED_BUILTINS);
 });
 

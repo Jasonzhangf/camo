@@ -9,6 +9,17 @@ import {
   resetRoutes,
 } from '../../../transports/http/server.mjs';
 import { buildRequest } from '../../../contracts/http_messages/v1/envelope.mjs';
+import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
+
+test('typed runtime terminal reaches the HTTP error envelope', async () => {
+  __enableTestRoot();
+  resetRoutes();
+  registerRoute('POST', '/run', async () => { throw new CamoError({ code: 'E_LOGIN_INVALID' }); });
+  const req = buildRequest({ id: 'login', kind: 'command', method: 'POST', path: '/run', body: null });
+  const reply = await handleRequest({ text: JSON.stringify(req) });
+  assert.equal(reply.kind, 'error');
+  assert.equal(reply.body.terminal, 'login_invalid');
+});
 
 test('positive: registerRoute + handleRequest returns result envelope', async () => {
   __enableTestRoot();

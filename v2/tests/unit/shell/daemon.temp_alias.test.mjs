@@ -79,6 +79,14 @@ function stubBrowser(profileId) {
     page: {
       goto: async () => {},
       content: async () => '<html><body>temp</body></html>',
+      evaluate: async () => ({
+        title: 'temp',
+        url: 'about:blank',
+        viewport: { width: 1280, height: 720 },
+        window: { innerWidth: 1280, innerHeight: 720 },
+        nodes: [],
+        capabilities: { semantic: 'dom-aria', nativeAccessibility: false },
+      }),
       url: () => 'about:blank',
       close: async () => {},
     },

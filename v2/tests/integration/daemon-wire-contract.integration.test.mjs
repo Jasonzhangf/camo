@@ -241,26 +241,56 @@ test('keyboard preserves a registry-valid dotted profile through the wire', asyn
   assert.deepEqual(pressed, ['Enter']);
 });
 
-test('snapshot projects the full HTML payload through the daemon wire', async () => {
+test('snapshot projects the semantic JSON payload through the daemon wire by default', async () => {
   enablePipeline();
   enableBridge();
   const profile = 'snapshot_wire_contract';
+  const semantic = () => ({
+    title: 'Example',
+    url: 'https://example.com/',
+    viewport: { width: 800, height: 600 },
+    window: { innerWidth: 800, innerHeight: 600 },
+    capabilities: { semantic: 'dom-aria', nativeAccessibility: false },
+    nodes: [
+      {
+        role: 'heading',
+        nameText: 'Example',
+        visible: true,
+        inViewport: true,
+        bounds: { x: 0, y: 0, width: 10, height: 20 },
+        state: {},
+        actions: [],
+        stableLocator: 'h1',
+      },
+    ],
+  });
   __setBrowserForTest(profile, {
     page: {
       url: () => 'https://example.com/',
       content: async () => '<html><body>Example</body></html>',
+      evaluate: async () => semantic(),
     },
   });
   const target = allocateTarget(profile, {
     url: () => 'https://example.com/',
     content: async () => '<html><body>Example</body></html>',
+    evaluate: async () => semantic(),
   });
   const result = await handleCommand('snapshot', { profile, target: target.targetId }, daemonContext(profile));
   assert.equal(result.ok, true);
   assert.equal(result.snapshot, true);
+  assert.equal(result.format, 'semantic-json');
   assert.equal(result.url, 'https://example.com/');
-  assert.equal(result.htmlLength, 33);
-  assert.equal(result.html, '<html><body>Example</body></html>');
+  assert.equal(result.title, 'Example');
+  assert.equal(result.documentId, target.pageId);
+  assert.match(result.snapshotId, /^snap_/);
+  assert.equal(Array.isArray(result.tree.nodes), true);
+  assert.equal(result.tree.nodes.length, 1);
+  assert.ok(result.tree.nodes[0].ref.startsWith('ref:'));
+  assert.equal(result.tree.nodes[0].name, 'Example');
+  assert.equal(result.tree.nodes[0].stableLocator, 'h1');
+  assert.equal('html' in result, false);
+  assert.equal('htmlLength' in result, false);
 });
 
 test('negative: click timeout crosses the daemon wire and releases the profile lock', async () => {
@@ -468,8 +498,30 @@ test('negative: multiple active targets require an explicit --target', async () 
   enablePipeline();
   enableBridge();
   const profile = 'multi_target_ambiguity_contract';
-  const first = { content: async () => '<html>first</html>', url: () => 'https://example.com/1' };
-  const second = { content: async () => '<html>second</html>', url: () => 'https://example.com/2' };
+  const first = {
+    content: async () => '<html>first</html>',
+    url: () => 'https://example.com/1',
+    evaluate: async () => ({
+      title: 'First',
+      url: 'https://example.com/1',
+      viewport: { width: 800, height: 600 },
+      window: { innerWidth: 800, innerHeight: 600 },
+      capabilities: { semantic: 'dom-aria', nativeAccessibility: false },
+      nodes: [{ role: 'heading', nameText: 'First', visible: true, inViewport: true, bounds: { x: 0, y: 0, width: 10, height: 20 }, state: {}, actions: [], stableLocator: 'h1' }],
+    }),
+  };
+  const second = {
+    content: async () => '<html>second</html>',
+    url: () => 'https://example.com/2',
+    evaluate: async () => ({
+      title: 'Second',
+      url: 'https://example.com/2',
+      viewport: { width: 800, height: 600 },
+      window: { innerWidth: 800, innerHeight: 600 },
+      capabilities: { semantic: 'dom-aria', nativeAccessibility: false },
+      nodes: [{ role: 'heading', nameText: 'Second', visible: true, inViewport: true, bounds: { x: 0, y: 0, width: 10, height: 20 }, state: {}, actions: [], stableLocator: 'h2' }],
+    }),
+  };
   __setBrowserForTest(profile, { page: first, context: { pages: () => [first, second] } });
   const firstTarget = allocateTarget(profile, first);
   const secondTarget = allocateTarget(profile, second);
@@ -481,6 +533,12 @@ test('negative: multiple active targets require an explicit --target', async () 
 
   const one = await handleCommand('snapshot', { profile, target: firstTarget.targetId }, daemonContext(profile));
   const two = await handleCommand('snapshot', { profile, target: secondTarget.targetId }, daemonContext(profile));
-  assert.equal(one.html, '<html>first</html>');
-  assert.equal(two.html, '<html>second</html>');
+  assert.equal(one.format, 'semantic-json');
+  assert.equal(one.url, 'https://example.com/1');
+  assert.equal(one.tree.nodes[0].name, 'First');
+  assert.equal(one.tree.nodes[0].stableLocator, 'h1');
+  assert.equal(two.format, 'semantic-json');
+  assert.equal(two.url, 'https://example.com/2');
+  assert.equal(two.tree.nodes[0].name, 'Second');
+  assert.equal(two.tree.nodes[0].stableLocator, 'h2');
 });

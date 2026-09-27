@@ -36,6 +36,7 @@ export class CamoError extends Error {
     const spec = load().map.get(code);
     super(spec ? spec.default_user_message : 'Unknown error');
     this.code = code;
+    if (spec?.terminal) this.terminal = spec.terminal;
     this.message_override = message;
     this.details = details || null;
     this.cause = cause || null;
@@ -54,6 +55,7 @@ export function project(err) {
   if (err instanceof CamoError) {
     return {
       code: err.code,
+      ...(err.terminal ? { terminal: err.terminal } : {}),
       message: err.message_override || err.message,
       details: err.details,
     };

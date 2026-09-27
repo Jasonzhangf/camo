@@ -42,7 +42,7 @@ test('negative: empty query throws E_INPUT_MISSING_FIELD', () => {
 
 test('negative: invalid role throws E_INPUT_OUT_OF_RANGE', () => {
   let err;
-  try { matcher.match({ role: 'checkbox' }, [{ id: 'a', role: 'button' }]); } catch (e) { err = e; }
+  try { matcher.match({ role: 'not-a-role' }, [{ id: 'a', role: 'button' }]); } catch (e) { err = e; }
   assert.equal(err?.code, 'E_INPUT_OUT_OF_RANGE');
   assert.equal(err?.details?.field, 'role');
 });
@@ -51,4 +51,30 @@ test('negative: non-array snapshot throws E_INPUT_INVALID', () => {
   let err;
   try { matcher.match({ id: 'a' }, { id: 'a' }); } catch (e) { err = e; }
   assert.equal(err?.code, 'E_INPUT_INVALID');
+});
+
+test('positive: semantic snapshot nodes normalize role/name/ref for matcher queries', () => {
+  const snap = [
+    { ref: 'ref:snap:n1', role: 'checkbox', nameText: 'Remember me', stableLocator: 'input[aria-label="Remember me"]', visible: true, inViewport: true },
+  ];
+  const out = matcher.match({ role: 'checkbox', text: 'Remember' }, snap);
+  assert.equal(out.matched.length, 1);
+  assert.equal(out.primary.ref, 'ref:snap:n1');
+  assert.equal(out.primary.stableLocator, 'input[aria-label="Remember me"]');
+  assert.equal(out.primary.nameText, 'Remember me');
+  const byRefId = matcher.match({ id: 'ref:snap:n1' }, snap);
+  assert.equal(byRefId.matched.length, 0);
+});
+
+test('positive: query.id matches the semantic node DOM id, not the snapshot ref', () => {
+  const snap = [
+    { ref: 'ref:snap:id-dom', id: 'submit-button', role: 'button', nameText: 'Submit', stableLocator: '#submit-button', visible: true, inViewport: true },
+  ];
+  const byDomId = matcher.match({ id: 'submit-button' }, snap);
+  assert.equal(byDomId.matched.length, 1);
+  assert.equal(byDomId.primary.id, 'submit-button');
+  assert.equal(byDomId.primary.ref, 'ref:snap:id-dom');
+  assert.equal(byDomId.primary.stableLocator, '#submit-button');
+  const byRef = matcher.match({ id: 'ref:snap:id-dom' }, snap);
+  assert.equal(byRef.matched.length, 0);
 });

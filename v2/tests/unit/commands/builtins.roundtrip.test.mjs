@@ -108,7 +108,7 @@ test('positive: goto builtin sends the right wire args', async () => {
   assert.equal(captured.target, null);
 });
 
-test('positive: snapshot builtin preserves HTML payload from server', async () => {
+test('positive: snapshot builtin projects semantic JSON by default and raw HTML only for raw-dom', async () => {
   enableWsTestRoot();
   resetRoutes();
   registerHandler('command', async () => ({
@@ -117,8 +117,16 @@ test('positive: snapshot builtin preserves HTML payload from server', async () =
       ok: true,
       snapshot: true,
       url: 'https://example.com/',
-      htmlLength: 42,
-      html: '<html><body>Example</body></html>',
+      documentId: 'page_test',
+      snapshotId: 'snap_1',
+      title: 'Example',
+      viewport: { width: 1280, height: 720 },
+      window: { innerWidth: 1280, innerHeight: 720 },
+      tree: {
+        nodes: [
+          { ref: 'ref:snap_1:n1', role: 'button', name: 'Go', visible: true, inViewport: true, bounds: {}, state: {}, actions: ['click'], stableLocator: 'button[aria-label="Go"]' },
+        ],
+      },
     },
   }));
   const transport = {
@@ -134,9 +142,47 @@ test('positive: snapshot builtin preserves HTML payload from server', async () =
   };
   const parsed = parseFlags(['--profile', 'p1', '--format', 'json'], { cmd: 'snapshot' });
   const out = await runBuiltin('snapshot', transport, parsed, {});
+  assert.equal(out.data.snapshotId, 'snap_1');
+  assert.equal(out.data.tree.nodes.length, 1);
+  assert.equal(out.data.url, 'https://example.com/');
+  assert.equal('html' in out.data, false);
+});
+
+test('positive: snapshot builtin forwards rawDom so the daemon returns HTML only when explicitly requested', async () => {
+  enableWsTestRoot();
+  resetRoutes();
+  registerHandler('command', async (env) => {
+    const args = env.payload.args;
+    return {
+      kind: 'result',
+      payload: {
+        ok: true,
+        snapshot: true,
+        target: args.target,
+        rawDom: true,
+        url: 'https://example.com/',
+        documentId: 'page_test',
+        htmlLength: 42,
+        html: '<html><body>Example</body></html>',
+      },
+    };
+  });
+  const transport = {
+    async sendFrame(env) {
+      let out;
+      const { handleFrame } = await import('../../../transports/ws/server.mjs');
+      await handleFrame({
+        text: JSON.stringify(env),
+        send: (e) => { out = e; },
+      });
+      return out;
+    },
+  };
+  const parsed = parseFlags(['--profile', 'p1', '--raw-dom'], { cmd: 'snapshot' });
+  const out = await runBuiltin('snapshot', transport, parsed, {});
   assert.equal(out.data.html, '<html><body>Example</body></html>');
   assert.equal(out.data.htmlLength, 42);
-  assert.equal(out.data.url, 'https://example.com/');
+  assert.equal(out.data.rawDom, true);
 });
 
 test('negative: stop builtin propagates E_STATE_NOT_FOUND from server', async () => {

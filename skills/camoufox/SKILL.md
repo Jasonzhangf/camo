@@ -111,7 +111,7 @@ camo goto <url> [--target <t_id>] [--waitUntil load|domcontentloaded|networkidle
 camo back [--target <t_id>]
 camo forward [--target <t_id>]
 camo reload [--target <t_id>] [--waitUntil load|domcontentloaded|networkidle|commit]
-camo snapshot [--target <t_id>] [--format json|yaml]
+camo snapshot [--target <t_id>] [--format json|yaml] [--raw-dom]
 camo screenshot [--target <t_id>] [--path <file>]
 camo evaluate [--target <t_id>] --script <js>
 camo wait [--target <t_id>] [--for load|domcontentloaded|networkidle|selector|text|url] [--condition <value>] [--timeout <ms>] [--ms <ms>]
@@ -173,6 +173,11 @@ Reuse the same profile after `stop` and a later `start`.
 2. Run `camo status --profile <profile>` and `camo status --target <target>`.
 3. Collect read-only evidence with `get-page-info` and `snapshot` on the same
    target.
+
+`snapshot` returns machine-readable semantic JSON by default (`snapshotId`,
+`documentId`, `url`, `title`, `viewport`, `window`, `tree.nodes`). Raw HTML is
+only returned with the explicit `--raw-dom` flag; there is no implicit HTML,
+screenshot, or retry fallback.
 4. Do not switch profiles, retry with a different page, or use `evaluate` as a
    substitute for the failed command.
 5. For a stale target, start a new session or allocate a new target and use

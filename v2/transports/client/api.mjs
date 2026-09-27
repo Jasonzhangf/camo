@@ -22,7 +22,7 @@ const ALLOWED_CMDS = new Set([
   'forward', 'get-cookies', 'get-page-info', 'get-readable', 'get-text', 'goto', 'hover',
   'keyboard', 'list-tabs', 'new-tab', 'screenshot', 'scroll', 'scroll-and-collect', 'select',
   'reload', 'set-cookies', 'set-user-agent', 'set-viewport', 'snapshot', 'start', 'status', 'stop', 'switch-tab',
-  'multi-open', 'type', 'upload', 'wait', 'wait-dom-stable'
+  'multi-open', 'type', 'upload', 'wait', 'wait-dom-stable', 'autoscript'
 ]);
 
 function assertCmd(cmd) {

@@ -12,6 +12,10 @@ async function importOp(opName) {
   return fn;
 }
 
+async function snapshotRegistry() {
+  return import('../../services/page_runtime/snapshot_registry.mjs');
+}
+
 async function resolveTarget(args, ctx) {
   const { resolveTarget: resolveOwnedTarget } = await import('../../services/browser_service/bootstrap.mjs');
   const target = await resolveOwnedTarget({
@@ -58,6 +62,77 @@ function withTargetArgs(target, args = {}) {
   };
 }
 
+export function assertAutoscriptTarget({ node, input, request, profileId }) {
+  // A node's policy hook sees only the ARCs that node consumes. The resolved
+  // target object (`page_context`/`validated_target.target`) carries the page
+  // handle; `semantic_snapshot` carries only profile/target identity. Validate
+  // whichever surface the node actually received instead of assuming every
+  // node sees `page_context`.
+  const pageTarget = input.page_context || input.validated_target?.target || null;
+  const semantic = input.semantic_snapshot || input.validated_target || null;
+  const targetId = pageTarget?.targetId || semantic?.targetId || null;
+  const targetProfileId = pageTarget?.profileId || semantic?.profileId || null;
+  if (!targetId) {
+    throw new CamoError({
+      code: 'E_GRAPH_INVALID',
+      details: {
+        graphNode: node.id,
+        reason: 'policy requires an ARC carrying a resolved browser target or semantic snapshot identity',
+      },
+    });
+  }
+  if (targetProfileId !== profileId || targetId !== request.target) {
+    throw new CamoError({
+      code: 'E_STATE_INVALID',
+      details: {
+        resource: 'browser_target',
+        targetId,
+        profileId,
+        reason: 'autoscript target must match the requested profile and target',
+      },
+    });
+  }
+  if (pageTarget && (pageTarget.status !== 'active' || !pageTarget.page)) {
+    throw new CamoError({
+      code: 'E_STATE_INVALID',
+      details: {
+        resource: 'browser_target',
+        targetId,
+        profileId,
+        reason: 'autoscript target must be active with a resolved page handle',
+      },
+    });
+  }
+  if (pageTarget && semantic?.targetId && semantic.targetId !== pageTarget.targetId) {
+    throw new CamoError({
+      code: 'E_STATE_INVALID',
+      details: { resource: 'semantic_snapshot', targetId: semantic.targetId, expectedTargetId: pageTarget.targetId },
+    });
+  }
+  const validated = input.validated_target?.validated;
+  if (validated && (validated.visible !== true || validated.inViewport !== true)) {
+    throw new CamoError({
+      code: 'E_STATE_INVALID',
+      details: { resource: 'semantic_node', ref: validated.ref || null, reason: 'target must be visible and in the viewport' },
+    });
+  }
+}
+
+const autoscriptPolicyHooks = {
+  preValidation: async (context) => assertAutoscriptTarget(context),
+  riskCheckpoint: async (context) => assertAutoscriptTarget(context),
+  postValidation: async ({ node, request, output }) => {
+    const expectedKind = String(request?.action?.kind || '').toLowerCase();
+    if (node.operator === 'camo.input.action'
+      && (output?.ok !== true || output.kind !== expectedKind)) {
+      throw new CamoError({
+        code: 'E_STATE_INVALID',
+        details: { graphNode: node.id, expectedKind, output, reason: 'autoscript action did not report validated success' },
+      });
+    }
+  },
+};
+
 /**
  * Handle a command. Delegates to input_pipeline operations.
  * @param {string} cmd - command name
@@ -69,6 +144,10 @@ function withTargetArgs(target, args = {}) {
  * @returns {Object} command result { ok, ... }
  */
 export async function handleCommand(cmd, args, ctx) {
+  return handleCommandNow(cmd, args, ctx);
+}
+
+async function handleCommandNow(cmd, args, ctx) {
   const { opts, ensureBrowser, ephemeralAllocations } = ctx;
   const requestedProfile = ctx.profile;
   const resolvedProfile = ephemeralAllocations?.get(requestedProfile) || requestedProfile;
@@ -76,7 +155,7 @@ export async function handleCommand(cmd, args, ctx) {
 
   // start owns allocation; every later browser command must reuse its
   // resolved ephemeral profile instead of launching the alias itself.
-  if (isBrowserCommand(cmd) && cmd !== 'start') {
+  if (isBrowserCommand(cmd) && cmd !== 'start' && cmd !== 'autoscript') {
     if (requestedProfile === 'temp' && !ephemeralAllocations?.has(requestedProfile)) {
       throw new CamoError({
         code: 'E_STATE_NOT_FOUND',
@@ -168,6 +247,8 @@ export async function handleCommand(cmd, args, ctx) {
           throw new CamoError({ code: 'E_STATE_NOT_FOUND', details: { resource: 'ephemeral_allocations', alias: 'temp' } });
       }
       const result = await stopSession(resolvedProfile);
+      const snapshots = await snapshotRegistry();
+      snapshots.invalidateForProfile(resolvedProfile, 'session_stopped');
       if (result.ephemeral === true) {
         const cleanup = await deleteTempProfile(resolvedProfile);
         if (cleanup.cleaned !== true) {
@@ -264,8 +345,20 @@ export async function handleCommand(cmd, args, ctx) {
     case 'snapshot': {
       const snapshot = await importOp('snapshot');
       const target = await resolveTarget(args, { ...ctx, profile });
-      const r = await snapshot(withTargetArgs(target));
-      return { ok: true, target: target.targetId, snapshot: true, url: r.url, htmlLength: r.htmlLength, html: r.html };
+      const r = await snapshot(withTargetArgs(target, { rawDom: args.rawDom === true }));
+      const common = { ok: true, target: target.targetId, snapshot: true, url: r.url, documentId: r.documentId };
+      if (r.rawDom === true) {
+        return { ...common, rawDom: true, htmlLength: r.htmlLength, html: r.html };
+      }
+      return {
+        ...common,
+        format: r.format,
+        snapshotId: r.snapshotId,
+        title: r.title,
+        viewport: r.viewport,
+        window: r.window,
+        tree: r.tree,
+      };
     }
 
     case 'wait': {
@@ -301,6 +394,12 @@ export async function handleCommand(cmd, args, ctx) {
       const { invalidateTarget } = await import('../../services/browser_service/bootstrap.mjs');
       const target = await resolveTarget(args, { ...ctx, profile });
       const r = await closeTab(withTargetArgs(target));
+      const snapshots = await snapshotRegistry();
+      if (target.pageId || target.documentId) {
+        snapshots.invalidateForDocument(profile, target.pageId || target.documentId, 'tab_closed');
+      } else {
+        snapshots.invalidateForProfile(profile, 'tab_closed');
+      }
       await invalidateTarget(target.targetId);
       return { ok: true, target: target.targetId, page: target.pageId, closed: r.closed === true };
     }
@@ -323,6 +422,33 @@ export async function handleCommand(cmd, args, ctx) {
         profiles: sessions.map((s) => s.profileId),
         browserCount: sessions.length,
       };
+    }
+
+    case 'autoscript': {
+      if (args?.subcommand !== 'run') {
+        throw new CamoError({
+          code: 'E_INPUT_OUT_OF_RANGE',
+          details: { field: 'subcommand', value: args?.subcommand, allowed: ['run'] },
+        });
+      }
+      const { runGraph } = await import('../../services/autoscript/compiled_runner.mjs');
+      return await runGraph({
+        graphPath: args.graphPath,
+        profileId: profile,
+        options: {
+          ...autoscriptPolicyHooks,
+          beforeExecution: async () => {
+            await resolveTarget({ target: args.target }, { profile });
+            await ensureBrowser(profile);
+          },
+        },
+        request: {
+          runId: args.runId,
+          profileId: profile,
+          target: args.target,
+          action: args.action,
+        },
+      });
     }
 
     case 'fetch-page': {
@@ -449,6 +575,8 @@ export async function handleCommand(cmd, args, ctx) {
         { kind: 'setuseragent', params: { userAgent: args.userAgent, targetId: target.targetId } },
         () => setSessionUserAgent({ profileId: profile, userAgent: args.userAgent }),
       );
+      const snapshots = await snapshotRegistry();
+      snapshots.invalidateForProfile(profile, 'session_generation_changed');
       return { ok: true, target: r.target, previousTarget: target.targetId, set: r.set === true, userAgent: r.userAgent };
     }
 

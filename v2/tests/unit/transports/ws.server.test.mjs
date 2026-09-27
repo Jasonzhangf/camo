@@ -11,6 +11,18 @@ import {
   registerSocket,
 } from '../../../transports/ws/server.mjs';
 import { build as buildEnvelope } from '../../../contracts/ws_messages/v1/envelope.mjs';
+import { CamoError } from '../../../contracts/error_envelope/projector.mjs';
+
+test('typed runtime terminal reaches the WebSocket error envelope', async () => {
+  __enableTestRoot();
+  resetRoutes();
+  registerHandler('command', async () => { throw new CamoError({ code: 'E_RISK_BLOCKED' }); });
+  const env = buildEnvelope({ kind: 'command', id: 'risk', payload: {} });
+  const sent = [];
+  await handleFrame({ text: JSON.stringify(env), send: value => sent.push(value) });
+  assert.equal(sent[0].kind, 'error');
+  assert.equal(sent[0].payload.terminal, 'risk_blocked');
+});
 
 test('positive: registerHandler routes a command envelope to result', async () => {
   __enableTestRoot();

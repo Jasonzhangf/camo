@@ -2,6 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CamoError, project, toWire, knownCodes, getSpec } from '../../../contracts/error_envelope/projector.mjs';
 
+test('runtime failure terminals survive error projection', () => {
+  for (const [code, terminal] of Object.entries({
+    E_GRAPH_INVALID: 'graph_invalid', E_RISK_BLOCKED: 'risk_blocked',
+    E_IO_TIMEOUT: 'operation_timeout', E_LOGIN_INVALID: 'login_invalid',
+  })) {
+    const error = new CamoError({ code });
+    assert.equal(error.terminal, terminal);
+    assert.equal(toWire(error).terminal, terminal);
+  }
+});
+
 test('positive: E_INPUT_MISSING_FIELD projects to expected wire form', () => {
   const ce = new CamoError({ code: 'E_INPUT_MISSING_FIELD', details: { field: 'profileId' } });
   const out = project(ce);

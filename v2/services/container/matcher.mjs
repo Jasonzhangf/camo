@@ -11,7 +11,28 @@
 
 import { CamoError } from '../../contracts/error_envelope/projector.mjs';
 
-const ALLOWED_ROLES = new Set(['button', 'link', 'textbox', 'tab', 'item', 'generic']);
+const ALLOWED_ROLES = new Set([
+  'button',
+  'link',
+  'textbox',
+  'tab',
+  'checkbox',
+  'radio',
+  'combobox',
+  'listbox',
+  'item',
+  'generic',
+  'navigation',
+  'main',
+  'article',
+  'banner',
+  'contentinfo',
+  'form',
+  'list',
+  'listitem',
+  'heading',
+  'img',
+]);
 
 function normalizeRole(role) {
   const r = String(role || '').trim().toLowerCase();
@@ -54,18 +75,28 @@ function normalizeSnapshot(snapshot) {
     }
     const visible = c.visible !== false;
     const vp = c.viewport && typeof c.viewport === 'object' ? c.viewport : null;
-    let inViewport = true;
+    const bounds = c.bounds && typeof c.bounds === 'object' ? c.bounds : {};
+    let inViewport = c.inViewport !== false;
     if (vp && Number.isFinite(vp.width) && Number.isFinite(vp.height)) {
-      const x = Number(c.x ?? 0);
-      const y = Number(c.y ?? 0);
-      const w = Number(c.width ?? 0);
-      const h = Number(c.height ?? 0);
+      const x = Number(c.x ?? bounds.x ?? 0);
+      const y = Number(c.y ?? bounds.y ?? 0);
+      const w = Number(c.width ?? bounds.width ?? 0);
+      const h = Number(c.height ?? bounds.height ?? 0);
       inViewport = x + w > 0 && y + h > 0 && x < vp.width && y < vp.height;
     }
+    const domId = c.id == null ? null : String(c.id);
     return {
-      id: c.id == null ? null : String(c.id),
+      id: domId,
+      ref: c.ref == null ? null : String(c.ref),
+      stableLocator: c.stableLocator == null ? null : String(c.stableLocator),
+      // `id` and `matchId` are DOM ids when the snapshot node exposes one.
+      // Snapshot refs stay a distinct control identity and are not silently
+      // reinterpreted as a DOM id for callers that omit the element id.
+      matchId: domId,
       role: c.role == null ? null : String(c.role).toLowerCase(),
-      text: c.text == null ? '' : String(c.text),
+      text: c.text == null ? (c.nameText == null ? (c.name == null ? '' : String(c.name)) : String(c.nameText)) : String(c.text),
+      nameText: c.nameText == null ? (c.name == null ? '' : String(c.name)) : String(c.nameText),
+      bounds: c.bounds && typeof c.bounds === 'object' ? c.bounds : null,
       visible,
       inViewport,
     };
@@ -73,12 +104,12 @@ function normalizeSnapshot(snapshot) {
 }
 
 function scoreMatch(container, q) {
-  if (q.id != null && container.id !== q.id) return 0;
+  if (q.id != null && container.matchId !== q.id) return 0;
   if (q.role != null && container.role !== q.role) return 0;
   if (q.text != null) {
     if (!container.text || !container.text.includes(q.text)) return 0;
   }
-  if (q.within != null && container.id !== q.within) return 0;
+  if (q.within != null && container.matchId !== q.within) return 0;
   if (!container.visible) return 0;
   if (!container.inViewport) return 0;
   if (q.text != null && container.text === q.text) return 2;

@@ -8,7 +8,7 @@
 2. 项目任务管理统一使用 `bd`，包括任务创建、拆解、状态更新与关闭，避免多套任务源并行导致状态不一致。
 3. **仓库边界（强制）**：
    - `camo` 仓库路径：`~/Documents/code/camo`（当前仓库）。
-   - `camo` 只承载通用能力（runtime/会话/路径解析/CLI 基础设施），不承载具体业务编排与平台策略（如 XHS 业务流程、点赞/评论业务规则）——业务编排由调用方（其他应用）负责，不得把业务代码合并回 `camo`。
+   - `camo` 只承载通用能力（runtime/会话/路径解析/CLI 基础设施），默认不通过默认 bd bot 声明 webauto 业务；具体业务编排与平台策略（如 XHS 业务流程、点赞/评论业务规则）由调用方 webauto 仓库负责，不得把业务代码合并回 `camo`。
 4. **执行链路约束（强制）**：
    - 所有用户操作必须统一基于 `camo CLI / camo runtime`，禁止旁路实现。
    - 禁止 hack 行为：禁止 DOM `click()`、JS `scrollTo/scrollBy`、`history.back`、`value=` 注入输入等。
@@ -23,5 +23,12 @@
    - 除非用户明确要求，不做兜底。
    - 团队硬约束原文：`兜底死全家`。
 
+7. **camo runtime DAG（强制）**：
+   - camo 底层能力以 `v2/docs/dagpipe/camo-runtime.graph.json` 为 SESE DAG 真源，执行 `dagpipe graph validate v2/docs/dagpipe/camo-runtime.graph.json` 必须 PASS。
+   - camo 内不引入 webauto 业务 DAG/XHS/Weibo 业务逻辑；业务编排由调用方负责。
+   - autoscript runner 必须先通过 `dagpipe graph validate` 再进入页面层；校验失败返回 `E_GRAPH_INVALID`，禁止绕过。
+8. **snapshot（强制）**：
+   - `camo snapshot` 默认返回机器可读语义 JSON（`snapshotId`/`documentId`/`url`/`title`/`viewport`/`window`/`tree.nodes`）。
+   - raw HTML 仅在显式 `camo snapshot --raw-dom` 时返回；stale/ambiguous ref 报 typed error，禁止静默回退到 HTML/截图。
 
 我们遇到 camo 的问题不要走回退或则加 patch，要找原因，解决问题

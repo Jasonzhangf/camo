@@ -110,7 +110,6 @@ export function boot({ profileId, headless, mode } = {}) {
             { id: 'session.create',  target: 'services/session/manager.mjs' },
             { id: 'tab_pool.ensure', target: 'services/page_runtime/tab_pool.mjs' },
             { id: 'display.read',    target: 'services/display/resolver.mjs' },
-            { id: 'autoscript.start',target: 'services/autoscript/runner.mjs' },
         ],
         startedAt: new Date().toISOString(),
         dryRun: true,
