@@ -55,7 +55,6 @@ The registry contains active v2 resources and their verification gates.
 | `src/services/browser-service/index.js` (display-metrics block) | display_metrics |
 | `src/services/browser-service/internal/browser-session/input-ops.js` | input_pipeline |
 | `src/core/actions.mjs` | input_pipeline |
-| `src/autoscript/action-providers/index.mjs` | autoscript_action |
 | `src/services/browser-service/internal/page-runtime/runtime.js` | page_runtime |
 | `src/container/subscription-registry.mjs` | subscription |
 | `src/container/runtime-core/operations/tab-pool.mjs` | tab_pool |

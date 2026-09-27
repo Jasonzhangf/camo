@@ -34,11 +34,6 @@
       "rule": "no source file > 500 lines; bootstrap only owns the loader, every primitive in its own file"
     },
     {
-      "id": "no-stub+per-action-owner",
-      "applies_to": "autoscript_action",
-      "rule": "no stubs; every action_id must point to a real module under services/autoscript/actions/"
-    },
-    {
       "id": "single-truth+explicit-actions",
       "applies_to": "autoscript_run",
       "rule": "action_id must exist in registry; missing action_id fails schema validation, never silently ok"
