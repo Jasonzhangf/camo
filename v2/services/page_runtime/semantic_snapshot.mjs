@@ -101,7 +101,6 @@ const EXTRACTION = function extractSemanticSnapshot() {
       if (parts.length) return parts.join(' ').slice(0, 160);
     }
     if (el.tagName === 'INPUT') {
-      if (el.value != null && String(el.value).trim()) return String(el.value).trim().slice(0, 160);
       if (el.getAttribute && el.getAttribute('placeholder')) return String(el.getAttribute('placeholder')).trim().slice(0, 160);
       return '';
     }

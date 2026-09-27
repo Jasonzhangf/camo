@@ -118,6 +118,30 @@ test('stableLocator escapes a leading hyphen before a digit', async () => {
   assert.equal(result.tree.nodes[0].stableLocator, '#\\2d \\31 ');
 });
 
+test('password input values are never used as accessible names', async () => {
+  const element = {
+    tagName: 'INPUT',
+    type: 'password',
+    value: 'super-secret',
+    getAttribute: (name) => (name === 'type' ? 'password' : name === 'placeholder' ? 'Password' : null),
+    getBoundingClientRect: () => ({ x: 11, y: 12, width: 40, height: 20, left: 11, top: 12, right: 51, bottom: 32 }),
+  };
+  const page = pageFor({
+    document: {
+      title: 'Secrets',
+      getElementById: () => null,
+      documentElement: { ...element, querySelectorAll: () => [element] },
+    },
+    window: { innerWidth: 100, innerHeight: 100, location: { href: 'about:blank' } },
+    getComputedStyle: () => ({ display: 'block', visibility: 'visible' }),
+  });
+  const result = await capture(page);
+  assert.equal(result.tree.nodes[0].role, 'textbox');
+  assert.equal(result.tree.nodes[0].name, 'Password');
+  assert.equal(result.tree.nodes[0].nameText, 'Password');
+  assert.equal(JSON.stringify(result).includes('super-secret'), false);
+});
+
 test('stableLocator escapes data-testid and aria-label attribute values', async () => {
   const byTestId = {
     tagName: 'BUTTON',
