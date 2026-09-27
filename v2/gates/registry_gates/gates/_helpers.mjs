@@ -40,7 +40,6 @@ export function v1Shadows(forbiddenPath) {
     'v2/services/browser_service/internal/browser_session/input_ops.js': 'src/services/browser-service/internal/browser-session/input-ops.js',
     'v2/services/browser_service/index.js': 'src/services/browser-service/index.js',
     'v2/core/actions.mjs':                                'src/core/actions.mjs',
-    'v2/autoscript/action_providers/index.mjs':           'src/autoscript/action-providers/index.mjs',
     'v2/container/runtime_core/search.mjs':               'src/container/runtime-core/search.mjs',
     'v2/container/subscription_registry.mjs':             'src/container/subscription-registry.mjs',
     'v2/operations/tab_pool.mjs':                         'src/container/runtime-core/operations/tab-pool.mjs',

@@ -16,7 +16,7 @@ Status: rebuilding from `v2/resources/registry/` truth.
 | 2h | services/container matcher | matcher.mjs | unit |
 | 2i | services/subscription registry | registry.mjs | unit |
 | 2j | services/page_runtime tab_pool + input_pipeline | both modules | unit |
-| 2k | services/autoscript runner + actions/<id> | runner + 4 sample actions | unit + schema |
+| 2k | services/autoscript runner | compiled_runner + SESE DAG | unit + schema |
 | 2l | services/browser_service process | bootstrap that owns services above | unit |
 | 3a | contracts/{ws,http}_messages | type-lock schemas + builders/parsers | unit |
 | 3b | transports/{ws,http,client,daemon} | thin transports | unit |

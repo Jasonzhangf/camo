@@ -157,14 +157,6 @@
       "status": "active"
     },
     {
-      "id": "services.autoscript.actions",
-      "layer": "L2_service",
-      "owned_paths": [
-        "v2/services/autoscript/actions/**"
-      ],
-      "status": "active"
-    },
-    {
       "id": "services.daemon_registration",
       "layer": "L2_service",
       "owned_paths": [

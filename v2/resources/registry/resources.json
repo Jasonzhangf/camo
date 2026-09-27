@@ -481,27 +481,6 @@
       "status": "active"
     },
     {
-      "resource_id": "autoscript_action",
-      "display_name": "Autoscript action provider",
-      "layer": "L2_service",
-      "truth_owner": "v2/services/autoscript/actions",
-      "truth_store": "code_registry",
-      "truth_path": "v2/services/autoscript/actions/<actionId>.mjs",
-      "read_paths": [
-        "v2/contracts/operations/registry.json::validate"
-      ],
-      "write_paths": [
-        "v2/services/autoscript/actions/<actionId>.mjs::run"
-      ],
-      "indirect_paths": [],
-      "forbidden_paths": [
-        "v2/autoscript/action_providers/index.mjs::stub"
-      ],
-      "verification_gate": "registry.resources.autoscript_action",
-      "policy_id": "no-stub+per-action-owner",
-      "status": "active"
-    },
-    {
       "resource_id": "progress_event",
       "display_name": "Progress / event stream",
       "layer": "L2_service",

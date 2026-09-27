@@ -255,16 +255,6 @@
       ]
     },
     {
-      "id": "autoscript.action",
-      "owner_resource": "autoscript_action",
-      "positive": [
-        "v2/tests/unit/services/autoscript.actions.test.mjs"
-      ],
-      "negative": [
-        "v2/tests/unit/services/autoscript.actions.test.mjs"
-      ]
-    },
-    {
       "id": "progress.append",
       "owner_resource": "progress_event",
       "positive": [

@@ -221,12 +221,6 @@
     },
     {
       "from": "services.autoscript",
-      "to": "services.autoscript.actions",
-      "kind": "call",
-      "reason": "delegate to per-action owner"
-    },
-    {
-      "from": "services.autoscript",
       "to": "services.progress_event",
       "kind": "call",
       "reason": "append run event"
@@ -314,12 +308,6 @@
       "to": "contracts.error_envelope",
       "kind": "call",
       "reason": "raise typed autoscript errors"
-    },
-    {
-      "from": "services.autoscript.actions",
-      "to": "contracts.error_envelope",
-      "kind": "call",
-      "reason": "raise typed action errors"
     },
     {
       "from": "services.browser_service",
